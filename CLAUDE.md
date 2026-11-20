@@ -1296,6 +1296,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   method** (`mcp-end-to-end.test.js`), hence POST on
   `/test-requests` and GET on `/test-requests/{id}`; each new GET needs its
   MCP tool, and `OSCAR_MCP/tests` count and list the tools.
+  **PR 4 (1.11.559): named suites** (`test_suite`, migration 60; unique
+  `(company_id, lower(name))`). `utils/testSuites.js`: `suiteOf()`
+  (selection and/or codes) and `suiteCodes()` (the selection's codes, then
+  the listed ones the provider has; the rest `not_found`).
+  `/v1/company/test-suites` (Test Managers write, members read), the Run
+  page's card (`public/js/test-suites.js` reads the page's own top-level
+  `runSelection`, so it is loaded **after** the page's inline script),
+  `GET /v1/api/suites` (+ MCP `oscar_list_suites`), and `suite` in a test
+  request (resolved by name in the account's company before planning).
 - **A page of runs is cut by runs, a batch must not be** (#986, 1.11.409).
   The dashboard groups `GET /v1/runs?limit=100` by batch, so a batch of 301
   read "100 scenarios". `whole_batches=1` adds the rest of each batch on the

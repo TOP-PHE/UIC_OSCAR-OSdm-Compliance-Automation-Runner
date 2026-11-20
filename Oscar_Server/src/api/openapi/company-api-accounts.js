@@ -92,7 +92,7 @@ module.exports = {
   },
   '/v1/api/test-requests': {
     post: { tags: ['API'], summary: 'Run scenarios on one or more providers, as a Company API account (#1342)', security: [{ apiAccountAuth: ['runs:write'] }],
-      description: `A Company API account's access token with runs:write; a read-only key gets 403. Body: { providers: [company or provider id] (1 to 20), scenarios: [code] (1 to 500) or selection (the Run page's: categories, groups, forms, modes, lastRun), reference (your own id, at most 100 characters) }. Header Idempotency-Key (optional, 8 to 100 of letters, digits, . _ : -): the same key and request answer the same test request (200); with another request, 422. Every provider is checked before anything is queued: one the account is not given is 404; an endpoint suspended, or the account's credentials, the endpoint or the data file missing there is 409, naming the provider (and \`missing\`). The account runs the company's shared scenarios, never a tester's own; a code a provider does not have is listed in its not_found. One batch per provider. Answer 202 with Location and the test request (as GET). 30 requests in 10 minutes per account.`,
+      description: `A Company API account's access token with runs:write; a read-only key gets 403. Body: { providers: [company or provider id] (1 to 20), scenarios: [code] (1 to 500) or selection (the Run page's: categories, groups, forms, modes, lastRun) or suite (the name of one of the company's suites, GET /v1/api/suites; 404 if none has it), reference (your own id, at most 100 characters) }. Header Idempotency-Key (optional, 8 to 100 of letters, digits, . _ : -): the same key and request answer the same test request (200); with another request, 422. Every provider is checked before anything is queued: one the account is not given is 404; an endpoint suspended, or the account's credentials, the endpoint or the data file missing there is 409, naming the provider (and \`missing\`). The account runs the company's shared scenarios, never a tester's own; a code a provider does not have is listed in its not_found. One batch per provider. Answer 202 with Location and the test request (as GET). 30 requests in 10 minutes per account.`,
       requestBody: jsonBody('{ providers, scenarios | selection, reference }'),
       responses: { 200: { description: 'The test request already made with this Idempotency-Key' }, 202: { description: 'The test request, queued' }, 400: { description: 'A bad body, or nothing would run' }, 401: { description: 'No valid token' }, 403: { description: 'A read-only key, or a token without runs:write' }, 404: { description: 'A provider unknown or not given to the account' }, 409: { description: 'A provider cannot run now' }, 422: { description: 'The Idempotency-Key was used for another request' }, 429: { description: 'Too many requests' } } },
   },
@@ -101,5 +101,29 @@ module.exports = {
       description: 'The account\'s own test requests only (another\'s, or a key, is 404). ?wait=<seconds> (0 to 60) answers as soon as the request is finished, or at the end of the wait; an account holds five waits at a time, and a sixth call answers at once. { id, reference, created_at, asked, state (queued | running | finished), verdict (null until finished; passed | failed | incomplete), counts: { queued, running, passed, failed, not_a_result, cancelled }, providers: [{ id, name, batch_id, not_found, state, verdict, counts, runs: [{ id, scenario_code, state, verdict (passed | failed | not_a_result | cancelled), reason, checks: { total, passed, failed }, queued_at, started_at, completed_at, run_url }] }] }. A pipeline is green on verdict passed only. No body, log or person is answered: run_url opens the run in OSCAR.',
       parameters: [pathParam('id', 'The test request')],
       responses: { 200: { description: 'The test request' }, 400: { description: 'wait is not 0 to 60' }, 401: { description: 'No valid token' }, 404: { description: 'No such test request of this account' } } },
+  },
+  '/v1/api/suites': {
+    get: { tags: ['API'], summary: 'The named suites a Company API account may ask by name (#1342)', security: [{ apiAccountAuth: ['runs:read'] }],
+      description: 'The suites of the account\'s company: { suites: [{ name, selection, codes, created_at, updated_at }] }. A suite holds a selection (the Run page\'s filters), a list of codes, or both; POST /v1/api/test-requests with { suite: name } runs, on each provider, the codes its selection keeps and the codes it lists. A read-only key gets 404.',
+      responses: { 200: { description: 'The suites' }, 401: { description: 'No valid token' }, 404: { description: 'A read-only key' } } },
+  },
+  '/v1/company/test-suites': {
+    get: { tags: ['Company'], summary: 'The named suites of the company (#1342)', security: bearer,
+      description: 'Members of the company (the request\'s company, or the distributor of the provider it names); administrators and certifiers get 403. { company: { id, name }, suites: [{ id, name, selection, codes, created_by, created_at, updated_at }] }, by name.',
+      responses: { 200: { description: 'The suites' }, 403: { description: 'Administrators and certifiers' } } },
+    post: { tags: ['Company'], summary: 'Save a named suite (#1342)', security: bearer,
+      description: 'Test Managers only. Body: { name (1-60 characters, unique in the company without case), selection (the Run page\'s), codes (1 to 500) }: a selection, a list of codes, or both. At most 100 a company. Answer 201, the suite.',
+      requestBody: jsonBody('{ name, selection, codes }'),
+      responses: { 201: { description: 'The suite' }, 400: { description: 'A bad name, selection or list, or neither' }, 403: { description: 'Not a Test Manager' }, 409: { description: 'The name is taken, or 100 suites' } } },
+  },
+  '/v1/company/test-suites/{id}': {
+    patch: { tags: ['Company'], summary: 'Change a named suite (#1342)', security: bearer,
+      description: 'Test Managers only. Any of name, selection, codes (null removes it); the suite as it would be is checked whole.',
+      parameters: [pathParam('id', 'The suite')], requestBody: jsonBody('{ name, selection, codes }'),
+      responses: { 200: { description: 'The suite' }, 400: { description: 'The suite would not be valid' }, 403: { description: 'Not a Test Manager' }, 404: { description: 'No such suite here' }, 409: { description: 'The name is taken' } } },
+    delete: { tags: ['Company'], summary: 'Delete a named suite (#1342)', security: bearer,
+      description: 'Test Managers only. Test requests already made keep what they asked.',
+      parameters: [pathParam('id', 'The suite')],
+      responses: { 200: { description: 'Deleted' }, 403: { description: 'Not a Test Manager' }, 404: { description: 'No such suite here' } } },
   },
 };

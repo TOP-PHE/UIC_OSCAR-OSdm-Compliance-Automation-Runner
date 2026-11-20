@@ -77,7 +77,7 @@ test('a client session: initialize, list, call; only GETs to /v1/api, with the k
   assert.equal(code, 0);
   const byId = Object.fromEntries(answers.map(a => [a.id, a]));
   assert.equal(byId[1].result.serverInfo.name, 'oscar');
-  assert.equal(byId[2].result.tools.length, 7);
+  assert.equal(byId[2].result.tools.length, 8);
   assert.deepEqual(JSON.parse(byId[3].result.content[0].text).runs, [{ id: 'r1', status: 'FAILED' }]);
   assert.equal(byId[4].result.isError, false);
   assert.match(byId[5].result.content[0].text, /HTTP 404\. No such run\./);

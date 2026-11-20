@@ -576,6 +576,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.559] — 2026-11-20
+
+API for test automation, part 4 (#1342): named suites. Not released on its own: listed in `compatibility.json` (2026.598) without moving `current_release`.
+
+### Why
+A company's test automation asks for a series of tests. #1342 chose named suites over tags on scenarios: a tag would live in every provider's data file and be kept in step there, and a tester cannot tag a Test Manager's scenario. A suite is written once for the company and applies to every provider.
+
+### Added
+- **A named suite** (`test_suite`, migration 60; rules `utils/testSuites.js`): a name unique in the company without case, and a selection (the Run page's filters, always cut from every scenario seen), a list of scenario codes (1 to 500), or both. At most 100 a company.
+- **`/v1/company/test-suites`**: the company's suites (the distributor of a provider the request names). Test Managers save, change (checked whole) and delete them; testers read them; administrators and certifiers get 403.
+- **The Run page's card *Named suites***: a Test Manager saves the selection the panel shows under a name (`public/js/test-suites.js`, loaded after the page's own script), and deletes a suite; testers see the list.
+- **`GET /v1/api/suites`** (scope `runs:read`): the suites a Company API account may ask. **`POST /v1/api/test-requests` takes `suite`** (a name, found without case) instead of `scenarios` or `selection`: on each provider, the codes its selection keeps, then the codes it lists that the provider has; the others are named in `not_found`. The batch keeps the suite's selection, as the Run page's batches do. An unknown name is 404 and says where suites are listed. `asked.suite` names it in the answer.
+- **MCP tool `oscar_list_suites`**.
+
 ## [server-1.11.558] — 2026-11-20
 
 API for test automation, part 3 (#1342): a Company API account launches tests and reads their verdicts. Not released on its own: listed in `compatibility.json` (2026.597) without moving `current_release`.

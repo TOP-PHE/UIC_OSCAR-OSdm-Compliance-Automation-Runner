@@ -14,7 +14,7 @@
  * scopes checked there.
  *
  *   POST /v1/api/test-requests        — run scenarios on one or more providers (runs:write)
- *     { providers: [id], scenarios: [code] | selection: {…}, reference }
+ *     { providers: [id], scenarios: [code] | selection: {…} | suite: name, reference }
  *     Idempotency-Key: <key>  (optional: asked again, the same answer)
  *   GET  /v1/api/test-requests/:id    — its state and verdicts (runs:read)
  *     ?wait=<seconds>  (at most 60: answers as soon as it is finished; five
@@ -40,6 +40,7 @@ const { facetsFor } = require('../helpers/runCandidates');
 const { visibleCodes } = require('../../utils/datafileOwnership');
 const RF = require('../../utils/runFilters');
 const TR = require('../../utils/testRequests');
+const S = require('../../utils/testSuites');
 const Tokens = require('../../utils/apiAccessTokens');
 
 // Per account: a CI pipeline asks a few times an hour.
@@ -91,7 +92,7 @@ function requestAnswer(row, base) {
     id: row.id,
     reference: row.reference,
     created_at: row.created_at,
-    asked: { scenarios: asked.scenarios || null, selection: asked.selection || null },
+    asked: { scenarios: asked.scenarios || null, selection: asked.selection || null, suite: asked.suite || null },
     ...TR.summaryOf(everyRun),
     providers,
   };
@@ -112,6 +113,12 @@ function providerRefusal(companyId, [status, body]) {
 async function codesFor(request, companyId, datafile, seen, user) {
   if (request.scenarios) {
     return { codes: request.scenarios.filter(c => seen.includes(c)), notFound: request.scenarios.filter(c => !seen.includes(c)) };
+  }
+  if (request.suiteFound) {
+    // A suite: the codes its selection keeps, then the codes it lists (#1342 PR 4).
+    const suite = request.suiteFound;
+    const selected = suite.selection ? RF.selectCodes(await facetsFor(companyId, datafile, seen, user), suite.selection) : null;
+    return S.suiteCodes(suite, seen, selected);
   }
   return { codes: RF.selectCodes(await facetsFor(companyId, datafile, seen, user), request.selection), notFound: [] };
 }
@@ -135,6 +142,15 @@ async function plansFor(request, req) {
   return { plans };
 }
 
+// A suite is the company's, asked by its name (without case): found, it is
+// request.suiteFound and the answer is true.
+function findSuite(request, account) {
+  const found = get('SELECT selection, codes FROM test_suite WHERE company_id = ? AND lower(name) = lower(?)', [account.companyId, request.suite]);
+  if (!found) return false;
+  request.suiteFound = { selection: found.selection ? JSON.parse(found.selection) : null, codes: found.codes ? JSON.parse(found.codes) : null };
+  return true;
+}
+
 // A request asked again with its Idempotency-Key: the same answer (200), or a refusal.
 function answerAgain(res, earlier, hash, base) {
   if (earlier.request_hash !== hash) return problem(res, 422, 'Unprocessable Entity', 'This Idempotency-Key was used for another request.');
@@ -147,7 +163,9 @@ function queueAll(plans, account, request) {
   return plans.map((p) => {
     if (p.codes.length === 0) return { company_id: p.companyId, batch_id: null, not_found: p.notFound };
     const { company, credentials, concurrentLimit } = p.ready;
-    const made = enqueueBatch({ companyId: p.companyId, userId: account.id, company, credentials, codes: p.codes, concurrentLimit, selection: request.selection });
+    // The batch keeps what it was chosen by: the selection, or the suite's (#1342 PR 4).
+    const made = enqueueBatch({ companyId: p.companyId, userId: account.id, company, credentials, codes: p.codes, concurrentLimit,
+      selection: request.selection || request.suiteFound?.selection || undefined });
     return { company_id: p.companyId, batch_id: made.batchId, not_found: p.notFound };
   });
 }
@@ -169,10 +187,14 @@ async function launchHandler(req, res) {
   const earlier = key ? get('SELECT * FROM test_request WHERE user_id = ? AND idempotency_key = ?', [account.id, key]) : null;
   if (earlier) return answerAgain(res, earlier, hash, base);
 
+  if (request.suite && !findSuite(request, account)) {
+    return problem(res, 404, 'Not Found', `Your company has no suite named "${request.suite}". GET /v1/api/suites lists them.`);
+  }
+
   const planned = await plansFor(request, req);
   if (planned.refusal) return res.status(planned.refusal[0]).json(planned.refusal[1]);
   if (planned.plans.every(p => p.codes.length === 0)) {
-    return problem(res, 400, 'Bad Request', 'Nothing would run: no scenario asked is on any provider named, or the selection keeps none.',
+    return problem(res, 400, 'Bad Request', 'Nothing would run: no scenario asked is on any provider named, or the selection or suite keeps none.',
       { not_found: planned.plans.map(p => ({ provider: p.companyId, codes: p.notFound })) });
   }
 
@@ -181,7 +203,7 @@ async function launchHandler(req, res) {
   try {
     run(`INSERT INTO test_request (id, user_id, company_id, reference, idempotency_key, request_hash, request)
          VALUES (?, ?, ?, ?, ?, ?, ?)`, [id, account.id, account.companyId, request.reference, key, hash,
-      JSON.stringify({ providers: request.providers, scenarios: request.scenarios, selection: request.selection })]);
+      JSON.stringify({ providers: request.providers, scenarios: request.scenarios, selection: request.selection, suite: request.suite })]);
   } catch {
     return problem(res, 409, 'Conflict', 'This Idempotency-Key was just used: ask again in a moment.');
   }

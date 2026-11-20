@@ -4,6 +4,17 @@
   "current_release": "2026.594",
   "releases": [
     {
+      "release": "2026.598",
+      "date": "2026-11-20",
+      "server": "1.11.559",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.559: API for test automation, part 4 (#1342): named suites. A suite belongs to the company and holds a selection (the Run page's filters), a list of scenario codes, or both. Test Managers save the Run page's selection as a suite (card Named suites) or use /v1/company/test-suites (list, save, change, delete; testers read them). A Company API account lists them on GET /v1/api/suites and asks one by name: POST /v1/api/test-requests { suite } runs, on each provider, the codes its selection keeps and the codes it lists, those a provider lacks named; an unknown name is 404. Migration 60 (test_suite). MCP tool oscar_list_suites. Listed, not released."
+      ]
+    },
+    {
       "release": "2026.597",
       "date": "2026-11-20",
       "server": "1.11.558",

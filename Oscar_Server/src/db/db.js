@@ -1347,6 +1347,22 @@ const MIGRATIONS = [
       db.exec('CREATE INDEX IF NOT EXISTS idx_test_request_user ON test_request(user_id, created_at)');
       db.exec('CREATE INDEX IF NOT EXISTS idx_test_request_company ON test_request(company_id)');
   }},
+  { version: 60, name: 'test-suites', up: () => {
+      // #1342 PR 4 - a named suite: a series of tests the distributor names
+      // once and asks by its name through the API. A selection (the Run
+      // page's filters), a list of codes, or both, as JSON.
+      db.exec(`CREATE TABLE IF NOT EXISTS test_suite (
+        id          TEXT PRIMARY KEY,
+        company_id  TEXT NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+        name        TEXT NOT NULL,
+        selection   TEXT,
+        codes       TEXT,
+        created_by  TEXT REFERENCES users(id) ON DELETE SET NULL,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at  TEXT
+      )`);
+      db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_test_suite_name ON test_suite(company_id, lower(name))');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is
