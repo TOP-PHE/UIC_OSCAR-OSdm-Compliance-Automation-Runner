@@ -590,7 +590,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-1.11.562] — 2026-11-21
 
-Release 2026.601 (`current_release`). Two points of the API Accounts and API Config pages, from the first set-up of a Company API account (#1351).
+Release 2026.601 (`current_release`). Three points found during the first set-up of a Company API account (#1351): the API Accounts and API Config pages, and the JUnit report.
 
 ### Fixed
 - **API Accounts: the provider names ran into their checkboxes** (#1351). The page's shared styles give every `input` the full width and every `label` upper case on a line of its own; the provider boxes undid only the line, so each checkbox stretched across its name ("BEN☐AILBETA"). A box now draws its checkbox at its own size, then the name as it was typed, on one line, and the boxes wrap as whole items.
@@ -601,6 +601,11 @@ Release 2026.601 (`current_release`). Two points of the API Accounts and API Con
   - Saved secrets still never reach the page ("leave blank to keep current"): the button shows what is typed there, and the token URL and scope the page already held.
   - The button never submits, names the field it controls (`aria-controls`) and says whether the text is shown (`aria-pressed`).
   - The same page opened for a Company API account's credentials has it too.
+
+### Changed
+- **The JUnit XML of a test request is written to be read** (#1351, maintainer's report). `…/results?format=junit` wrote every element on one line, so a file opened in an editor was one long line cut only by the texts' own line breaks. It now writes one element a line, indented two spaces a level (`pad()`, `caseLines()` in `junitReport.js`).
+  - The text of `<failure>` and `<system-out>` is unchanged, line breaks included. CI tools ignore the space between elements.
+  - Proved the same document: on 100,000 drawn results, the new report with the space between elements taken out equals the old one.
 
 ---
 

@@ -40,3 +40,29 @@ test('each verdict becomes its element; a run not finished is skipped', () => {
   expect(out).toContain('<system-out>Known deviation: 03 returned HTTP 501\nw\n… more warnings in OSCAR</system-out>');
   expect(out).toContain('<property name="run_url" value="https://o/r1"/>');
 });
+
+test('#1351: one element a line, two spaces a level; the texts keep their own line breaks', () => {
+  const out = junitOf({ id: 'T', reference: null, providers: [{ id: 'p', name: 'P', runs: [
+    { id: 'r1', scenario_code: 'A', verdict: 'failed', run_url: 'https://o/r1', failures: [{ step: '05', check: 'c', message: 'm' }], warnings: [{ step: '05', message: 'w1' }] },
+  ] }] });
+  expect(out.split('\n')).toEqual([
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<testsuites name="OSCAR test request T" tests="1" failures="1" errors="0" skipped="0">',
+    '  <testsuite name="P" id="p" tests="1" failures="1" errors="0" skipped="0">',
+    '    <testcase classname="P" name="A" time="0">',
+    '      <properties>',
+    '        <property name="verdict" value="failed"/>',
+    '        <property name="run_id" value="r1"/>',
+    '        <property name="run_url" value="https://o/r1"/>',
+    '      </properties>',
+    '      <failure message="05: c — m" type="failed">05: c — m</failure>',
+    '      <system-out>05: w1',
+    'Run in OSCAR: https://o/r1</system-out>',
+    '    </testcase>',
+    '  </testsuite>',
+    '</testsuites>',
+    '',
+  ]);
+  // No provider: the suites element still closes on a line of its own.
+  expect(junitOf({ id: 'E', providers: [] })).toMatch(/skipped="0">\n<\/testsuites>\n$/);
+});
