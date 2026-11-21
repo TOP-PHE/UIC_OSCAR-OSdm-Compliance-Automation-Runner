@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A production smoke test through the test automation API** (#1359). CI and documentation, no version.
+  - `.github/workflows/production-smoke.yml`: after each successful promotion, and every morning, production is asked for three GAMMA scenarios through the API by the example client, as a company's CI would. After a promotion it first waits until `/health` shows the promoted release (Watchtower takes about five minutes). The client's report is the job's summary, and its exit code the verdict.
+  - A Company API account of its own in *UIC Simulateurs*, given GAMMA only, and a GitHub environment of its own, `oscar-smoke` (no reviewer, `main` only): never `production`, which asks a reviewer. Without its secrets the job says so and passes.
+  - Set-up and what to look at when it is red: *OSCAR - Production smoke test*.
+
 - **The example client takes the Run page's filters as options** (#1357, maintainer's request, after #1355). A tool, its README and the guide, no version.
   - `--categories`, `--modes`, `--groups`, `--forms` (each a list, upper or lower case, given once or several times), `--last-run`, and `--run-list` for each provider's own run list. They build the same selection as a `--selection` file, so no JSON is typed on a command line (Windows PowerShell 5.1 drops its inner quotes).
   - An unknown value stops the tool with the values OSCAR knows. The values are OSCAR's own: a test pins them to `runFilters.js` and `capabilities.js` when the repository is there.

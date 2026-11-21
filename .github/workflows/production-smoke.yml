@@ -1,0 +1,109 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+name: Production smoke · OSCAR API
+
+# After each successful promotion, and every morning, asks production for a
+# few scenarios on a simulator through the test automation API, as a
+# company's CI would (#1359), with the example client OSCAR_API_TestTool/.
+# Red when production no longer runs a test from end to end: sign-in, queue,
+# runner, collection, results.
+#
+# Set-up: Documentation/Server_Operations/OSCAR - Production smoke test.md.
+# A Company API account of its own, in the simulators' company, and a GitHub
+# environment of its own, `oscar-smoke` (no reviewer, main only), holding
+# the secrets OSCAR_SMOKE_CLIENT_ID and OSCAR_SMOKE_PRIVATE_KEY, and
+# optionally the variables OSCAR_SMOKE_PROVIDER and OSCAR_SMOKE_SCENARIOS.
+# Never the `production` environment: it asks a reviewer before each job.
+# Without the secrets the job says so and passes.
+on:
+  workflow_run:
+    workflows: ['Promote · release tag → :stable image']
+    types: [completed]
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  OSCAR_URL: https://oscar.uic.org
+
+jobs:
+  smoke:
+    name: Smoke tests on production through the API
+    # After a promotion, only a successful one.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    environment: oscar-smoke
+    timeout-minutes: 75
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Wait for the promoted release to answer
+        # The promotion publishes :stable; Watchtower takes it within about
+        # five minutes. Values from the event go through the environment.
+        if: github.event_name == 'workflow_run'
+        env:
+          TAG: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+          WANT="${TAG#release-}"
+          if ! printf '%s' "$WANT" | grep -Eq '^[0-9]{4}\.[0-9]{1,6}$'; then
+            echo "Not a release tag: giving Watchtower six minutes, then testing what runs."
+            sleep 360
+            exit 0
+          fi
+          GOT=''
+          for _ in $(seq 1 40); do
+            GOT=$(curl -sf --max-time 15 "$OSCAR_URL/health" | jq -r '.release_label // empty' || true)
+            if [ "$GOT" = "$WANT" ]; then echo "Release $WANT answers."; exit 0; fi
+            sleep 30
+          done
+          echo "::error::Release $WANT did not answer within 20 minutes (it answers: ${GOT:-nothing})."
+          exit 1
+
+      - name: Smoke tests
+        working-directory: OSCAR_API_TestTool
+        env:
+          OSCAR_CLIENT_ID: ${{ secrets.OSCAR_SMOKE_CLIENT_ID }}
+          OSCAR_PRIVATE_KEY: ${{ secrets.OSCAR_SMOKE_PRIVATE_KEY }}
+          PROVIDER: ${{ vars.OSCAR_SMOKE_PROVIDER || 'GAMMA' }}
+          SCENARIOS: ${{ vars.OSCAR_SMOKE_SCENARIOS || 'SIM_SALE_SEARCH_1ADT_38,SIM_REFUND_RETURN_1ADT_38,SIM_EXCHANGE_1ADT_38' }}
+          RUN_KEY: gh-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -uo pipefail
+          if [ -z "$OSCAR_CLIENT_ID" ] || [ -z "$OSCAR_PRIVATE_KEY" ]; then
+            echo "::notice::The oscar-smoke environment holds no API account yet: nothing tested."
+            exit 0
+          fi
+          node oscar-test.js --provider "$PROVIDER" --scenarios "$SCENARIOS" \
+            --reference "GitHub smoke $GITHUB_RUN_ID" --idempotency-key "$RUN_KEY" \
+            --timeout 45 --junit smoke.xml 2>&1 | tee smoke.txt
+          CODE=${PIPESTATUS[0]}
+          {
+            echo "### OSCAR production smoke: exit $CODE"
+            echo
+            echo '```'
+            cat smoke.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$CODE"
