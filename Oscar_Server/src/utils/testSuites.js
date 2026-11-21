@@ -14,7 +14,8 @@
  * A suite belongs to the distributor and holds a selection (the Run page's
  * filters, utils/runFilters.js), a list of scenario codes, or both: it then
  * runs the codes the selection keeps and the codes listed. It is resolved on
- * each provider at each launch, so a suite of filters follows the data file;
+ * each provider at each launch, so a suite of filters follows the data file
+ * (with the run list as its base, each provider's own run list, #1353);
  * a list of codes names exactly what runs, and a code a provider does not
  * have is said, never a refusal. Tags on scenarios were not chosen: they would
  * live in every provider's data file (#1342, "Series").
@@ -40,7 +41,9 @@ function suiteOf(body) {
   if (b.selection !== undefined && b.selection !== null) {
     const problem = RF.selectionProblem(b.selection);
     if (problem) return { error: problem };
-    selection = RF.withDefaults({ ...b.selection, base: 'all' });
+    // Its base is kept (#1353): `list` runs, on each provider at each launch,
+    // that provider's run list (selectionBaseOf() in api-test-requests.js).
+    selection = RF.withDefaults(b.selection);
   }
   let codes = null;
   if (b.codes !== undefined && b.codes !== null) {

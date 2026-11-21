@@ -24,9 +24,10 @@ describe('requestOf()', () => {
       .toEqual({ providers: [P, Q], scenarios: ['A', 'B'], reference: 'ci 42' });
   });
 
-  test('a selection is cut from every scenario seen, whatever base it names', () => {
+  test('a selection keeps its base: the run list is each provider\'s at the launch (#1353)', () => {
     const r = TR.requestOf({ providers: [P], selection: { base: 'list', categories: ['happy'] } });
-    expect(r.selection.base).toBe('all');
+    expect(r.selection.base).toBe('list');
+    expect(TR.requestOf({ providers: [P], selection: { categories: ['happy'] } }).selection.base).toBe('all');
     expect(r.selection.categories).toEqual(['happy']);
   });
 

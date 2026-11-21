@@ -1305,6 +1305,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `runSelection`, so it is loaded **after** the page's inline script),
   `GET /v1/api/suites` (+ MCP `oscar_list_suites`), and `suite` in a test
   request (resolved by name in the account's company before planning).
+  **A suite or selection keeps its base** (#1353, 1.11.563): `base: 'list'`
+  is each provider's own run list at the launch (`selectionBaseOf()` in
+  `api-test-requests.js`: the data file's `scenariosToRun` among the shared
+  scenarios; none or ALL = every one), never a tester's personal list.
+  `suiteOf()` and `requestOf()` forced `all` until then.
   **PR 5 (1.11.560): results.** `GET /v1/api/test-requests/:id/results`
   (`?format=junit`, `utils/junitReport.js`): per run `failures` (problem
   code from an error answer's body, the code only), `warnings`

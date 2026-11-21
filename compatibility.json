@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.601",
+  "current_release": "2026.602",
   "releases": [
+    {
+      "release": "2026.602",
+      "date": "2026-11-21",
+      "server": "1.11.563",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.563 (#1353): a named suite saved with My run list, and a test request's selection with base \"list\", run on each provider that provider's own run list (the scenarios its Test Config selects, shared ones only; none set = every scenario), read at each launch. Until now both were cut from every scenario: suiteOf() and requestOf() replaced the base with \"all\". The suite's description on the Run page says \"run list of each provider\". A suite saved with My run list before this release holds \"all\" and must be saved again."
+      ]
+    },
     {
       "release": "2026.601",
       "date": "2026-11-21",

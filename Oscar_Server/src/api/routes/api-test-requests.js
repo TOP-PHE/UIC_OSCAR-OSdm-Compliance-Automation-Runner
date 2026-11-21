@@ -118,18 +118,29 @@ function providerRefusal(companyId, [status, body]) {
   return [code, { ...body, status: code, title: code === 404 ? 'Not Found' : 'Conflict', detail: `${name}: ${body.detail || body.title}`, provider: companyId }];
 }
 
+// The scenarios a selection is cut from on one provider (#1353). With the run
+// list as its base, that provider's run list as its Test Config sets it
+// (`scenariosToRun`; none set or ALL = every scenario), among those `seen`, in
+// the list's order: each provider runs its own. Else every scenario seen. A
+// tester's personal run list is never read: a suite is the company's.
+function selectionBaseOf(selection, datafile, seen) {
+  if (selection?.base !== 'list' || !Array.isArray(datafile.scenariosToRun)) return seen;
+  const known = new Set(seen);
+  return [...new Set(datafile.scenariosToRun)].filter(c => known.has(c));
+}
+
 // What one provider runs of the request, among the scenarios `seen` there: { codes, notFound }.
 async function codesFor(request, companyId, datafile, seen, user) {
   if (request.scenarios) {
     return { codes: request.scenarios.filter(c => seen.includes(c)), notFound: request.scenarios.filter(c => !seen.includes(c)) };
   }
+  const selectedBy = async selection => RF.selectCodes(await facetsFor(companyId, datafile, selectionBaseOf(selection, datafile, seen), user), selection);
   if (request.suiteFound) {
     // A suite: the codes its selection keeps, then the codes it lists (#1342 PR 4).
     const suite = request.suiteFound;
-    const selected = suite.selection ? RF.selectCodes(await facetsFor(companyId, datafile, seen, user), suite.selection) : null;
-    return S.suiteCodes(suite, seen, selected);
+    return S.suiteCodes(suite, seen, suite.selection ? await selectedBy(suite.selection) : null);
   }
-  return { codes: RF.selectCodes(await facetsFor(companyId, datafile, seen, user), request.selection), notFound: [] };
+  return { codes: await selectedBy(request.selection), notFound: [] };
 }
 
 async function plansFor(request, req) {

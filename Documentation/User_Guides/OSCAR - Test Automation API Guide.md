@@ -35,7 +35,8 @@ conformance tests through an API and reads their results. Issue #1342.
    **token endpoint** shown there: your automation needs both.
 4. **Optionally, name suites.** On the **Run** page, choose a selection and
    *Save the selection above as a suite* (card *Named suites*). The automation
-   then asks it by name.
+   then asks it by name. Saved with *My run list*, a suite runs on each provider
+   that provider's own run list, as its Test Config selects it.
 
 To stop an account at once, use **Suspend**. Every token it holds stops
 working, even after a resume, and its queued runs do not start. **Delete**
@@ -166,8 +167,14 @@ def oscar_token(oscar, client_id, key_file):
 ```
 
 - **Exactly one of:** `scenarios` (a list of scenario codes), `selection` (the
-  Run page's: `categories`, `groups`, `forms`, `modes`, `lastRun`), or `suite`
-  (a name; `GET /v1/api/suites` lists them).
+  Run page's: `base`, `categories`, `groups`, `forms`, `modes`, `lastRun`), or
+  `suite` (a name; `GET /v1/api/suites` lists them).
+- **`base: "list"`** (the Run page's *My run list*), in a selection or a
+  suite, cuts the selection from **each provider's own run list**, the
+  scenarios its Test Config selects, read at each launch: two providers may run
+  different scenarios. A provider with no run list set runs every scenario.
+  `"all"` (the default) cuts it from every scenario. Either way, the account
+  runs shared scenarios only.
 - **`providers`:** 1 to 20. `GET /v1/api/key` lists the account's company and
   providers with their ids.
 - **`reference`:** your own id, given back as it is.

@@ -75,7 +75,8 @@ function requestOf(body) {
   }
   const problem = RF.selectionProblem(b.selection);
   if (problem) return { error: problem };
-  out.selection = RF.withDefaults({ ...b.selection, base: 'all' });
+  // Its base is kept (#1353): `list` is each provider's run list at the launch.
+  out.selection = RF.withDefaults(b.selection);
   return out;
 }
 

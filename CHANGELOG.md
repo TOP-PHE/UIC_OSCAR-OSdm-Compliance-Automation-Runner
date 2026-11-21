@@ -588,6 +588,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.563] — 2026-11-21
+
+Release 2026.602 (`current_release`). A suite on the run list runs each provider's own (#1353).
+
+### Fixed
+- **A named suite saved with *My run list* ran every scenario** (#1353, maintainer's report). Testing the API, `MY_RUN` (saved with *My run list*, 2 scenarios on GAMMA) launched 161 runs. `suiteOf()` (`utils/testSuites.js`) stored every suite's selection with `base: 'all'`, and `requestOf()` (`utils/testRequests.js`) did the same to a request's own `selection`; the suite's description never named the base, so nothing showed it.
+  - Now the base is kept. With `base: 'list'`, each provider runs, at each launch, its own run list (`selectionBaseOf()` in `api-test-requests.js`): the data file's `scenariosToRun`, as its Test Config selects it, among the shared scenarios the account runs, and the other filters on top. Two providers may run different scenarios: that is the point of such a suite (maintainer's decision). No run list set (`ALL` or none) = every scenario. A tester's personal run list is never read: a suite is the company's.
+  - The Run page's *Named suites* says "run list of each provider" for such a suite, and its hint says what it does.
+  - A suite saved with *My run list* before this release holds `all`: delete it and save it again.
+  - Guide § 1 and § 5 and the OpenAPI document name `base`.
+
+---
+
 ## [server-1.11.562] — 2026-11-21
 
 Release 2026.601 (`current_release`). Three points found during the first set-up of a Company API account (#1351): the API Accounts and API Config pages, and the JUnit report.
