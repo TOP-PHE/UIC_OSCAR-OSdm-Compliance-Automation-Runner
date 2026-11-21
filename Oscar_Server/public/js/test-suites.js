@@ -29,6 +29,8 @@ function selectionText(selection) {
     .filter(([key]) => Array.isArray(selection[key]) && selection[key].length > 0)
     .map(([key, word]) => word + ': ' + selection[key].join(', '));
   if (selection.lastRun && selection.lastRun !== 'all') parts.push('last run: ' + selection.lastRun);
+  // #1353: the run list is each provider's own, read at each launch.
+  if (selection.base === 'list') parts.unshift('run list of each provider');
   return parts.length ? parts.join(' · ') : 'every scenario';
 }
 

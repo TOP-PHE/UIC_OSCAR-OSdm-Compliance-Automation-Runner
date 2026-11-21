@@ -20,10 +20,11 @@ const S = require('../../src/utils/testSuites');
 const { esc } = require('../../public/js/esc');
 
 describe('suiteOf()', () => {
-  test('a selection, a list of codes, or both; the selection always cut from every scenario', () => {
+  test('a selection, a list of codes, or both; the selection keeps its base (#1353)', () => {
     expect(S.suiteOf({ name: ' nightly ', codes: ['A', 'A', 'B'] })).toEqual({ name: 'nightly', selection: null, codes: ['A', 'B'] });
     const both = S.suiteOf({ name: 'both', selection: { base: 'list', groups: [] }, codes: ['A'] });
-    expect(both.selection.base).toBe('all');
+    expect(both.selection.base).toBe('list');
+    expect(S.suiteOf({ name: 'all', selection: { groups: [] } }).selection.base).toBe('all');
     expect(both.codes).toEqual(['A']);
   });
 
@@ -61,6 +62,9 @@ describe('the Run page\'s suites card', () => {
     expect(selectionText({ categories: ['happy'], groups: ['refund', 'sale'], forms: [], lastRun: 'failed' }))
       .toBe('category: happy · capability: refund, sale · last run: failed');
     expect(selectionText({ categories: [], lastRun: 'all' })).toBe('every scenario');
+    // #1353: a suite on the run list says so, first.
+    expect(selectionText({ base: 'list', categories: ['happy'], lastRun: 'all' })).toBe('run list of each provider · category: happy');
+    expect(selectionText({ base: 'list', categories: [] })).toBe('run list of each provider');
   });
 
   test('each suite escaped; Delete for a Test Manager only', () => {

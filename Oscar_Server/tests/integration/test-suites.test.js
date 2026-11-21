@@ -51,6 +51,7 @@ const CERT = user('certification_user');
 const OTHER_TM = user('test_manager', OTHER);
 const session = u => `Bearer ${jwt.sign({ sub: u.id, email: u.email, companyId: u.companyId, role: u.role }, process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '1h' })}`;
 let token;
+let accountId;
 
 beforeAll(async () => {
   run(`INSERT INTO companies (id, name, slug, api_base) VALUES (?, 'Suites Co', ?, 'https://d.example/osdm')`, [D, `suites-${tag}`]);
@@ -63,6 +64,7 @@ beforeAll(async () => {
     { code: 'OTST_SALE_A' }, { code: 'OTST_SALE_B' }, { code: 'NHF_REFUSED_C', scenarioType: 'SALE' },
   ] }));
   const account = (await request(app).post('/v1/company/api-accounts').set('Authorization', session(TM)).send({ name: 'CI', providers: [P1] })).body;
+  accountId = account.id;
   setCredentials(account.id, P1, { auth_mode: 'bearer', access_token_enc: encrypt('t'), credentials_endpoint: 'https://p1.example' });
   token = Tokens.issue(account.id, ['runs:read', 'runs:write']).token;
 });
@@ -140,5 +142,53 @@ describe('asked by name through the API', () => {
     expect(res.body.detail).toContain('/v1/api/suites');
     await suites('post', '', OTHER_TM).send({ name: 'theirs', codes: ['OTST_SALE_A'] });
     expect((await asAccount('post', '/test-requests').send({ providers: [P1], suite: 'theirs' })).status).toBe(404);
+  });
+});
+
+describe('#1353: on the run list, each provider runs its own', () => {
+  const P2 = crypto.randomUUID();
+  const ofProvider = (res, id) => res.body.providers.find(p => p.id === id).runs.map(r => r.scenario_code);
+
+  beforeAll(async () => {
+    run(`INSERT INTO companies (id, name, slug, parent_id, api_base) VALUES (?, 'Suites P2', ?, ?, 'https://p2.example/osdm')`, [P2, `suites-${tag}--p2`, D]);
+    // P1's run list: two of its three scenarios; P2's: one shared scenario and the Test Manager's private one.
+    await writeDatafile({ id: P1, slug: `suites-${tag}--p1` }, asValidDatafile({
+      scenarios: [{ code: 'OTST_SALE_A' }, { code: 'OTST_SALE_B' }, { code: 'NHF_REFUSED_C', scenarioType: 'SALE' }],
+      scenariosToRun: ['NHF_REFUSED_C', 'OTST_SALE_B'],
+    }));
+    await writeDatafile({ id: P2, slug: `suites-${tag}--p2` }, asValidDatafile({
+      scenarios: [{ code: 'OTST_SALE_A' }, { code: 'OTST_SALE_B' }, { code: 'OTST_TM_OWN', created_by: TM.email, shared: false }],
+      scenariosToRun: ['OTST_TM_OWN', 'OTST_SALE_A'],
+    }));
+    expect((await request(app).patch(`/v1/company/api-accounts/${accountId}`).set('Authorization', session(TM)).send({ providers: [P1, P2] })).status).toBe(200);
+    setCredentials(accountId, P2, { auth_mode: 'bearer', access_token_enc: encrypt('t'), credentials_endpoint: 'https://p2.example' });
+  });
+
+  afterAll(() => {
+    const row = get('SELECT datafile_path FROM companies WHERE id = ?', [P2]);
+    if (row?.datafile_path) fs.rmSync(row.datafile_path, { force: true });
+  });
+
+  test('a suite saved on "My run list" keeps it (it was saved as every scenario until #1353)', async () => {
+    const made = await suites('post').send({ name: 'MY_RUN', selection: { base: 'list' } });
+    expect(made.status).toBe(201);
+    expect(made.body.selection).toMatchObject({ base: 'list', categories: ['happy', 'refusal'] });
+  });
+
+  test('launched on two providers, each runs its own run list, shared scenarios only', async () => {
+    const res = await asAccount('post', '/test-requests').send({ providers: [P1, P2], suite: 'my_run' });
+    expect(res.status).toBe(202);
+    expect(ofProvider(res, P1).sort()).toEqual(['NHF_REFUSED_C', 'OTST_SALE_B']);
+    // The Test Manager's private scenario is on P2's list, but the account runs shared scenarios only.
+    expect(ofProvider(res, P2)).toEqual(['OTST_SALE_A']);
+  });
+
+  test('a request\'s own selection on the run list does the same; the other filters still apply; without it, every scenario', async () => {
+    const happy = await asAccount('post', '/test-requests').send({ providers: [P1, P2], selection: { base: 'list', categories: ['happy'] } });
+    expect(happy.status).toBe(202);
+    expect(ofProvider(happy, P1)).toEqual(['OTST_SALE_B']);
+    expect(ofProvider(happy, P2)).toEqual(['OTST_SALE_A']);
+    const all = await asAccount('post', '/test-requests').send({ providers: [P2], selection: { categories: ['happy'] } });
+    expect(ofProvider(all, P2).sort()).toEqual(['OTST_SALE_A', 'OTST_SALE_B']);
   });
 });

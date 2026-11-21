@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-21-suite-run-list",
+    "date": "November 21, 2026",
+    "tag": "Bug Fix",
+    "title": "A named suite saved with \"My run list\" runs each provider's own run list",
+    "summary": "A suite saved on the Run page with \"My run list\" now runs, on each provider, the scenarios selected in that provider's Test Config. It used to run every scenario.",
+    "content": "On the Run page, a named suite saves the selection of the panel, so that your company's test automation can ask for it by name through the API. A suite saved with \"My run list\" lost that choice and ran every scenario the other filters kept.\n\nIt now runs, on each provider and at each launch, that provider's own run list: the scenarios selected in its Test Config, shared ones only, with the other filters on top. Two providers may therefore run different scenarios under one suite. A provider with no run list set runs every scenario. Such a suite says \"run list of each provider\" in the Named suites card. The same holds for a selection sent directly through the API with \"base\": \"list\".\n\nWhat to do: a suite you saved with \"My run list\" before this change still runs every scenario. Delete it in the Named suites card and save it again."
+  },
+  {
     "id": "2026-11-21-show-typed-credentials",
     "date": "November 21, 2026",
     "tag": "Improvement",
