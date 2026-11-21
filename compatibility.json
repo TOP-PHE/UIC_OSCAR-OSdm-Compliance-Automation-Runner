@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.600",
+  "current_release": "2026.601",
   "releases": [
+    {
+      "release": "2026.601",
+      "date": "2026-11-21",
+      "server": "1.11.562",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.562 (#1351): on API Accounts the providers an account may use are drawn as a checkbox and the name as typed, on one line (the page's shared styles stretched each checkbox across its name, upper case, and the names ran into each other); on API Config every masked credential field (bearer token, token URL, client id and secret, scope, extra credential, requestor, subscription key) has an eye button that shows what was typed and masks it again, masked again on each save or re-read; saved secrets still never reach the page; the JUnit XML of a test request's results is written one element a line, indented, so a person can read it (the same document otherwise: compared on 100,000 drawn results)."
+      ]
+    },
     {
       "release": "2026.600",
       "date": "2026-11-20",

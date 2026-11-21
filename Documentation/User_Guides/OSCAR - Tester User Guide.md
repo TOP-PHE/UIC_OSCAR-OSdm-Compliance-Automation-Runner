@@ -125,6 +125,9 @@ Framework, test resources, findings, runs and reports.
   provider are used only for runs on that provider. A section with text you
   have not saved is marked *not saved*. **Working on** only decides which
   section is opened first.
+  The credential fields are masked: the 👁 button beside each shows what you
+  typed, to check it for a typo before saving, and masks it again (#1351). A
+  saved secret is never shown again: leave its field blank to keep it.
 - **Who sees which provider.** Test Managers see every provider of the company.
   A tester sees the providers a Test Manager has granted. If access is withdrawn
   while you work on a provider, OSCAR tells you and switches the tab back to

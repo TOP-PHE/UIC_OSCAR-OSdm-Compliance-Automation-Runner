@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-21-show-typed-credentials",
+    "date": "November 21, 2026",
+    "tag": "Improvement",
+    "title": "See what you typed in a credential field before saving it",
+    "summary": "On API Config, an eye button beside each masked field shows what you typed, to catch a typo; the provider names of API Accounts are readable again.",
+    "content": "On API Config, the credential fields of each company or provider are masked: the bearer token, the token URL, the client id and secret, the scope, the extra credential, the requestor and the subscription key. A typo in one of them used to show only when a run or a credential test failed.\n\nEach of these fields now has an eye button beside it. Click it to see what you typed, click it again to mask it. Every field is masked again when you save the section. Saved secrets are still never sent back to the page: the button shows what you type, not what is stored. It is on the page opened for a Company API account's credentials too.\n\nOn API Accounts, the providers an account may use are drawn again as a checkbox followed by the name, as it was typed; the names had run into each other.\n\nThe JUnit report of a test request, for those whose test automation asks OSCAR for tests, is now written one element per line and indented, so it reads well in an editor too. Its content and how CI tools read it do not change.\n\nNothing to do on your side."
+  },
+  {
     "id": "2026-11-20-test-automation-api",
     "date": "November 20, 2026",
     "tag": "New Feature",

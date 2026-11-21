@@ -103,16 +103,25 @@ function outLines(run) {
   return out;
 }
 
-function caseXml(run, suiteName) {
+// The indentation of an element at this depth: one element a line, two spaces a
+// level, so a person can read the file (#1351). Only the space between
+// elements: the text of <failure> and <system-out> is kept as it is.
+const pad = depth => '  '.repeat(depth);
+
+// A run's <testcase>, as its lines.
+function caseLines(run, suiteName) {
   const props = [['verdict', run.verdict || run.state], ['run_id', run.id], ['run_url', run.run_url]]
     .filter(([, v]) => v)
-    .map(([k, v]) => `<property name="${xml(k)}" value="${xml(v)}"/>`).join('');
+    .map(([k, v]) => `${pad(4)}<property name="${xml(k)}" value="${xml(v)}"/>`);
   const outcome = outcomeXml(run);
   const out = outLines(run);
-  return `<testcase classname="${xml(suiteName)}" name="${xml(run.scenario_code)}" time="${seconds(run)}">`
-    + `<properties>${props}</properties>${outcome}`
-    + (out.length ? `<system-out>${xml(out.join('\n'))}</system-out>` : '')
-    + '</testcase>';
+  return [
+    `${pad(2)}<testcase classname="${xml(suiteName)}" name="${xml(run.scenario_code)}" time="${seconds(run)}">`,
+    `${pad(3)}<properties>`, ...props, `${pad(3)}</properties>`,
+    ...(outcome ? [pad(3) + outcome] : []),
+    ...(out.length ? [`${pad(3)}<system-out>${xml(out.join('\n'))}</system-out>`] : []),
+    `${pad(2)}</testcase>`,
+  ];
 }
 
 const isError = r => r.verdict === 'not_a_result';
@@ -122,19 +131,25 @@ const isSkipped = r => !r.verdict || r.verdict === 'cancelled';
 function junitOf(results) {
   const providers = results.providers || [];
   const all = providers.flatMap(p => p.runs || []);
-  const suites = providers.map((p) => {
+  const suites = providers.flatMap((p) => {
     const runs = p.runs || [];
     const name = p.name || p.id;
-    return `<testsuite name="${xml(name)}" id="${xml(p.id)}" tests="${runs.length}" failures="${runs.filter(r => r.verdict === 'failed').length}"`
-      + ` errors="${runs.filter(isError).length}" skipped="${runs.filter(isSkipped).length}">`
-      + runs.map(r => caseXml(r, name)).join('') + '</testsuite>';
+    return [
+      `${pad(1)}<testsuite name="${xml(name)}" id="${xml(p.id)}" tests="${runs.length}" failures="${runs.filter(r => r.verdict === 'failed').length}"`
+        + ` errors="${runs.filter(isError).length}" skipped="${runs.filter(isSkipped).length}">`,
+      ...runs.flatMap(r => caseLines(r, name)),
+      `${pad(1)}</testsuite>`,
+    ];
   });
   const reference = results.reference ? ' (' + results.reference + ')' : '';
   const title = `OSCAR test request ${results.id}${reference}`;
-  return '<?xml version="1.0" encoding="UTF-8"?>\n'
-    + `<testsuites name="${xml(title)}" tests="${all.length}" failures="${all.filter(r => r.verdict === 'failed').length}"`
-    + ` errors="${all.filter(isError).length}" skipped="${all.filter(isSkipped).length}">`
-    + suites.join('') + '</testsuites>\n';
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    `<testsuites name="${xml(title)}" tests="${all.length}" failures="${all.filter(r => r.verdict === 'failed').length}"`
+      + ` errors="${all.filter(isError).length}" skipped="${all.filter(isSkipped).length}">`,
+    ...suites,
+    '</testsuites>',
+  ].join('\n') + '\n';
 }
 
 module.exports = { junitOf, xml };

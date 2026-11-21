@@ -74,6 +74,7 @@ function makeCard(id) {
   return {
     dataset: { targetId: id },
     element,
+    querySelectorAll: () => [],
     querySelector(selector) {
       const match = /^\[data-f="([^"]+)"\]$/.exec(selector);
       if (!match) throw new Error(`a section is only searched by data-f, not by ${selector}`);
@@ -136,7 +137,7 @@ function openPage(role, { selected = null, failing = () => false, search = '' } 
   const code = [
     declarationOf('API_ACCOUNT_ID'),
     declarationOf('CAN_EDIT_HEADERS'), declarationOf('CAN_EDIT_ENDPOINT'), declarationOf('targets'),
-    ...['apiAccountIdOf', 'credentialsUrl', 'whoseCredentials', 'listAccountTargets', 'showAccountNotice', 'field', 'inTarget', 'credentialsSet', 'badge', 'markUnsaved', 'nameTarget', 'fillShared', 'showSuspension', 'fillCredentials', 'showEndpointChanged',
+    ...['apiAccountIdOf', 'credentialsUrl', 'whoseCredentials', 'listAccountTargets', 'showAccountNotice', 'field', 'inTarget', 'credentialsSet', 'badge', 'markUnsaved', 'nameTarget', 'fillShared', 'showSuspension', 'setShown', 'maskSecrets', 'fillCredentials', 'showEndpointChanged',
       'fillTarget', 'targetUnavailable', 'loadTarget', 'sharedPayload', 'credentialsPayload', 'saveShared',
       'saveTarget', 'clearCredentials', 'listTargets',
       'lifetimeText', 'credentialTestLines', 'showTestResult', 'testSavedCredentials'].map(sourceOf),
@@ -655,5 +656,103 @@ describe('API Config page — a Company API account\'s credentials (#1342)', () 
       const page = openPage('test_manager', { search: bad });
       expect(page.context.credentialsUrl('/test')).toBe('/v1/me/credentials/test');
     }
+  });
+});
+
+describe('API Config page — show what was typed in a masked field (#1351)', () => {
+  const MASKED = ['access_token', 'token_url', 'client_id', 'client_secret', 'oauth_scope', 'oauth_extra', 'requestor', 'subscription_key'];
+
+  // A section holding masked fields, with just enough DOM for the three functions.
+  function section(names) {
+    const inputs = names.map((name, i) => ({
+      type: 'password', id: `${name}-${i}`, dataset: { f: name }, value: '',
+      replaceWith(el) { this.replacedBy = el; },
+    }));
+    const buttons = [];
+    const document = {
+      createElement: tag => {
+        const el = {
+          tag, dataset: {}, attributes: {}, children: [], listeners: {},
+          setAttribute(k, v) { this.attributes[k] = v; },
+          append(...c) { this.children.push(...c); },
+          addEventListener(type, fn) { this.listeners[type] = fn; },
+        };
+        if (tag === 'button') buttons.push(el);
+        return el;
+      },
+    };
+    const card = {
+      querySelectorAll(selector) {
+        if (selector === 'input[type="password"]') return inputs.filter(i => i.type === 'password');
+        if (selector === 'button.reveal') return buttons;
+        throw new Error(`not expected: ${selector}`);
+      },
+      querySelector(selector) {
+        const match = /^\[data-f="([^"]+)"\]$/.exec(selector);
+        if (!match) throw new Error(`a section is only searched by data-f, not by ${selector}`);
+        return inputs.find(i => i.dataset.f === match[1]);
+      },
+    };
+    const context = vm.createContext({ document, String });
+    vm.runInContext(['field', 'addRevealButtons', 'setShown', 'maskSecrets'].map(sourceOf).join('\n\n'), context);
+    return { context, card, inputs, buttons };
+  }
+
+  test('every masked field of the template gets the button, and nothing else is masked', () => {
+    const from = SOURCE.findIndex(l => l.includes('<template id="target-template">'));
+    const to = SOURCE.findIndex((l, i) => i > from && l.includes('</template>'));
+    const template = SOURCE.slice(from + 1, to).join('\n');
+    const masked = [...template.matchAll(/<input type="password" id="([^"]+)"/g)].map(m => m[1]);
+    expect(masked.sort()).toEqual([...MASKED].sort());
+    // The buttons are added after each copy has its own ids, before it enters the page.
+    const addTarget = sourceOf('addTarget');
+    expect(addTarget.indexOf('addRevealButtons(card);')).toBeGreaterThan(addTarget.indexOf('label.htmlFor = input.id;'));
+    expect(addTarget.indexOf("document.getElementById('targets').appendChild(card);")).toBeGreaterThan(addTarget.indexOf('addRevealButtons(card);'));
+  });
+
+  test('a button beside each field, masked at first, named for a screen reader', () => {
+    const { context, card, inputs, buttons } = section(MASKED);
+    context.addRevealButtons(card);
+    expect(buttons).toHaveLength(MASKED.length);
+    inputs.forEach((input, i) => {
+      const button = buttons[i];
+      expect(input.replacedBy.className).toBe('secret-field');
+      expect(input.replacedBy.children).toEqual([input, button]);
+      expect(input.type).toBe('password');
+      expect(button.type).toBe('button');   // never submits anything
+      expect(button.dataset.reveals).toBe(input.dataset.f);
+      expect(button.attributes['aria-controls']).toBe(input.id);
+      expect(button.attributes['aria-pressed']).toBe('false');
+      expect(button.attributes['aria-label']).toBe('Show what is typed in this field');
+    });
+  });
+
+  test('a click shows that field only; a second masks it again', () => {
+    const { context, card, inputs, buttons } = section(['client_id', 'client_secret']);
+    context.addRevealButtons(card);
+    buttons[1].listeners.click();
+    expect(inputs.map(i => i.type)).toEqual(['password', 'text']);
+    expect(buttons[1].attributes['aria-pressed']).toBe('true');
+    expect(buttons[1].attributes['aria-label']).toBe('Hide what is typed in this field');
+    buttons[1].listeners.click();
+    expect(inputs.map(i => i.type)).toEqual(['password', 'password']);
+    expect(buttons[1].attributes['aria-pressed']).toBe('false');
+  });
+
+  test('a save, a clear or a re-read masks every field again (fillCredentials)', () => {
+    const { context, card, inputs, buttons } = section(['access_token', 'token_url']);
+    context.addRevealButtons(card);
+    buttons.forEach(b => b.listeners.click());
+    expect(inputs.map(i => i.type)).toEqual(['text', 'text']);
+    context.maskSecrets(card);
+    expect(inputs.map(i => i.type)).toEqual(['password', 'password']);
+    expect(buttons.map(b => b.attributes['aria-pressed'])).toEqual(['false', 'false']);
+    expect(sourceOf('fillCredentials')).toMatch(/^function fillCredentials\(card, m\) \{\n {2}maskSecrets\(card\);/);
+  });
+
+  test('a saved secret still never comes back into its field', () => {
+    const fill = sourceOf('fillCredentials');
+    expect(fill).toContain("['access_token', 'client_id', 'client_secret', 'oauth_extra', 'requestor', 'subscription_key']");
+    expect(fill).toContain(".forEach(secret => { field(card, secret).value = ''; });");
   });
 });

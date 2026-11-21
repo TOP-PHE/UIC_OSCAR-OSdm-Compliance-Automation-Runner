@@ -118,3 +118,21 @@ test('only a UUID read from an answer goes in a request address (S8476)', () => 
   expect(accountIdOf('3F2A91C0-1D2E-4C5B-8A9F-0123456789AB')).toBe('3f2a91c0-1d2e-4c5b-8a9f-0123456789ab');
   for (const bad of ['../admin', '1', '', null, { id: 'x' }, '3f2a91c0-1d2e-4c5b-8a9f-0123456789ab/keys']) expect(accountIdOf(bad)).toBeNull();
 });
+
+test('#1351: a provider box draws the checkbox at its own size and the name as typed, on one line', () => {
+  const page = read('api-accounts.html');
+  const rule = selector => {
+    const line = page.split('\n').find(l => l.startsWith(selector + '{'));
+    if (!line) throw new Error(`no rule ${selector}`);
+    return line;
+  };
+  // oscar-page.css gives every label upper case and every input 100 % width: the box undoes both.
+  expect(read('css/oscar-page.css')).toContain('input,select{width:100%');
+  expect(rule('.box')).toContain('display:inline-flex');
+  expect(rule('.box')).toContain('text-transform:none');
+  expect(rule('.box')).toContain('white-space:nowrap');
+  expect(rule('.box input')).toContain('width:auto');
+  // Each box holds its checkbox, then the name.
+  expect(providerBoxesHtml([{ id: 'p1', name: 'Benerail' }], [], null))
+    .toMatch(/^<label class="box"><input type="checkbox" value="p1"[^>]*> Benerail<\/label>$/);
+});

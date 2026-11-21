@@ -51,6 +51,12 @@ details.target.current{box-shadow:0 0 0 2px #0090D4,0 1px 4px rgba(0,0,0,.08)}
 /* #872: the result of "Test my credentials", under the buttons. */
 .msg-info{background:#e3f2fd;color:#0d47a1;border:1px solid #90caf9}
 .test-result div+div{margin-top:4px}
+/* #1351: a masked field and the button that shows what was typed in it. */
+.secret-field{display:flex;gap:6px;align-items:stretch}
+.secret-field input{flex:1;min-width:0}
+.reveal{flex:none;width:40px;padding:0;border:1px solid #cfd8dc;border-radius:6px;background:#f5f7f8;cursor:pointer;font-size:16px;line-height:1}
+.reveal:hover,.reveal:focus-visible{border-color:#0090D4;background:#e3f2fd}
+.reveal[aria-pressed="true"]{background:#e3f2fd;border-color:#0090D4}
 </style>
 </head>
 <body>
@@ -289,6 +295,40 @@ function field(card, name) {
   return card.querySelector('[data-f="' + name + '"]');
 }
 
+// #1351: an eye button beside each masked field of a section shows what was
+// typed in it, to catch a typo before saving, and masks it again. Saved
+// secrets never reach the page ("leave blank to keep current"): it shows what
+// is typed here, and the token URL and scope the page already holds.
+function addRevealButtons(card) {
+  card.querySelectorAll('input[type="password"]').forEach(input => {
+    const box = document.createElement('div');
+    box.className = 'secret-field';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'reveal';
+    button.textContent = '👁';
+    button.dataset.reveals = input.dataset.f;
+    button.setAttribute('aria-controls', input.id);
+    input.replaceWith(box);
+    box.append(input, button);
+    setShown(input, button, false);
+    button.addEventListener('click', () => setShown(input, button, input.type === 'password'));
+  });
+}
+
+// Shows or masks one field's text, and says which on its button.
+function setShown(input, button, shown) {
+  input.type = shown ? 'text' : 'password';
+  button.setAttribute('aria-pressed', String(shown));
+  button.setAttribute('aria-label', (shown ? 'Hide' : 'Show') + ' what is typed in this field');
+  button.title = shown ? 'Hide' : 'Show what is typed';
+}
+
+// Every field of a section masked again: after a save, a clear or a re-read.
+function maskSecrets(card) {
+  card.querySelectorAll('button.reveal').forEach(button => setShown(field(card, button.dataset.reveals), button, false));
+}
+
 // Every request of a section names the company or provider of that section.
 // The menu's "Working on" choice plays no part on this page: nav.js adds it
 // only to a request that names none, and every request here names one.
@@ -492,6 +532,7 @@ function fillShared(card, c) {
 
 // The user's own part of a section. A secret is never put back in its field.
 function fillCredentials(card, m) {
+  maskSecrets(card);
   field(card, 'auth_mode').value             = m.auth_mode || 'bearer';
   field(card, 'token_url').value             = m.token_url || '';
   field(card, 'oauth_profile').value         = m.oauth_profile || 'oauth2_basic';
@@ -813,6 +854,7 @@ function addTarget(target, index) {
     input.id = label.htmlFor + '-' + index;
     label.htmlFor = input.id;
   });
+  addRevealButtons(card);
   field(card, 'name').textContent = target.name;
   field(card, 'name-2').textContent = target.name;
   field(card, 'auth_mode').addEventListener('change', () => switchMode(card));
