@@ -588,6 +588,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.562] — 2026-11-21
+
+Release 2026.601 (`current_release`). Two points of the API Accounts and API Config pages, from the first set-up of a Company API account (#1351).
+
+### Fixed
+- **API Accounts: the provider names ran into their checkboxes** (#1351). The page's shared styles give every `input` the full width and every `label` upper case on a line of its own; the provider boxes undid only the line, so each checkbox stretched across its name ("BEN☐AILBETA"). A box now draws its checkbox at its own size, then the name as it was typed, on one line, and the boxes wrap as whole items.
+
+### Added
+- **API Config: an eye button shows what was typed in a masked field** (#1351, maintainer's request). Every masked field of a section (bearer token, token URL, client id, client secret, scope, extra credential, requestor, subscription key) has one, to catch a typo before saving; a second click masks it again.
+  - Each field shows on its own, and every field is masked again when the section is saved, cleared or read again (`maskSecrets()` in `fillCredentials()`).
+  - Saved secrets still never reach the page ("leave blank to keep current"): the button shows what is typed there, and the token URL and scope the page already held.
+  - The button never submits, names the field it controls (`aria-controls`) and says whether the text is shown (`aria-pressed`).
+  - The same page opened for a Company API account's credentials has it too.
+
+---
+
 ## [server-1.11.561] — 2026-11-20
 
 Release 2026.600 (`current_release`). API for test automation, part 6 (#1342), and the release of the programme as a whole: parts 1 to 5 (1.11.556 to 1.11.560, listed as 2026.595 to 2026.599) and this one. Nothing changes for a company that makes no Company API account.
