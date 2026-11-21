@@ -108,15 +108,28 @@ the guide's § 11.
 | `--provider <name or id>` | a simulator (or the company) to test; repeat it, or separate with commas. Names are matched without case |
 | `--suite <name>` | a named suite of the company |
 | `--scenarios <A,B,…>` | scenario codes |
-| `--selection <file.json>` | a selection as the Run page makes it: `{ "categories": ["happy"], "groups": ["refund"] }` |
+| `--selection <file.json>` | a selection as the Run page makes it: `{ "categories": ["happy"], "groups": ["Refund"] }` (OSCAR's spelling, case included) |
+| `--categories`, `--modes`, `--groups`, `--forms` | the Run page's filters, each a list, upper or lower case: `happy,refusal,simulated`; `PRODUCT,FARE`; `"Sale,Refund,Seat reservations"`…; `SEARCH,SPECIFICATION,TRIP_IDS`… (`--help` lists every value) |
+| `--last-run <all\|toRunAgain\|failed>` | the Run page's *Last run* |
+| `--run-list` | each provider's own run list (the Run page's *My run list*) instead of every scenario |
 | `--reference <text>` | your own id (a pipeline number), given back as it is |
 | `--idempotency-key <key>` | a retry with the same key and request runs nothing twice |
 | `--timeout <minutes>` | how long to wait for the verdict (60) |
 | `--junit <file>` / `--json <file>` | write the results |
 | `--oscar`, `--client-id`, `--key` | instead of the environment variables |
 
-Only one of `--suite`, `--scenarios` and `--selection`. A scenario a simulator
-does not have is reported as *not on this provider*; it does not stop the run.
+Only one of `--suite`, `--scenarios`, `--selection`, or the filter options. The
+filter options build the same selection as a `--selection` file, without a
+file: a filter left out keeps the Run page's default (every value, but the
+categories: happy and refusal). For example, refunds of the happy flows on each
+provider's own run list:
+
+```powershell
+node oscar-test.js --provider GAMMA,ALPHA --categories happy --groups Refund --run-list
+```
+
+A scenario a simulator does not have is reported as *not on this provider*; it
+does not stop the run.
 
 `OSCAR_PRIVATE_KEY` may hold the PEM text itself instead of a file, with line
 breaks written `\n`. That is handy in a CI's secret variables.

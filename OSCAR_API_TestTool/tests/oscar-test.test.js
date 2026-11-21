@@ -21,9 +21,9 @@ const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
 const { execFileSync, spawnSync } = require('node:child_process');
-const { argsOf } = require('../src/args');
+const { argsOf, FILTERS, LAST_RUNS } = require('../src/args');
 const { clientFor, assertionFor, privateKeyOf, originOf } = require('../src/oscar');
-const { runTool, providerIdsOf, waitForVerdict, textOf, EXIT, WAIT_S } = require('../src/run');
+const { runTool, providerIdsOf, requestBodyOf, waitForVerdict, textOf, EXIT, WAIT_S } = require('../src/run');
 const { OscarError } = require('../src/oscar');
 
 const CLIENT = '3f2a91c0-1d2e-4c5b-8a9f-0123456789ab';
@@ -263,4 +263,29 @@ test('a selection file from PowerShell is read whatever its encoding', () => {
   for (const buffer of [Buffer.from(json), Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(json)]), le, be]) {
     assert.deepEqual(JSON.parse(textOf(buffer)), { categories: ['happy'] });
   }
+});
+
+// The Run page's filters as options: no JSON on the command line.
+test('filter options: OSCAR\'s values without case, a list given twice, the run list; one way to say what to run', () => {
+  const base = ['--oscar', 'https://o.example', '--client-id', CLIENT, '--key', 'k.pem', '--provider', 'GAMMA'];
+  const s = argsOf([...base, '--categories', 'HAPPY', '--groups', 'seat reservations,refund', '--groups', 'Sale,refund',
+    '--forms', 'search', '--modes', 'product', '--last-run', 'to-run-again', '--run-list']);
+  assert.deepEqual(s.filters, { categories: ['happy'], groups: ['Seat reservations', 'Refund', 'Sale'], forms: ['SEARCH'],
+    modes: ['PRODUCT'], lastRun: 'toRunAgain', base: 'list' });
+  assert.equal(s['run-list'], undefined);
+  // The request carries them as the selection --selection would.
+  assert.deepEqual(requestBodyOf(s, ['p1'], () => { throw new Error('no file read'); }),
+    { providers: ['p1'], selection: s.filters });
+  // The run list alone is a selection too.
+  assert.deepEqual(argsOf([...base, '--run-list']).filters, { base: 'list' });
+  assert.match(argsOf([...base, '--groups', 'Refunds']).error, /--groups: unknown value "Refunds" \(known: Reference data, .*Time limits\)/);
+  assert.match(argsOf([...base, '--last-run', 'never']).error, /--last-run is one of all, toRunAgain, failed/);
+  assert.match(argsOf([...base, '--suite', 'smoke', '--categories', 'happy']).error, /exactly one of --suite, --scenarios, --selection, or the filters/);
+});
+
+test('the filter values are OSCAR\'s own (when the repository is there)', { skip: !fs.existsSync(path.resolve(__dirname, '../../Oscar_Server/src/utils/runFilters.js')) }, () => {
+  const RF = require('../../Oscar_Server/src/utils/runFilters.js');
+  const K = require('../../Oscar_Server/src/utils/capabilities.js');
+  assert.deepEqual(FILTERS, { categories: [...RF.CATEGORIES], modes: [...RF.MODES], groups: [...K.GROUPS], forms: [...RF.FORMS] });
+  assert.deepEqual([...LAST_RUNS], [...RF.LAST_RUNS]);
 });

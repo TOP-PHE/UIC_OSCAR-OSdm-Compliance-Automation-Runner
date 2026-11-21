@@ -17,6 +17,7 @@
  *   --key <file>             OSCAR_PRIVATE_KEY_FILE   (or OSCAR_PRIVATE_KEY: the PEM text)
  *   --provider <name|id>     repeatable, or comma-separated
  *   --suite <name> | --scenarios <A,B,…> | --selection <file.json>
+ *     | the Run page's filters: --categories --modes --groups --forms --last-run --run-list
  *   --reference <text>  --idempotency-key <key>
  *   --timeout <minutes>      how long to wait for the verdict (60)
  *   --junit <file>  --json <file>
@@ -33,6 +34,15 @@ What to run (one of):
   --suite <name>             a named suite of the company (see --suites)
   --scenarios <A,B,…>        scenario codes
   --selection <file.json>    a selection as the Run page makes it
+  the Run page's filters, each a list (upper or lower case), any of them:
+    --categories <…>         happy, refusal, simulated (default: happy, refusal)
+    --modes <…>              PRODUCT, FARE
+    --groups <…>             Reference data, Offers, Sale, Passengers, Seat reservations,
+                             Return journeys, Fulfilment, Refund, Exchange, Fares, Time limits
+    --forms <…>              SEARCH, SPECIFICATION, TRIP_IDS, NON_TRIP_PLACES, NON_TRIP_ZONES, NON_TRIP_NUTS
+    --last-run <…>           all, toRunAgain, failed
+    --run-list               each provider's own run list instead of every scenario
+                             (a filter left out keeps every value; quote a list with a space)
 
 Other choices:
   --provider <name|id>       a provider (or the company) to test; repeat it, or separate with commas
@@ -55,13 +65,49 @@ cancelled), 3 not finished within --timeout, 4 an error (settings, network,
 refusal).`;
 
 const WITH_VALUE = new Set(['oscar', 'client-id', 'key', 'provider', 'suite', 'scenarios', 'selection',
-  'reference', 'idempotency-key', 'timeout', 'junit', 'json', 'status']);
-const FLAGS = new Set(['whoami', 'suites', 'help']);
+  'reference', 'idempotency-key', 'timeout', 'junit', 'json', 'status',
+  'categories', 'modes', 'groups', 'forms', 'last-run']);
+const FLAGS = new Set(['whoami', 'suites', 'help', 'run-list']);
+
+// The Run page's filters as options, so no JSON is typed on a command line
+// (Windows PowerShell 5.1 drops its inner quotes). The values are OSCAR's own
+// (Oscar_Server/src/utils/runFilters.js), matched without case; the tests pin
+// them to OSCAR's when the repository is there.
+const FILTERS = Object.freeze({
+  categories: ['happy', 'refusal', 'simulated'],
+  modes: ['PRODUCT', 'FARE'],
+  groups: ['Reference data', 'Offers', 'Sale', 'Passengers', 'Seat reservations', 'Return journeys',
+    'Fulfilment', 'Refund', 'Exchange', 'Fares', 'Time limits'],
+  forms: ['SEARCH', 'SPECIFICATION', 'TRIP_IDS', 'NON_TRIP_PLACES', 'NON_TRIP_ZONES', 'NON_TRIP_NUTS'],
+});
+const LAST_RUNS = Object.freeze(['all', 'toRunAgain', 'failed']);
 
 const list = value => String(value).split(',').map(s => s.trim()).filter(Boolean);
+const sameWord = (a, b) => a.toLowerCase().replaceAll('-', '') === b.toLowerCase().replaceAll('-', '');
+
+// One filter option into o.filters (a list may be given twice): an error text, or null.
+function setFilter(o, name, value) {
+  const filters = o.filters || {};
+  if (name === 'last-run') {
+    const found = LAST_RUNS.find(k => sameWord(k, value));
+    if (!found) return `--last-run is one of ${LAST_RUNS.join(', ')}.`;
+    o.filters = { ...filters, lastRun: found };
+    return null;
+  }
+  const known = FILTERS[name];
+  const values = [...(filters[name] || [])];
+  for (const given of list(value)) {
+    const found = known.find(k => sameWord(k, given));
+    if (!found) return `--${name}: unknown value "${given}" (known: ${known.join(', ')}).`;
+    if (!values.includes(found)) values.push(found);
+  }
+  o.filters = { ...filters, [name]: values };
+  return null;
+}
 
 // One option and its value into o: an error text, or null.
 function setOption(o, name, value) {
+  if (FILTERS[name] || name === 'last-run') return setFilter(o, name, value);
   if (name === 'provider') o.providers.push(...list(value));
   else if (name === 'scenarios') o.scenarios = list(value);
   else if (name === 'timeout') {
@@ -87,6 +133,11 @@ function optionsOf(argv) {
     const error = setOption(o, name, value);
     if (error) return { error };
   }
+  if (o['run-list']) {
+    // The Run page's "My run list": each provider's own, as its Test Config selects it.
+    o.filters = { ...o.filters, base: 'list' };
+    delete o['run-list'];
+  }
   return o;
 }
 
@@ -96,8 +147,11 @@ function problemOf(o) {
   if (!o.clientId) return 'Say which account: --client-id <the account\'s client id> (or OSCAR_CLIENT_ID).';
   if (!o.key && !o.keyText) return 'Say where the private key is: --key <file> (or OSCAR_PRIVATE_KEY_FILE).';
   if (o.whoami || o.suites || o.status) return null;
-  const chosen = ['suite', 'scenarios', 'selection'].filter(k => o[k] !== undefined);
-  if (chosen.length !== 1) return 'Say what to run: exactly one of --suite, --scenarios and --selection.';
+  const chosen = ['suite', 'scenarios', 'selection', 'filters'].filter(k => o[k] !== undefined);
+  if (chosen.length !== 1) {
+    return 'Say what to run: exactly one of --suite, --scenarios, --selection, or the filters '
+      + '(--categories, --modes, --groups, --forms, --last-run, --run-list).';
+  }
   if (o.providers.length === 0) return 'Say where to run it: --provider <name or id> (one or more).';
   return null;
 }
@@ -114,4 +168,4 @@ function argsOf(argv, env = {}) {
   return error ? { error } : o;
 }
 
-module.exports = { argsOf, USAGE };
+module.exports = { argsOf, USAGE, FILTERS, LAST_RUNS };

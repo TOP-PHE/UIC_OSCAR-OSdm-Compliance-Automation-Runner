@@ -451,7 +451,10 @@ scenario is not seen by the account, even yours as a Test Manager.
 A selection file (`--selection`) holds the Run page's filters as JSON (§ 5).
 JSON typed on the command line does not survive Windows PowerShell 5.1, which
 drops the inner quotes: write it to a file. The example client reads the file
-whatever encoding PowerShell gave it.
+whatever encoding PowerShell gave it, and also takes the filters as options,
+with no file: `--categories happy --groups Refund --run-list` (its `--help`
+lists every value). In JSON, the values are spelled as OSCAR spells them:
+`"Refund"`, not `"refund"`.
 
 ### 11.4 Waiting for the verdict
 
