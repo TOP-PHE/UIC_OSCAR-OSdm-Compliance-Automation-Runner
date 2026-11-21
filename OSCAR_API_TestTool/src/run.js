@@ -71,6 +71,8 @@ function requestBodyOf(settings, providerIds, readFile) {
       throw new OscarError(`--selection: ${settings.selection} is not a JSON file (${e.message}).`);
     }
   }
+  // The filter options are the same selection, written by the tool.
+  if (settings.filters) body.selection = settings.filters;
   if (settings.reference) body.reference = settings.reference;
   return body;
 }

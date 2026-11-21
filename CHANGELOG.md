@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **The example client takes the Run page's filters as options** (#1357, maintainer's request, after #1355). A tool, its README and the guide, no version.
+  - `--categories`, `--modes`, `--groups`, `--forms` (each a list, upper or lower case, given once or several times), `--last-run`, and `--run-list` for each provider's own run list. They build the same selection as a `--selection` file, so no JSON is typed on a command line (Windows PowerShell 5.1 drops its inner quotes).
+  - An unknown value stops the tool with the values OSCAR knows. The values are OSCAR's own: a test pins them to `runFilters.js` and `capabilities.js` when the repository is there.
+  - The README's `--selection` example said `"refund"`, which OSCAR refuses: `"Refund"`.
+
 ### Fixed
 
 - **The CI job "k3s on one machine" failed since #1336** (#1340). CI, guide and a test, no version.
