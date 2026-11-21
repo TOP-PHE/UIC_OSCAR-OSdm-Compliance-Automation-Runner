@@ -17,6 +17,8 @@ conformance tests through an API and reads their results. Issue #1342.
   to 60 seconds. There is no webhook.
 - **A working client to start from:** `OSCAR_API_TestTool/` in the repository.
   § 10 uses it to check a set-up step by step, before the CI uses it.
+- **When something goes wrong:** § 11 lists the problems met during the first
+  real set-up, each with its cause and what to do.
 
 ---
 
@@ -29,7 +31,9 @@ conformance tests through an API and reads their results. Issue #1342.
 2. **Give it OSDM credentials.** In the account's row, *Set its OSDM
    credentials* opens **API Config** for the account. Fill one section per
    company or provider it tests, as you would your own credentials, and use
-   *Test the account's credentials*. Its runs use these, never yours.
+   *Test the account's credentials*. Its runs use these, never yours. Choose
+   OAuth2 where the provider gives a client id and secret: a pre-obtained
+   bearer token expires, and the account's runs would then fail.
 3. **Give it a public key.** In the card *Signing in to the API*, paste the
    public key your company made (§ 3). Note the account's **client id** and the
    **token endpoint** shown there: your automation needs both.
@@ -37,6 +41,10 @@ conformance tests through an API and reads their results. Issue #1342.
    *Save the selection above as a suite* (card *Named suites*). The automation
    then asks it by name. Saved with *My run list*, a suite runs on each provider
    that provider's own run list, as its Test Config selects it.
+
+**The account runs shared scenarios only.** A scenario you create, duplicate or
+copy is yours and private until you share it in Test Config, even as a Test
+Manager: share every scenario the automation must run (§ 11.3).
 
 To stop an account at once, use **Suspend**. Every token it holds stops
 working, even after a resume, and its queued runs do not start. **Delete**
@@ -202,7 +210,9 @@ A scenario code a provider does not have is listed in that provider's
 
 `GET /v1/api/test-requests/{id}?wait=60` (scope `runs:read`) answers as soon as
 the request is finished, or after 60 seconds with its state. Call it again
-until `state` is `finished`.
+until `state` is `finished`. Behind a proxy that cuts a call held open
+60 seconds (nginx's default read timeout), ask less: `?wait=50`, and on a 502,
+503 or 504 ask again with a shorter wait (§ 11.4).
 
 - **`state`:** `queued`, `running` or `finished`.
 - **`verdict`**, once finished, is one of three values. Make the pipeline green
@@ -253,7 +263,7 @@ REQ=$(curl -sf -X POST "$OSCAR/v1/api/test-requests" \
   -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -H "Idempotency-Key: ci-$CI_PIPELINE_ID" \
   -d '{"providers":["'"$PROVIDER_ID"'"],"suite":"nightly","reference":"'"$CI_PIPELINE_ID"'"}' | jq -r .id)
-until [ "$(curl -sf "$OSCAR/v1/api/test-requests/$REQ?wait=60" -H "Authorization: Bearer $TOKEN" | jq -r .state)" = finished ]; do :; done
+until [ "$(curl -sf "$OSCAR/v1/api/test-requests/$REQ?wait=50" -H "Authorization: Bearer $TOKEN" | jq -r .state)" = finished ]; do :; done
 curl -sf "$OSCAR/v1/api/test-requests/$REQ/results?format=junit" -H "Authorization: Bearer $TOKEN" -o oscar-junit.xml
 ```
 
@@ -391,3 +401,72 @@ It reads results only (§ 7) and never prints the private key, the assertion or
 the token. `--whoami`, `--suites` and `--status` ask a token holding
 `runs:read` only, and so does the MCP server (§ 8). The tool's own tests run
 it against a stand-in OSCAR that checks each signed assertion as OSCAR does.
+
+## 11. Problems met while setting it up
+
+These all happened during the first real set-up, on the simulators (November
+2026). Each has its symptom, its cause and what to do.
+
+### 11.1 Signing in
+
+| Symptom | Cause | What to do |
+|---|---|---|
+| `(HTTP 401). invalid_client` with the account's name as client id | The client id is not the account's name | Use the UUID shown under the account in *Signing in to the API*, after `client_id` |
+| `invalid_client` although everything looks right | `OSCAR_URL` is another name of the server, or has a path | Use the card's token endpoint without `/v1/api/oauth/token`, nothing more (§ 10.1) |
+| `openssl` is not recognised (Windows) | Windows has no OpenSSL by default | Make the pair with Node (§ 3) |
+| `Get-Content … oscar-ci.pub` finds no file | The key was made in another folder than the one given | Look in the folder where the command ran; give the full path, in quotes when it holds a space |
+| `--whoami` says `scopes runs:read` | Normal: reading commands ask a read-only token | A launch asks `runs:write` too |
+
+Keep the private key out of any repository and of any synchronised drive
+(OneDrive, Dropbox…): whatever is there can be copied elsewhere. Paste only
+the `.pub` text into OSCAR.
+
+### 11.2 The account's providers and OSDM credentials
+
+| Symptom | Cause | What to do |
+|---|---|---|
+| `"X" is not a company or provider this account may test` | The provider is not ticked for the account | Tick it in the account's row on **API Accounts**, then `--whoami` again |
+| `HTTP 409 — X: Cannot start run — missing: …` | The account has no OSDM credentials for that provider | **API Config** opened from the account's row (*Set its OSDM credentials*): the page then says *The account's credentials*. Your own are not changed |
+| Runs fail with 401 after some minutes | The account's credentials are a pre-obtained bearer token, which expires | Choose OAuth2 (client id and secret, token URL): OSCAR then gets a token at each run |
+
+The account's credentials may be the same OSDM client as yours. Two users of one
+client see each other's bookings on the provider: harmless for tests, but a
+client of its own keeps the account's runs apart.
+
+### 11.3 Which scenarios run
+
+**The account runs shared scenarios only.** It is not you: a scenario you
+create, duplicate or copy is yours and **private** until you share it (the
+*Private* button of its row in Test Config turns it to *Shared*). A private
+scenario is not seen by the account, even yours as a Test Manager.
+
+| Symptom | Cause | What to do |
+|---|---|---|
+| `HTTP 400 — Nothing would run: no scenario asked is a shared scenario of a provider named (X: CODE)` | The code is private, or is not in that provider's data file | Share it, or copy it into that provider (Test Config → *Copy scenarios from…*), then share the copy |
+| `not on this provider: CODE` for one provider, the others run | That provider has no shared scenario of that code | Not an error: each provider runs the codes it has |
+| A simulator code runs on one simulator only | The simulators' codes end in their OSDM version (`_36` ALPHA, `_37` BETA, `_38` GAMMA, `_39` DELTA, `_310` EPSILON, `_312` ZETA) | Give each provider's code, or copy one scenario (or a catalogue `OTST_…` one) into each provider, shared, so one code runs everywhere |
+| A suite on *My run list* ran every scenario | A suite saved before 1.11.563 lost that choice (#1353) | Delete it and save it again on *My run list*: it then runs each provider's own run list |
+| The Run page and the API count differently | The Run page counts for what **Working on** selects; the API counts each provider's data file, shared scenarios only | Select the provider in **Working on** to compare |
+
+A selection file (`--selection`) holds the Run page's filters as JSON (§ 5).
+JSON typed on the command line does not survive Windows PowerShell 5.1, which
+drops the inner quotes: write it to a file. The example client reads the file
+whatever encoding PowerShell gave it.
+
+### 11.4 Waiting for the verdict
+
+| Symptom | Cause | What to do |
+|---|---|---|
+| `HTTP 504` (or 502) while waiting | A proxy in front of OSCAR cut a call held open a minute: nginx's read timeout is 60 s by default | Ask OSCAR's administrator to set `proxy_read_timeout 660s` in the `location /` block, as `OSCAR_Deploy/nginx/oscar.conf.example` does. The example client waits 50 s at a time and, if a proxy cuts it, asks again half as long |
+| The client stops before the verdict (exit 3, or a closed window) | `--timeout` reached, or the PC asleep | Nothing is lost: the runs go on in OSCAR. `--status <id>` waits again; a finished request answers at once |
+| A run lasts more than the token's 15 minutes | Normal | A client signs a new assertion before its token ends (the example client does it by itself, § 7) |
+
+### 11.5 Reading the results
+
+- The console of the example client prints the verdict and each failed check.
+  The warnings are in `--json` and in the JUnit file's `<system-out>`.
+- **JUnit** is for the CI's test report; **JSON** for reading or for your own
+  scripts (each check with its fields). Both hold the same results.
+- A failed check is listed once, among the failures. The run's log also echoes
+  it as a warning (`[WARNING] ❌ …`); since 1.11.564 the API leaves that echo out
+  of `warnings`.

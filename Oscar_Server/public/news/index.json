@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-21-api-account-setup-points",
+    "date": "November 21, 2026",
+    "tag": "Improvement",
+    "title": "Company API accounts: clearer answers, and a guide to the problems met when setting one up",
+    "summary": "API Config says when the credentials are the account's, a refused test request says which scenarios were not found and why, and a failed check is no longer listed as a warning too.",
+    "content": "These come from setting up a first Company API account on the simulators.\n\nOn API Config opened for an account, the credentials are now named the account's, not yours: your own are not changed when you save there.\n\nWhen a test request is refused because nothing would run, the answer now says, for each provider, which scenario codes were not found, and the two usual reasons: the account runs shared scenarios only, so a scenario you keep private is not seen, and a code must be that provider's own. Share the scenarios your automation must run.\n\nIn the results, a failed check was also listed among the warnings. It is now listed once, among the failures.\n\nThe example client waits less long at a time and copes with a proxy that cuts a long wait. The Test Automation API Guide has a new section listing each problem met during a set-up, its cause and what to do.\n\nNothing to do on your side, except sharing the scenarios your test automation should run."
+  },
+  {
     "id": "2026-11-21-suite-run-list",
     "date": "November 21, 2026",
     "tag": "Bug Fix",

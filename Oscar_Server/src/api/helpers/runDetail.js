@@ -76,11 +76,17 @@ function failuresOf(runId) {
   };
 }
 
-// The [WARNING] lines of one log row (its text is encrypted at rest).
+// The collection echoes every failed check in the log as "[WARNING] ❌ <check>"
+// (bruTest() in library-bruno/testCapture.js, on purpose). That check is
+// already among the failures: listed as a warning too, one problem read twice.
+const FAILURE_ECHO = /\[WARNING\]\s*❌/u;
+
+// The [WARNING] lines of one log row (its text is encrypted at rest), failure
+// echoes left out (#1355).
 function warningLinesOf(row) {
   let text = '';
   try { text = colDecrypt(row.message) || ''; } catch { text = ''; }
-  return String(text).split('\n').filter(isWarningLine);
+  return String(text).split('\n').filter(line => isWarningLine(line) && !FAILURE_ECHO.test(line));
 }
 
 // One warning line: a known deviation (said once, among the deviations), else a

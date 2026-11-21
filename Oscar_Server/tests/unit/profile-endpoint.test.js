@@ -377,7 +377,7 @@ describe('API Config page — one section per company or provider (#580)', () =>
     }
     expect(page.cards[OWN].element('kind').textContent).toBe('your company');
     expect(page.cards[BETA].element('kind').textContent).toBe('provider');
-    expect(SOURCE.some(l => l.includes('Your Credentials for <span data-f="name-2">'))).toBe(true);
+    expect(SOURCE.some(l => l.includes('<span data-f="creds-whose">Your</span> Credentials for <span data-f="name-2">'))).toBe(true);
   });
 
   test('clearing asks first, names the section, and clears only there', async () => {
@@ -468,7 +468,7 @@ describe('API Config page — one section per company or provider (#580)', () =>
 
     test('the script finds a field inside its section, never by id across the page', () => {
       const byId = [...script.matchAll(/getElementById\('([^']+)'\)/g)].map(m => m[1]);
-      expect([...new Set(byId)].sort()).toEqual(['account-notice', 'msg', 'page-hint', 'providers-link', 'target-template', 'targets', 'targets-summary', 'targets-summary-rows']);
+      expect([...new Set(byId)].sort()).toEqual(['account-notice', 'msg', 'page-hint', 'providers-link', 'summary-creds-col', 'target-template', 'targets', 'targets-summary', 'targets-summary-rows']);
       expect(script).not.toMatch(/querySelector\('#/);
     });
   });
@@ -754,5 +754,24 @@ describe('API Config page — show what was typed in a masked field (#1351)', ()
     const fill = sourceOf('fillCredentials');
     expect(fill).toContain("['access_token', 'client_id', 'client_secret', 'oauth_extra', 'requestor', 'subscription_key']");
     expect(fill).toContain(".forEach(secret => { field(card, secret).value = ''; });");
+  });
+});
+
+describe('API Config page — opened for a Company API account, the credentials are named the account\'s (#1355)', () => {
+  test('the section heading and hint, and the summary column, say whose credentials they are', () => {
+    const addTarget = sourceOf('addTarget');
+    expect(addTarget).toContain(String.raw`field(card, 'creds-whose').textContent = 'The account\'s';`);
+    expect(addTarget).toMatch(/if \(API_ACCOUNT_ID\) \{\n[^}]*creds-hint/);
+    expect(SOURCE.join('\n')).toContain('<h3 class="second"><span data-f="creds-whose">Your</span> Credentials for <span data-f="name-2"></span></h3>');
+    expect(SOURCE.join('\n')).toContain('<p class="hint" data-f="creds-hint">');
+    expect(sourceOf('showAccountNotice')).toContain(String.raw`column.textContent = 'The account\'s credentials';`);
+  });
+
+  test('the warnings about credentials saved for another endpoint say whose they are', () => {
+    const page = openPage('test_manager', { search: `?api_account=${ACCOUNT}` });
+    expect(page.context.whoseCredentials(true)).toBe('The account\'s');
+    const source = SOURCE.join('\n');
+    expect(source).toContain("'⚠️ The OSDM endpoint changed since ' + whoseCredentials(false) + ' credentials were saved. '");
+    expect(source).toContain("'⚠️ ' + whoseCredentials(true) + ' credentials were saved before there was an OSDM endpoint. '");
   });
 });

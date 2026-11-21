@@ -23,7 +23,8 @@ const http = require('node:http');
 const { execFileSync, spawnSync } = require('node:child_process');
 const { argsOf } = require('../src/args');
 const { clientFor, assertionFor, privateKeyOf, originOf } = require('../src/oscar');
-const { runTool, providerIdsOf, EXIT } = require('../src/run');
+const { runTool, providerIdsOf, waitForVerdict, textOf, EXIT, WAIT_S } = require('../src/run');
+const { OscarError } = require('../src/oscar');
 
 const CLIENT = '3f2a91c0-1d2e-4c5b-8a9f-0123456789ab';
 const COMPANY = { id: 'c0000000-0000-4000-8000-000000000000', name: 'UIC Simulateurs' };
@@ -144,7 +145,7 @@ test('a suite on two providers by name: the request, the wait, the report, JUnit
     assert.equal(id, 'tr-1');
     assert.deepEqual(oscar.seen.posts, [{ body: { providers: [ALPHA.id, BETA.id], suite: 'smoke', reference: 'pipeline 42' }, key: 'ci-build-1001' }]);
     assert.equal(oscar.seen.tokens, 1, 'the token is asked once and kept');
-    assert.deepEqual(oscar.seen.reads, ['60', '60']);
+    assert.deepEqual(oscar.seen.reads, [String(WAIT_S), String(WAIT_S)]);
     const text = h.lines.join('\n');
     assert.match(text, /alpha: 1 run\(s\); not on this provider: OTST_GONE/);
     assert.match(text, /Verdict: FAILED/);
@@ -219,5 +220,47 @@ test('the command line: --help, and a missing setting is exit 4 with the reason'
     assert.match(missing.stderr, /File not found/);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// #1355: a proxy in front of OSCAR may cut a long wait (nginx's 60 s default answered 504).
+test('a wait a proxy cuts is asked again, half as long; five cuts in a row stop with how to wait again', async () => {
+  // A client whose OSCAR answers the waits listed, in turn: a status cut by a proxy, or a state.
+  const clientOf = (answers) => {
+    const asked = [];
+    return {
+      asked,
+      call: async (method, where) => {
+        asked.push(Number(new URL(where, 'https://o.example').searchParams.get('wait')));
+        const next = answers.shift();
+        if (typeof next === 'number') throw new OscarError(`GET ${where}: HTTP ${next}`, next);
+        return { status: 200, body: { state: next, counts: { running: 1 } } };
+      },
+    };
+  };
+  const lines = [];
+  const opts = { deadline: Date.now() + 3600 * 1000, out: l => lines.push(l) };
+  assert.equal(WAIT_S < 60, true);
+  const client = clientOf([504, 502, 'running', 'finished']);
+  const done = await waitForVerdict(client, 'tr-1', opts);
+  assert.equal(done.state, 'finished');
+  // Halved at each cut, and kept short after: whatever cut one wait may cut the next.
+  assert.deepEqual(client.asked, [WAIT_S, Math.floor(WAIT_S / 2), Math.floor(WAIT_S / 4), Math.floor(WAIT_S / 4)]);
+  assert.equal(lines.filter(l => l.includes('a proxy cut the wait')).length, 2);
+
+  const cut = clientOf([504, 504, 504, 504, 504]);
+  await assert.rejects(waitForVerdict(cut, 'tr-9', opts), /cut the wait 5 times in a row[\s\S]*--status tr-9[\s\S]*proxy_read_timeout/);
+  assert.equal(Math.min(...cut.asked), 10);
+  // Any other refusal is not retried.
+  await assert.rejects(waitForVerdict(clientOf([401]), 'tr-2', opts), /HTTP 401/);
+});
+
+test('a selection file from PowerShell is read whatever its encoding', () => {
+  const json = '{"categories":["happy"]}';
+  const le = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(json, 'utf16le')]);
+  const be = Buffer.from(le);
+  be.swap16();
+  for (const buffer of [Buffer.from(json), Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(json)]), le, be]) {
+    assert.deepEqual(JSON.parse(textOf(buffer)), { categories: ['happy'] });
   }
 });

@@ -17,7 +17,26 @@
 const { OscarError } = require('./oscar');
 
 const EXIT = Object.freeze({ passed: 0, failed: 1, incomplete: 2, timeout: 3, error: 4 });
-const WAIT_S = 60;
+// The longest wait asked, under the 60 s a proxy in front of OSCAR often
+// allows (nginx's default read timeout cut a 60 s wait with 504, #1355).
+const WAIT_S = 50;
+// A wait a proxy cuts is asked again, half as long (not under MIN_WAIT_S); after
+// GATEWAY_TRIES cuts in a row the tool stops waiting.
+const GATEWAY_STATUSES = new Set([502, 503, 504]);
+const MIN_WAIT_S = 10;
+const GATEWAY_TRIES = 5;
+
+/** Text of a file as read: a leading UTF-8 byte-order mark dropped, UTF-16 read as such. */
+function textOf(buffer) {
+  if (buffer[0] === 0xff && buffer[1] === 0xfe) return buffer.subarray(2).toString('utf16le');
+  if (buffer[0] === 0xfe && buffer[1] === 0xff) {
+    const swapped = Buffer.from(buffer.subarray(2));
+    swapped.swap16();
+    return swapped.toString('utf16le');
+  }
+  const text = buffer.toString('utf8');
+  return text.codePointAt(0) === 0xfeff ? text.slice(1) : text;
+}
 
 /** The account as OSCAR describes it (GET /v1/api/key). */
 async function whoami(client) {
@@ -59,13 +78,38 @@ function requestBodyOf(settings, providerIds, readFile) {
 const countsText = c => ['queued', 'running', 'passed', 'passed_with_deviation', 'failed', 'not_a_result', 'cancelled']
   .filter(k => c?.[k]).map(k => `${k.replaceAll('_', ' ')} ${c[k]}`).join(', ') || 'nothing yet';
 
+// One wait of at most `wait` seconds: the answer, or null when a proxy cut it.
+async function waitOnce(client, id, wait) {
+  try {
+    return (await client.call('GET', `/v1/api/test-requests/${encodeURIComponent(id)}?wait=${wait}`)).body;
+  } catch (e) {
+    if (e instanceof OscarError && GATEWAY_STATUSES.has(e.status)) return null;
+    throw e;
+  }
+}
+
+const cutText = (id, cuts) => `A proxy in front of OSCAR cut the wait ${cuts} times in a row (HTTP 502, 503 or 504). `
+  + `The tests go on in OSCAR: wait again later with --status ${id}. OSCAR's administrator can raise the proxy's `
+  + 'read timeout (nginx: proxy_read_timeout 660s).';
+
 /** Waits for the verdict: the answer once finished, or null at the deadline. */
 async function waitForVerdict(client, id, { deadline, out, now = () => Date.now() }) {
   let last = '';
+  let longest = WAIT_S;
+  let cuts = 0;
   for (;;) {
     const left = Math.floor((deadline - now()) / 1000);
-    const wait = Math.max(0, Math.min(WAIT_S, left));
-    const { body } = await client.call('GET', `/v1/api/test-requests/${encodeURIComponent(id)}?wait=${wait}`);
+    const wait = Math.max(0, Math.min(longest, left));
+    const body = await waitOnce(client, id, wait);
+    if (!body) {
+      cuts += 1;
+      if (cuts >= GATEWAY_TRIES) throw new OscarError(cutText(id, cuts));
+      // Shorter waits from now on: whatever cut this one may cut the next.
+      longest = Math.max(MIN_WAIT_S, Math.floor(longest / 2));
+      out(`  (a proxy cut the wait: asking every ${longest} s now)`);
+      continue;
+    }
+    cuts = 0;
     const line = `${body.state}: ${countsText(body.counts)}`;
     if (line !== last) { out(`  ${line}`); last = line; }
     if (body.state === 'finished') return body;
@@ -189,4 +233,4 @@ async function runTool(settings, client, io) {
   return { code: await report(settings, client, io, id), id };
 }
 
-module.exports = { runTool, providerIdsOf, requestBodyOf, reportOf, exitOf, waitForVerdict, EXIT };
+module.exports = { runTool, providerIdsOf, requestBodyOf, reportOf, exitOf, waitForVerdict, textOf, EXIT, WAIT_S };

@@ -119,7 +119,13 @@ describe('launching', () => {
     expect(runsOf(res.body).map(r => r.scenario_code).sort()).toEqual(['OTST_SALE_A', 'OTST_SALE_B']);
     const own = await launch({ providers: [P1], scenarios: ['OTST_TESTER_OWN'] });
     expect(own.status).toBe(400);
-    expect(own.body.not_found).toEqual([{ provider: P1, codes: ['OTST_TESTER_OWN'] }]);
+    expect(own.body.not_found).toEqual([{ provider: P1, name: 'Req P1', codes: ['OTST_TESTER_OWN'] }]);
+    // #1355: the refusal says where, what, and the two usual reasons.
+    expect(own.body.detail).toContain('(Req P1: OTST_TESTER_OWN)');
+    expect(own.body.detail).toContain('one kept private in Test Config is not seen');
+    const none = await launch({ providers: [P1], selection: { categories: ['simulated'] } });
+    expect(none.status).toBe(400);
+    expect(none.body.detail).toContain('The selection keeps no shared scenario on any provider named.');
   });
 
   test('refused before anything is queued: a provider not given, a suspended endpoint, missing credentials', async () => {

@@ -95,6 +95,12 @@ waited for again:
 node oscar-test.js --status <test request id> --junit result.xml
 ```
 
+The tool waits 50 seconds at a time. If a proxy in front of OSCAR cuts a wait
+(HTTP 502, 503 or 504), it asks again with a shorter wait, and after five cuts
+in a row it stops (exit 4) and says how to wait again. A `--selection` file is
+read whatever encoding PowerShell wrote it in. More problems and their causes:
+the guide's § 11.
+
 ### Options
 
 | Option | |
