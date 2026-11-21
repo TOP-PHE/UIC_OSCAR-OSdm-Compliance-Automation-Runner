@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.602",
+  "current_release": "2026.603",
   "releases": [
+    {
+      "release": "2026.603",
+      "date": "2026-11-21",
+      "server": "1.11.564",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.564 (#1355), from the first real set-up of a Company API account: API Config opened for an account names the credentials the account's (section heading and hint, summary column, the endpoint warnings); a test request refused because nothing would run says, per provider, which codes were not found and why (a private scenario is not seen by the account; a code must be that provider's own), its not_found naming each provider; the API's warnings of a run leave out the collection's echo of each failed check ([WARNING] ❌), already among the failures; the example client waits 50 s at a time, asks again with a shorter wait when a proxy cuts a wait (502/503/504) and reads a --selection file in any encoding PowerShell writes; the Test Automation API Guide gains § 11, the problems met and what to do."
+      ]
+    },
     {
       "release": "2026.602",
       "date": "2026-11-21",

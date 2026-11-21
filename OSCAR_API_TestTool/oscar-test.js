@@ -18,7 +18,7 @@
 const fs = require('node:fs');
 const { argsOf, USAGE } = require('./src/args');
 const { clientFor, privateKeyOf, originOf, OscarError } = require('./src/oscar');
-const { runTool, EXIT } = require('./src/run');
+const { runTool, textOf, EXIT } = require('./src/run');
 
 async function main() {
   const settings = argsOf(process.argv.slice(2), process.env);
@@ -41,7 +41,7 @@ async function main() {
     });
     const { code } = await runTool(settings, client, {
       out: line => process.stdout.write(`${line}\n`),
-      readFile: file => fs.readFileSync(file, 'utf8'),
+      readFile: file => textOf(fs.readFileSync(file)),
       writeFile: (file, text) => fs.writeFileSync(file, text),
     });
     return code;

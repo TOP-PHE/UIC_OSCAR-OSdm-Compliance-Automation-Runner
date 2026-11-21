@@ -588,6 +588,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.564] — 2026-11-21
+
+Release 2026.603 (`current_release`). What the first real set-up of a Company API account met (#1355, maintainer's request: document every problem, fix the points still open).
+
+### Fixed
+- **API Config opened for a Company API account named the credentials yours.** The section heading, its hint ("Visible to you only… Each tester keeps their own"), the summary's column and the two endpoint warnings now say *the account's*, and the hint that your own are not changed (`creds-whose`, `creds-hint`, `summary-creds-col`, `whoseCredentials()`).
+- **A failed check was also listed as a warning.** The collection echoes each failed check in the log as `[WARNING] ❌ <check>` (`bruTest()`, on purpose); the API's `warnings` (JSON, and the JUnit `<system-out>`) took every `[WARNING]` line and repeated the failure. `warningLinesOf()` (`runDetail.js`) leaves the echo out; the AI analysis and the coverage report are not changed.
+
+### Changed
+- **"Nothing would run" says where and why.** The 400 of `POST /v1/api/test-requests` named neither the providers nor the reason, and was met five times (a private scenario, another simulator's code, a code that did not exist). It now names, for each provider, the codes not found (five, then "and N more"), and says that the account runs shared scenarios only and that a code must be that provider's own; for a selection or suite, that it keeps no shared scenario. `not_found` names each provider (`name`).
+- **The example client** (`OSCAR_API_TestTool/`, no version): it waits 50 s at a time (production's nginx, at its 60 s default read timeout, cut a 60 s wait with 504); a wait answered 502, 503 or 504 is asked again half as long (not under 10 s), and five cuts in a row stop it with how to wait again. A `--selection` file is read with a UTF-8 byte-order mark or in UTF-16, as PowerShell writes them (`textOf()`).
+
+### Documentation
+- ***OSCAR - Test Automation API Guide*: new § 11, "Problems met while setting it up"**: signing in, the account's providers and credentials, which scenarios run (shared only, codes per OSDM version, *My run list*, the Run page's counts), waiting (a proxy's timeout, `--status`), reading the results. § 1 says to choose OAuth2 for the account and that it runs shared scenarios only; § 6 and the CI example ask `?wait=50`. The client's README says how it waits.
+
+---
+
 ## [server-1.11.563] — 2026-11-21
 
 Release 2026.602 (`current_release`). A suite on the run list runs each provider's own (#1353).

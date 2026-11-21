@@ -82,7 +82,7 @@ details.target.current{box-shadow:0 0 0 2px #0090D4,0 1px 4px rgba(0,0,0,.08)}
   <div class="card" id="targets-summary" style="display:none">
     <table>
       <thead>
-        <tr><th scope="col">Company or provider</th><th scope="col">OSDM endpoint</th><th scope="col">Your credentials</th><th scope="col">Test data</th></tr>
+        <tr><th scope="col">Company or provider</th><th scope="col">OSDM endpoint</th><th scope="col" id="summary-creds-col">Your credentials</th><th scope="col">Test data</th></tr>
       </thead>
       <tbody id="targets-summary-rows"></tbody>
     </table>
@@ -153,8 +153,8 @@ details.target.current{box-shadow:0 0 0 2px #0090D4,0 1px 4px rgba(0,0,0,.08)}
       </div>
 
       <!-- Per user: only YOUR credentials for this company or provider -->
-      <h3 class="second">Your Credentials for <span data-f="name-2"></span></h3>
-      <p class="hint">
+      <h3 class="second"><span data-f="creds-whose">Your</span> Credentials for <span data-f="name-2"></span></h3>
+      <p class="hint" data-f="creds-hint">
         Visible to you only, and used only for your runs here. Each tester keeps their own.
       </p>
       <div class="field">
@@ -592,10 +592,10 @@ function showEndpointChanged(card, m) {
   const text = document.createElement('span');
   // 1.11.479: saved while there was no endpoint, they are tied to none.
   if (m.credentials_endpoint) {
-    title.textContent = '⚠️ The OSDM endpoint changed since your credentials were saved. ';
+    title.textContent = '⚠️ The OSDM endpoint changed since ' + whoseCredentials(false) + ' credentials were saved. ';
     text.textContent = `They were saved for ${m.credentials_endpoint}. OSCAR sends them nowhere, and starts no run, until you check them below and save them again.`;
   } else {
-    title.textContent = '⚠️ Your credentials were saved before there was an OSDM endpoint. ';
+    title.textContent = '⚠️ ' + whoseCredentials(true) + ' credentials were saved before there was an OSDM endpoint. ';
     text.textContent = 'OSCAR sends them nowhere, and starts no run, until you check them below and save them again.';
   }
   note.append(title, text);
@@ -857,6 +857,11 @@ function addTarget(target, index) {
   addRevealButtons(card);
   field(card, 'name').textContent = target.name;
   field(card, 'name-2').textContent = target.name;
+  if (API_ACCOUNT_ID) {
+    // #1355: opened for a Company API account, the section is the account's, not the person's.
+    field(card, 'creds-whose').textContent = 'The account\'s';
+    field(card, 'creds-hint').textContent = 'Used only for the Company API account\'s runs here. Your own credentials are not changed.';
+  }
   field(card, 'auth_mode').addEventListener('change', () => switchMode(card));
   field(card, 'oauth_profile').addEventListener('change', () => switchProfile(card));
   field(card, 'save-btn').addEventListener('click', () => { saveTarget(card).catch(reportTargetError(card)); });
@@ -918,6 +923,9 @@ function showAccountNotice(account) {
   back.textContent = '← Back to API Accounts';
   box.replaceChildren(title, text, back);
   box.style.display = 'block';
+  // #1355: the summary's column names whose credentials it shows.
+  const column = document.getElementById('summary-creds-col');
+  if (column) column.textContent = 'The account\'s credentials';
 }
 
 function openTarget(id) {

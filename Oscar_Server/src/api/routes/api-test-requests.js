@@ -112,10 +112,30 @@ const requestRow = (id, accountId) => get('SELECT * FROM test_request WHERE id =
 // Every provider is checked before anything is queued: { plans } or { refusal: [status, body] }.
 // A provider that cannot run, as the API answers it: 404 when it is not
 // there, else 409, naming the provider.
+const companyName = companyId => get('SELECT name FROM companies WHERE id = ?', [companyId])?.name || companyId;
+
 function providerRefusal(companyId, [status, body]) {
   const code = status === 404 ? 404 : 409;
-  const name = get('SELECT name FROM companies WHERE id = ?', [companyId])?.name || companyId;
-  return [code, { ...body, status: code, title: code === 404 ? 'Not Found' : 'Conflict', detail: `${name}: ${body.detail || body.title}`, provider: companyId }];
+  return [code, { ...body, status: code, title: code === 404 ? 'Not Found' : 'Conflict', detail: `${companyName(companyId)}: ${body.detail || body.title}`, provider: companyId }];
+}
+
+// At most this many codes a provider in the words of a refusal; the body lists them all.
+const CODES_SAID = 5;
+
+// Why nothing would run, in words (#1355): what each provider lacks, and the two
+// reasons met in practice (a private scenario, another provider's code).
+function nothingToRunText(request, plans) {
+  if (request.scenarios) {
+    const where = plans.map((p) => {
+      const more = p.notFound.length > CODES_SAID ? ` and ${p.notFound.length - CODES_SAID} more` : '';
+      return `${companyName(p.companyId)}: ${p.notFound.slice(0, CODES_SAID).join(', ')}${more}`;
+    }).join('; ');
+    return `Nothing would run: no scenario asked is a shared scenario of a provider named (${where}). `
+      + 'The account runs shared scenarios only: one kept private in Test Config is not seen. Each code must be that provider\'s own.';
+  }
+  const what = request.suite ? `The suite "${request.suite}"` : 'The selection';
+  return `Nothing would run: ${what} keeps no shared scenario on any provider named. `
+    + 'The account runs shared scenarios only; on the run list, each provider runs what its own Test Config selects.';
 }
 
 // The scenarios a selection is cut from on one provider (#1353). With the run
@@ -214,8 +234,8 @@ async function launchHandler(req, res) {
   const planned = await plansFor(request, req);
   if (planned.refusal) return res.status(planned.refusal[0]).json(planned.refusal[1]);
   if (planned.plans.every(p => p.codes.length === 0)) {
-    return problem(res, 400, 'Bad Request', 'Nothing would run: no scenario asked is on any provider named, or the selection or suite keeps none.',
-      { not_found: planned.plans.map(p => ({ provider: p.companyId, codes: p.notFound })) });
+    return problem(res, 400, 'Bad Request', nothingToRunText(request, planned.plans),
+      { not_found: planned.plans.map(p => ({ provider: p.companyId, name: companyName(p.companyId), codes: p.notFound })) });
   }
 
   // The key is taken before anything is queued: two calls at once with it queue once.

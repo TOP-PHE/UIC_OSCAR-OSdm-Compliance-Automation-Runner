@@ -83,6 +83,8 @@ beforeAll(async () => {
         expected: '200', actual: '400', body: JSON.stringify({ code: 'urn:uic:problem:BOOKING_REFUSED', title: 'Refused', detail: 'Alex Example' }) },
     ],
     events: [{ step: '02. POST Booking', message: '[WARNING] The booking names no confirmableUntil.' },
+      // #1355: the collection's echo of the failed check is not a warning of its own.
+      { step: '02. POST Booking', message: '[WARNING] ❌ HTTP response status — expected 200: expected 200, actual: 400' },
       { step: '02. POST Booking', level: 'info', message: '[INFO] Not a warning, never answered' }],
   });
   // B: passed, with a known deviation applied.
