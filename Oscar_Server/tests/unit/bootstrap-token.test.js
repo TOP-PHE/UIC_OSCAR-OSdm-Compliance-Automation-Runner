@@ -108,3 +108,19 @@ describe('the route', () => {
     expect([...places].sort((a, b) => a - b)).toEqual(places);
   });
 });
+
+describe("the route's rate limit", () => {
+  // Named in the route's own chain, first: a limit applied through
+  // router.use('/bootstrap', …) is one the code scanner does not see, and it
+  // shared the bucket of the sign-in attempts.
+  const auth = fs.readFileSync(path.join(SRC, "api", "routes", "auth.js"), "utf8");
+
+  test("the route names its own limiter before anything else", () => {
+    expect(auth).toContain("router.post('/bootstrap/platform-user', bootstrapLimiter,");
+    expect(auth).toMatch(/const bootstrapLimiter = rateLimit\(\{/);
+  });
+
+  test("and is no longer counted in the sign-in attempts' bucket as well", () => {
+    expect(auth).not.toMatch(/^router[.]use[(]'[/]bootstrap', authLimiter[)];/m);
+  });
+});
