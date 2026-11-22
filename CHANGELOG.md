@@ -636,6 +636,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.571] — 2026-11-22
+
+Two heavy reads taken off the server's thread: a run's warning lines, the list of references (#1383). Not released on its own: listed in `compatibility.json` (2026.610) without moving `current_release`.
+
+### Changed
+- **A run's warning lines are kept on their own, and read from there.** A run's log is some 1,500 lines, a few dozen of them warnings, and the log table's one index is by run: the coverage report, the AI analysis and a run's detail through the API each read every run's whole log to keep those few.
+  - The writer of the log (`worker/runLog.js`) now writes a warning line a second time, in `run_warning_lines`, under the id its log line gets and in the same transaction. The runner marks a run when it starts it (`runs.warn_lines_kept`, migration 61).
+  - `api/helpers/runWarnings.js` reads a marked run from that table and any other run from its log, and merges the two by the log line's id: the three readers get the rows their statements gave, in the same order and under the same limits. A test compares them with those statements on drawn data, with no run marked, every run marked, and mixes.
+  - **Measured** on a throw-away database, 300 runs of 1,500 lines, 13,800 warnings: 1.9 s with the statement of before, 48 ms with every run marked. The writer: 450,000 lines in 11.8 to 15.3 s without the copy and 12.3 to 14.4 s with it, three times each on a new database: no difference above the noise.
+  - **The runs of before are read as before.** Nothing is copied for them, and no index is made on the log table: it is the largest table, and making one reads it whole with the server unable to write meanwhile (#1295). The gain comes with each new run, and the coverage report reads the latest run of each scenario.
+- **The reference configurations are read once per version of their files.** `GET /v1/company/reference`, asked at each load of the Run page and of Test Config, read and parsed the simulator's data file (1.9 MB) and computed a version again for each of the six references: 101 ms a call here, 10.5 ms now. The kept-file code of the catalogue (#1236) moved to `utils/keptJsonFile.js` and serves both; a reference's version is kept while its two files are the same. The references and the catalogue now share one parsed data file. What comes back is frozen, as the catalogue's files are.
+
+### Tests
+- `run-warnings.test.js` (31 tests) and `reference-store-kept.test.js` (9 tests), both new. 24 mutations of the changed code, each caught by a test.
+
+### Documentation
+- *Solution Architecture* (the new table). No news entry: nothing changes for testers or Test Managers but the time two pages take.
+
 ## [server-1.11.570] — 2026-11-22
 
 The code-scanning alerts left on `main`, read one by one (#1377). Not released on its own: listed in `compatibility.json` (2026.609) without moving `current_release`.

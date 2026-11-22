@@ -1261,6 +1261,28 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   conversion): `export MSYS_NO_PATHCONV=1` before passing a comment line as an
   anchor. **On a pull request CodeQL reports on the changed lines only**
   ("Persisted N diff range(s)"); the whole reading is `main`'s next analysis.
+- **A run's warning lines are read through `api/helpers/runWarnings.js`,
+  never from `run_events` directly** (#1383, 1.11.571). The log's writer
+  (`runLog.js` `writeLine()`) writes a line of level `warn` a second time in
+  `run_warning_lines` (`event_id` = the id of its `run_events` row, same
+  transaction, same stored text), and the runner sets `runs.warn_lines_kept`
+  in the statement that starts the run (migration 61, default 0).
+  `warningRowsOf(runIds, limit)` (500 runs a call at most) and
+  `warningRowsOfBatch(companyId, batchId, statuses, limit)` read a marked run
+  from that table, any other from its log, and merge by the log line's id:
+  the same rows and order as `… WHERE level = 'warn' … ORDER BY id LIMIT ?`,
+  which `run-warnings.test.js` holds against the old statements on drawn
+  data. **A new reader of warnings goes through the helper**, or it walks
+  whole logs again (1.9 s against 48 ms for 300 runs on the bench). **The
+  runs of before are not copied and `run_events` gets no index**: it is the
+  largest table (the #1295 rule). `FINISHED` in `batchFailures.js` is a
+  `Set`: a helper that takes it spreads it (`statuses.length` was undefined,
+  "column index out of range"; a scratch call with an array had passed).
+  **A file of the collection is parsed once per version by
+  `utils/keptJsonFile.js` `keptJson()`** (moved out of `catalogueSource.js`),
+  frozen, and the same object comes back while the file is the same:
+  `referenceStore.js` keeps a reference's version under its two objects, and
+  the references share the catalogue's parsed data file.
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;

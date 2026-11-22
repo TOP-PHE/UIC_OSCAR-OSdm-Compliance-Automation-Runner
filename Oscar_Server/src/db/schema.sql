@@ -177,6 +177,19 @@ CREATE TABLE IF NOT EXISTS run_events (
 );
 CREATE INDEX IF NOT EXISTS idx_run_events_run_id ON run_events(run_id);
 
+-- A run's warning lines, kept on their own by the writer of the log
+-- (worker/runLog.js): the readers of warnings used to walk each run's whole
+-- log, whose one index is by run. event_id is the id of the line in
+-- run_events, so both give the same order. Only for the runs marked
+-- runs.warn_lines_kept (migration 61); api/helpers/runWarnings.js reads both.
+CREATE TABLE IF NOT EXISTS run_warning_lines (
+  event_id     INTEGER PRIMARY KEY,
+  run_id       TEXT NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
+  request_name TEXT,
+  message      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_run_warning_lines_run ON run_warning_lines(run_id);
+
 -- ── Run Artifacts ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS run_artifacts (
   id        TEXT PRIMARY KEY,                    -- UUID

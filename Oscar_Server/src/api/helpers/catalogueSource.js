@@ -18,7 +18,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { get } = require('../../db/db');
 const { decryptFromFileAsync } = require('../../utils/at-rest');
-const { fileVersion, deepFreeze } = require('../../utils/runDatafile');
+const { keptJson } = require('../../utils/keptJsonFile');
 const TripApply = require('../../../public/js/trip-apply');
 const log = require('../../utils/logger').child({ module: 'catalogue-source' });
 
@@ -48,26 +48,7 @@ async function readDatafile(companyId) {
 // the file is looked at each time and read again once it changed. What is
 // kept is frozen: a caller that wrote into it would change what the next
 // one reads, and throws instead (they all work on copies).
-const MAX_KEPT_FILES = 8;
-const keptFiles = new Map();
-
-// The file is opened once and its version and text read from what was opened,
-// so a file replaced in between is never kept under the other's version.
-function keptJson(file) {
-  const fd = fs.openSync(file, 'r');
-  try {
-    const version = fileVersion(fs.fstatSync(fd, { bigint: true }));
-    const kept = keptFiles.get(file);
-    if (kept?.version === version) return kept.value;
-    const value = deepFreeze(JSON.parse(fs.readFileSync(fd, 'utf8')));
-    keptFiles.delete(file);
-    keptFiles.set(file, { version, value });
-    while (keptFiles.size > MAX_KEPT_FILES) keptFiles.delete(keptFiles.keys().next().value);
-    return value;
-  } finally {
-    fs.closeSync(fd);
-  }
-}
+// (utils/keptJsonFile.js, shared with the reference configurations).
 
 // A file of the collection the runs use (COLLECTION_PATH), else the
 // repository's copy, as the data file schema is read. Frozen (#1236).

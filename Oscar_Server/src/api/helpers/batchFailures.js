@@ -15,6 +15,7 @@
  */
 
 const { all, colDecrypt } = require('../../db/db');
+const { warningRowsOfBatch } = require('./runWarnings');
 const S = require('../../utils/findingSuggestions');
 const { isWarningLine } = require('../../utils/aiAnalysis');
 
@@ -66,15 +67,7 @@ function failuresOfBatch(companyId, batchId) {
  * `truncated` says when that limit was met.
  */
 function warningsOfBatch(companyId, batchId) {
-  const rows = all(
-    `SELECT e.run_id, e.request_name, e.message, r.scenario_code
-       FROM run_events e
-       JOIN runs r ON r.id = e.run_id
-      WHERE r.company_id = ? AND r.batch_id = ? AND r.status IN (?, ?) AND e.level = 'warn'
-      ORDER BY r.queued_at ASC, e.id ASC
-      LIMIT ?`,
-    [companyId, batchId, ...FINISHED, MAX_WARNING_EVENTS]
-  );
+  const rows = warningRowsOfBatch(companyId, batchId, FINISHED, MAX_WARNING_EVENTS);
   const warnings = [];
   for (const row of rows) {
     let text = '';
