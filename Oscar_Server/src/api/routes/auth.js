@@ -80,7 +80,19 @@ const authLimiter = rateLimit({
 });
 router.use('/login', authLimiter);
 router.use('/register', authLimiter);
-router.use('/bootstrap', authLimiter);
+
+// The bootstrap route (#1365): a limit of its own, named in the route's own
+// chain. It was limited through router.use('/bootstrap', authLimiter), in the
+// bucket of the sign-in attempts; the code scanner does not read that as a
+// limit on the route, and a sign-in page left open no longer uses up the
+// attempts of whoever installs the server.
+const bootstrapLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: AUTH_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many attempts. Please try again later.' }
+});
 
 // Issue #449 — register/confirm now does more (account creation, a
 // test_manager lookup, an outbound email) than before, and CodeQL's
@@ -374,7 +386,7 @@ router.get('/register/check-token', registerConfirmLimiter, (req, res) => {
 });
 
 // ── POST /v1/auth/bootstrap/platform-user ────────────────────────────────────
-router.post('/bootstrap/platform-user',
+router.post('/bootstrap/platform-user', bootstrapLimiter,
   validate([
     v.body('email').isString().withMessage('email is required')
       .isEmail().withMessage('email must be a valid address')
