@@ -283,11 +283,23 @@ HOST=oscar.example.org     # ← yours
 curl -s -o /dev/null -D - -H 'Accept-Encoding: gzip' "https://$HOST/js/scenarios.js" | grep -i '^content-encoding'
 ```
 
-An installation made before this section existed has no `gzip_types` line:
-add the six `gzip` lines above after `client_max_body_size` in
-`/etc/nginx/sites-available/oscar` (in the `server` block that listens on
-443), then `sudo nginx -t && sudo systemctl reload nginx`. A reload cuts no
-connection and stops no run.
+An installation made before this section existed has no `gzip_types` line.
+The simplest there is a file of its own: it touches neither the site's file
+nor `nginx.conf`, and removing it goes back. The command checks the
+configuration before it reloads, and removes the file if nginx refuses it:
+
+```bash
+FILE=/etc/nginx/conf.d/oscar-compression.conf     # ← yours
+printf '%s\n' 'gzip_comp_level 5;' 'gzip_min_length 1024;' 'gzip_proxied    any;' 'gzip_vary       on;' 'gzip_types      application/json application/problem+json application/javascript text/javascript text/css text/plain text/csv application/xml image/svg+xml;' | sudo tee "$FILE" > /dev/null
+if sudo nginx -t; then sudo systemctl reload nginx && echo reloaded; else sudo rm "$FILE"; echo "refused: file removed, nothing changed"; fi
+```
+
+No `gzip on;` in that file: Ubuntu's `nginx.conf` already says it for the
+whole server, and saying it twice at the same level is an error (`nginx -t`
+names it). On a distribution whose `nginx.conf` has none, add the line. A
+reload cuts no connection and stops no run. Done this way on production on
+2026-11-22: the Test Config script went from 555,602 to 150,043 bytes on the
+wire.
 
 ---
 
