@@ -1201,11 +1201,40 @@ function noteRunTimes(runId) {
   }
 }
 
-async function runSteps({ runId, companyId, userId, scenarioOverride }) {
-  // 1. Load run + company + user from DB. The OSDM credentials (auth_mode,
-  //    OAuth fields, bearer token, token cache) are the user's for THIS
-  //    company (#540: tester_credentials, per user and company). The company
-  //    row keeps api_base + datafile only.
+// A run, stage by stage. `run` is what the run is made of: its job (runId,
+// companyId, scenarioOverride), its rows (runRow, companyRow, userRow) and
+// what each stage adds for the next ones (the token, the working folder, the
+// environment's name, the process's limits…). A stage that cannot go on marks
+// the run FAILED and gives what executeRun answers.
+async function runSteps(job) {
+  const run = loadRun(job);
+  run.keptBatch = markRunning(run);
+  run.runArtifactDir = await artifactFolderOf(run.runId);
+
+  const refusal = await refusalBeforeStart(run);
+  if (refusal) return failRun(run.runId, refusal);
+  await recordRunVersions(run.runId, run.companyRow.datafile_path, run.scenarioOverride);
+
+  const failed = await prepareRun(run);
+  if (failed) return failed;
+
+  const exitCode = await runProcess(run);
+  return finishRun(run, exitCode);
+}
+
+// The run is marked FAILED, with its reason in its row and in its log. `said`
+// is the log's wording when it is not the reason itself.
+function failRun(runId, reason, said = reason) {
+  writeRunStatus(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [reason, runId]);
+  logEvent(runId, 'error', `[runner] ${said}`);
+  return { exitCode: 1, error: reason };
+}
+
+// 1. Load run + company + user from DB. The OSDM credentials (auth_mode,
+//    OAuth fields, bearer token, token cache) are the user's for THIS
+//    company (#540: tester_credentials, per user and company). The company
+//    row keeps api_base + datafile only.
+function loadRun({ runId, companyId, userId, scenarioOverride }) {
   const runRow     = get('SELECT * FROM runs     WHERE id = ?', [runId]);
   const companyRow = get('SELECT * FROM companies WHERE id = ?', [companyId]);
   // Prefer the userId from the queue job; fall back to the run's recorded
@@ -1215,7 +1244,11 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
 
   if (!runRow || !companyRow) throw new Error('Run or company not found in DB.');
   if (!userRow)               throw new Error('User row not found for run — cannot resolve credentials.');
+  return { runId, companyId, scenarioOverride, runRow, companyRow, userRow, effectiveUserId };
+}
 
+// Gives the batch whose kept pods may take the run, if any.
+function markRunning({ runId, companyId, runRow, companyRow, userRow, effectiveUserId }) {
   // Mark as RUNNING. warn_lines_kept: this server keeps the run's warning
   // lines on their own as it logs them (runLog.js), so its readers need not
   // walk its log (api/helpers/runWarnings.js).
@@ -1229,20 +1262,26 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
   // waiting pods are not told to stop while this run is on its way.
   const keptBatch = keptPodsOn() && runRow.batch_id ? { companyId, userId: effectiveUserId, batchId: runRow.batch_id } : null;
   if (keptBatch) keptRunPool.announce(runId, keptBatch);
+  return keptBatch;
+}
 
-  // 2. Prepare artifact directory — inline path-traversal guard (Sonar S6549)
+// 2. Prepare artifact directory — inline path-traversal guard (Sonar S6549)
+async function artifactFolderOf(runId) {
   if (typeof runId !== 'string' || !RUN_ID_RE.test(runId)) {
     throw new Error('executeRun: invalid runId format');
   }
   const runArtifactDir = safeJoinUuid(ARTIFACTS_DIR, runId);
   if (!runArtifactDir) throw new Error('executeRun: invalid runId format');
   await fs.promises.mkdir(runArtifactDir, { recursive: true });
+  return runArtifactDir;
+}
 
-  // 2b. Some runs are not started: because of the scenario's code (tracker
-  //     NEW-02, second half) or of text in the datafile (NEW-10). The run
-  //     stops here: before a token is asked for, before the environment file
-  //     is written, before anything is started.
-  const refusal = refusedRunScope(runRow, companyId, effectiveUserId)
+// 2b. Some runs are not started: because of the scenario's code (tracker
+//     NEW-02, second half) or of text in the datafile (NEW-10). The run
+//     stops here: before a token is asked for, before the environment file
+//     is written, before anything is started.
+async function refusalBeforeStart({ runRow, companyId, effectiveUserId, scenarioOverride, companyRow, userRow }) {
+  return refusedRunScope(runRow, companyId, effectiveUserId)
     || refusedSuspendedEndpoint(companyId)
     || launcherProblem()
     || refusedScenarioCode(scenarioOverride)
@@ -1250,38 +1289,51 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     || await refusedDatafileText(companyRow.datafile_path, { testManager: userRow.role === 'test_manager', email: userRow.email })
     || refusedFrameworkText(companyId)
     || await refusedOsdmVersion(companyRow.datafile_path, scenarioOverride, companyId);
-  if (refusal) {
-    writeRunStatus(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [refusal, runId]);
-    logEvent(runId, 'error', `[runner] ${refusal}`);
-    return { exitCode: 1, error: refusal };
-  }
-  await recordRunVersions(runId, companyRow.datafile_path, scenarioOverride);
+}
 
-  // 3. Resolve access token (per-tester credentials, per-tester token cache).
-  //    The oauth2/bearer logic + token cache live in access-token.js so the
-  //    Timetable Discovery endpoint reuses the exact same path (issue #157).
-  let accessToken;
+// What a run needs before its process starts: its token, the tester's
+// values, its data file, its working folder, its environment file and the
+// place of its results. Gives the refusal of the first stage that fails.
+async function prepareRun(run) {
+  let failed = await takeAccessToken(run);
+  if (failed) return failed;
+  takeTesterValues(run);
+  failed = await findDatafile(run);
+  if (failed) return failed;
+  failed = await makeWorkspace(run);
+  if (failed) return failed;
+  failed = await writeEnvironment(run);
+  if (failed) return failed;
+  await prepareOutput(run);
+  return null;
+}
+
+// 3. Resolve access token (per-tester credentials, per-tester token cache).
+//    The oauth2/bearer logic + token cache live in access-token.js so the
+//    Timetable Discovery endpoint reuses the exact same path (issue #157).
+async function takeAccessToken(run) {
+  const { runId, userRow } = run;
   // #1327: when the token expires, if OSCAR knows (an OAuth token whose
   // provider gave expires_in): the collection renews it before then, from
   // the run's first request on, not only once step 01 has asked again.
-  let tokenExpiresAt = null;
+  run.tokenExpiresAt = null;
   try {
-    accessToken = await resolveAccessToken(userRow, _authLogger(runId), { onExpiry: (at) => { tokenExpiresAt = at; } });
+    run.accessToken = await resolveAccessToken(userRow, _authLogger(runId), { onExpiry: (at) => { run.tokenExpiresAt = at; } });
     if (userRow.auth_mode !== 'oauth2') {
       logEvent(runId, 'info', '[runner] Bearer token resolved.');
     }
+    return null;
   } catch (err) {
     // The run's error and log are read by the company: no secret, no quoted
     // token answer in them (tokenErrors.js).
     const reason = tokenErrorText(err, userRow);
-    writeRunStatus(
-      `UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`,
-      [reason, runId]
-    );
-    logEvent(runId, 'error', `[runner] Auth failed: ${reason}`);
-    return { exitCode: 1, error: reason };
+    return failRun(runId, reason, `Auth failed: ${reason}`);
   }
+}
 
+// The tester's own values and the company's dedicated headers.
+function takeTesterValues(run) {
+  const { runId, userRow, companyRow } = run;
   // 4. Resolve requestor (optional, per-tester since v12)
   const requestor = userRow.requestor_enc ? decrypt(userRow.requestor_enc) : null;
 
@@ -1309,23 +1361,30 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
   } catch (_ehErr) {
     logEvent(runId, 'warn', `[runner] Ignoring malformed company extra_headers: ${_ehErr.message}`);
   }
+  Object.assign(run, { requestor, subscriptionKey, oauthExtra, extraHeaders });
+}
 
-  // 5. Validate data file exists
+// 5. Validate data file exists
+async function findDatafile(run) {
+  const { runId, companyRow } = run;
   const datafileUrl = `${serverUrls().data}/data/${companyRow.slug}-datafile.json`;
   const datafilePath = companyRow.datafile_path;
   if (!datafilePath || !(await fsExists(datafilePath))) {
     const msg = 'No data file uploaded. Upload a data file in your company profile before running.';
-    writeRunStatus(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [msg, runId]);
-    logEvent(runId, 'error', `[runner] ${msg}`);
-    return { exitCode: 1, error: msg };
+    return failRun(runId, msg);
   }
+  Object.assign(run, { datafileUrl, datafilePath });
+  return null;
+}
 
-  // 5b. Workspace isolation (Linux only — for parallel/concurrent runs)
-  // Only create a workspace when scenarioOverride is set (parallel mode).
-  // Sequential runs use COLLECTION_PATH directly — Bruno CLI may not follow symlinks.
-  // An isolated run always has one: the runner agent sees the working
-  // folders only, never the collection's own folder.
-  // Pod mode (#1130): the run's pod makes its own folder from its image; nothing here.
+// 5b. Workspace isolation (Linux only — for parallel/concurrent runs)
+// Only create a workspace when scenarioOverride is set (parallel mode).
+// Sequential runs use COLLECTION_PATH directly — Bruno CLI may not follow symlinks.
+// An isolated run always has one: the runner agent sees the working
+// folders only, never the collection's own folder.
+// Pod mode (#1130): the run's pod makes its own folder from its image; nothing here.
+async function makeWorkspace(run) {
+  const { runId, scenarioOverride } = run;
   const podMode = isolationMode() === 'pod';
   const useWorkspace = !podMode && (isolationMode() === 'isolated' || (process.platform !== 'win32' && !!scenarioOverride));
   let workspaceDir = null;
@@ -1338,39 +1397,80 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     } catch (err) {
       // Refuse, never throw: a thrown executeRun leaves the run unmarked.
       const msg = `The run's working folder could not be made: ${err.message}`;
-      writeRunStatus(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [msg, runId]);
-      logEvent(runId, 'error', `[runner] ${msg}`);
+      const failed = failRun(runId, msg);
       await cleanupWorkspace(runId);
-      return { exitCode: 1, error: msg };
+      return failed;
     }
     runCwd = workspaceDir;
     logEvent(runId, 'info', `[runner] Workspace created → ${workspaceDir}`);
   }
+  Object.assign(run, { podMode, workspaceDir, runRealDir, runCwd });
+  return null;
+}
 
-  // 6. Generate ephemeral env file (credential-free since #306 — secrets go
-  //    through the child process environment at spawn time instead)
-  // Use a per-run unique env name to prevent file collisions when multiple
-  // runs for the same company execute concurrently (MAX_CONCURRENT_RUNS > 1).
-  // On Linux the workspace provides isolation, but on Windows (no workspace)
-  // the unique name is essential. Harmless on Linux — just extra safety.
-  // The clean label (without runId) is already stored in runs.env_name_used
-  // at submission time for UI display purposes.
+// 6. Generate ephemeral env file (credential-free since #306 — secrets go
+//    through the child process environment at spawn time instead)
+// Use a per-run unique env name to prevent file collisions when multiple
+// runs for the same company execute concurrently (MAX_CONCURRENT_RUNS > 1).
+// On Linux the workspace provides isolation, but on Windows (no workspace)
+// the unique name is essential. Harmless on Linux — just extra safety.
+// The clean label (without runId) is already stored in runs.env_name_used
+// at submission time for UI display purposes.
+async function writeEnvironment(run) {
+  const { runId, companyRow, requestor, datafileUrl, scenarioOverride, extraHeaders, podMode, workspaceDir, runRealDir } = run;
   const runIdShort = runId.slice(0, 8);
   const envName    = `OTST_${companyRow.slug}_${runIdShort}_Env`;
   const traceSettings = traceRunSettingsOf(frameworkConfigOf(companyRow.id) || {});
   const envYml     = buildEnvYml(envName, companyRow.api_base, requestor, datafileUrl, scenarioOverride || null, extraHeaders, traceSettings);
-  // #204: inject the run's HARD DEADLINE (epoch ms ≈ when the runner SIGTERMs
-  // the run, i.e. now + effective timeout) as a read-only env var. The
-  // expired-booking test uses it to decide whether waiting until the booking's
-  // confirmation deadline fits the run budget — if not, it skips with a
-  // WARNING instead of being killed mid-wait.
-  //
-  // Tester timer (#204 + Phase 2): if any in-scope scenario sets a per-scenario
-  // expired-flow max-wait — currently `expiredBookingMaxWaitMinutes` or
-  // `expiredOfferMaxWaitMinutes` (see EXPIRED_FLOW_TIMERS) — the effective
-  // timeout is auto-extended to cover the largest request (clamped to
-  // RUN_HARD_MAX_TIMEOUT_MS). The SAME value drives both this env injection
-  // and the SIGTERM setTimeout below — they MUST agree.
+  const _runBudget = await runBudgetOf(run);
+  // #204: inject the runId so 06.yml can call the loopback refresh-access-token
+  // endpoint after the wait. The endpoint validates that the requested runId
+  // exists and only refreshes the token bound to that run.
+  // The run's own tag on its intrusion lines (utils/intrusion.js): a line
+  // without it is not acted on, whatever prints it.
+  const intrusionTag = newIntrusionTag();
+  const envYmlOut  = envYml + [
+    ...envVar('runHardDeadlineMs', Date.now() + _runBudget.effectiveMs),
+    ...envVar('__runId', runId),
+    ...envVar('__intrusionTag', intrusionTag),
+    ...envVar('oscar_loopback_base', serverUrls().loopback),
+    // #1327: ms since the epoch; the collection renews before it.
+    ...(Number.isFinite(Date.parse(run.tokenExpiresAt)) ? envVar('__tokenExpiresAt', Date.parse(run.tokenExpiresAt)) : []),
+  ].join('\n') + '\n';
+  const envsDir    = workspaceDir ? path.join(workspaceDir, 'environments') : ENVS_DIR;
+  const envFilePath = path.join(envsDir, `${envName}.yml`);
+
+  const forScenario = scenarioOverride ? ` (scenario_override: ${scenarioOverride})` : '';
+  if (podMode) {
+    // The pod writes it in its own folder, from the run request (run-pod/runPod.js).
+    logEvent(runId, 'info', `[runner] Environment file ${envName}.yml sent with the run to its pod${forScenario}`);
+  } else {
+    try {
+      if (!workspaceDir) await fs.promises.mkdir(envsDir, { recursive: true });
+      await writeRunFile(envsDir, `${envName}.yml`, envYmlOut, { ...runFolderCheck(runRealDir, 'environments'), mode: 0o600 });
+      logEvent(runId, 'info', `[runner] Ephemeral env file written → ${envName}.yml${forScenario}`);
+    } catch (err) {
+      const msg = `Failed to write env file: ${err.message}`;
+      return failRun(runId, msg);
+    }
+  }
+  Object.assign(run, { envName, envYmlOut, envFilePath, _runBudget, intrusionTag });
+  return null;
+}
+
+// #204: inject the run's HARD DEADLINE (epoch ms ≈ when the runner SIGTERMs
+// the run, i.e. now + effective timeout) as a read-only env var. The
+// expired-booking test uses it to decide whether waiting until the booking's
+// confirmation deadline fits the run budget — if not, it skips with a
+// WARNING instead of being killed mid-wait.
+//
+// Tester timer (#204 + Phase 2): if any in-scope scenario sets a per-scenario
+// expired-flow max-wait — currently `expiredBookingMaxWaitMinutes` or
+// `expiredOfferMaxWaitMinutes` (see EXPIRED_FLOW_TIMERS) — the effective
+// timeout is auto-extended to cover the largest request (clamped to
+// RUN_HARD_MAX_TIMEOUT_MS). The SAME value drives both this env injection
+// and the SIGTERM setTimeout below — they MUST agree.
+async function runBudgetOf({ runId, datafilePath, scenarioOverride }) {
   const _runBudget = await computeEffectiveRunTimeoutMs(datafilePath, scenarioOverride || null);
   // Always emit the chosen budget so the operator can tell exactly what the
   // runner decided — whether the extension fired, fell back silently, or hit
@@ -1389,44 +1489,15 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     logEvent(runId, 'warn',
       `[runner] expired-flow per-scenario max-wait requested ${_runBudget.requestedMs}ms but RUN_HARD_MAX_TIMEOUT_MS clamps to ${_runBudget.hardMaxMs}ms. Raise RUN_HARD_MAX_TIMEOUT_MS on the server if you need a longer wait.`);
   }
-  // #204: inject the runId so 06.yml can call the loopback refresh-access-token
-  // endpoint after the wait. The endpoint validates that the requested runId
-  // exists and only refreshes the token bound to that run.
-  // The run's own tag on its intrusion lines (utils/intrusion.js): a line
-  // without it is not acted on, whatever prints it.
-  const intrusionTag = newIntrusionTag();
-  const envYmlOut  = envYml + [
-    ...envVar('runHardDeadlineMs', Date.now() + _runBudget.effectiveMs),
-    ...envVar('__runId', runId),
-    ...envVar('__intrusionTag', intrusionTag),
-    ...envVar('oscar_loopback_base', serverUrls().loopback),
-    // #1327: ms since the epoch; the collection renews before it.
-    ...(Number.isFinite(Date.parse(tokenExpiresAt)) ? envVar('__tokenExpiresAt', Date.parse(tokenExpiresAt)) : []),
-  ].join('\n') + '\n';
-  const envsDir    = workspaceDir ? path.join(workspaceDir, 'environments') : ENVS_DIR;
-  const envFilePath = path.join(envsDir, `${envName}.yml`);
+  return _runBudget;
+}
 
-  const forScenario = scenarioOverride ? ` (scenario_override: ${scenarioOverride})` : '';
-  if (podMode) {
-    // The pod writes it in its own folder, from the run request (run-pod/runPod.js).
-    logEvent(runId, 'info', `[runner] Environment file ${envName}.yml sent with the run to its pod${forScenario}`);
-  } else {
-    try {
-      if (!workspaceDir) await fs.promises.mkdir(envsDir, { recursive: true });
-      await writeRunFile(envsDir, `${envName}.yml`, envYmlOut, { ...runFolderCheck(runRealDir, 'environments'), mode: 0o600 });
-      logEvent(runId, 'info', `[runner] Ephemeral env file written → ${envName}.yml${forScenario}`);
-    } catch (err) {
-      const msg = `Failed to write env file: ${err.message}`;
-      writeRunStatus(`UPDATE runs SET status = 'FAILED', completed_at = datetime('now'), error_message = ? WHERE id = ?`, [msg, runId]);
-      logEvent(runId, 'error', `[runner] ${msg}`);
-      return { exitCode: 1, error: msg };
-    }
-  }
-
-  // 7. Paths for Bruno output
-  // Use a RELATIVE path for --reporter-json so bru.cmd resolves it from its own cwd.
-  // runCwd is either the workspace (Linux) or COLLECTION_PATH (Windows).
-  // Each run gets its own JSON file to prevent collisions under concurrent execution.
+// 7. Paths for Bruno output
+// Use a RELATIVE path for --reporter-json so bru.cmd resolves it from its own cwd.
+// runCwd is either the workspace (Linux) or COLLECTION_PATH (Windows).
+// Each run gets its own JSON file to prevent collisions under concurrent execution.
+async function prepareOutput(run) {
+  const { runId, runCwd, workspaceDir, podMode, envName } = run;
   const valDir         = path.join(runCwd, 'Validation_Reports');
   const bruJsonFile    = bruResultsName(runId);   // the run pod names it alike (run-pod/runLayout.js)
 
@@ -1444,183 +1515,34 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
   // staleness guarantee while eliminating this sub-second truncation race.
   const MTIME_FILTER_SAFETY_MARGIN_MS = 2000;
   const runStartTime = Date.now() - MTIME_FILTER_SAFETY_MARGIN_MS;
+  Object.assign(run, { valDir, bruJsonFile, runStartTime });
+}
 
-  // Detect auth/format failures in Bruno log output
-  let authErrorDetected  = false;
-  let tokenFormatError   = false;
+// Detect auth/format failures in Bruno log output
+const AUTH_401_PATTERN    = /Wrong response status:\s*401|401\s+Unauthorized|HTTP\s+401/i;
+const TOKEN_FORMAT_PATTERN = /Error parsing environment|YAMLParseError|Unexpected scalar/i;
+
+// 8. The run's process, from its start to its end, with what watches it: the
+// run's time limit, the silence of Bruno, the tester's token kept fresh, and
+// its output, logged line by line. Gives its exit code: 1 when it could not
+// be started or was lost.
+function runProcess(run) {
+  const { runId } = run;
+  // What the output and the process showed, for the end of the run to say.
   // #1272: the run's process could not be started or was lost (in pod mode,
   // the dispatcher refused it or went away): the run never went to its end.
-  let processError       = false;
-  const AUTH_401_PATTERN    = /Wrong response status:\s*401|401\s+Unauthorized|HTTP\s+401/i;
-  const TOKEN_FORMAT_PATTERN = /Error parsing environment|YAMLParseError|Unexpected scalar/i;
-
-  const exitCode = await new Promise((resolve) => {
-    // Relative --reporter-json path (no spaces issue); the run pod starts Bruno alike.
-    const args = bruRunArgs(envName, runId);
-
-    // Security: only the allowlisted env vars, never process.env — it holds
-    // ENCRYPTION_KEY, JWT_SECRET and the SMTP credentials (CHILD_ENV_ALLOWLIST).
-    const safeEnv = childBaseEnv();
-    // #306: hand the per-run credentials to Bruno via its process
-    // environment — never via the env yml on disk (see buildEnvYml). The
-    // collection's before-request hook (opencollection.yml) seeds them into
-    // Bruno's runtime vars with bru.getProcessEnv(), only while the runtime
-    // var is still empty — so a mid-run loopback token refresh (#204) is
-    // never clobbered by the stale spawn-time value.
-    safeEnv.OSCAR_ACCESS_TOKEN = accessToken;
-    if (subscriptionKey) safeEnv.OSCAR_SUBSCRIPTION_KEY = subscriptionKey;
-    if (oauthExtra)      safeEnv.OSCAR_OAUTH_EXTRA      = String(oauthExtra);
-    // S8-loopback: the secret that lets this child — and only while it runs —
-    // fetch its company's datafile and refresh its token. Carried via the
-    // environment like the token above, never written to the env file on disk.
-    // The collection sends it back as a header on both loopback calls; the
-    // routes bind it to this run's company. Revoked when the child exits.
-    safeEnv.OSCAR_RUN_SECRET = runSecrets.issue(runId, companyRow.id);
-    // Started by kind through the launcher (worker/launcher.js), which
-    // keeps the shell off unless BRU_CMD is a Windows batch wrapper.
-    let proc;
-    let podEnded = () => {};
-    let firstLineSeen = () => {};
-    runTimeline.mark(runId, 'launched');
-    try {
-      const podRun = podMode ? {
-        runId, envName, envYml: Buffer.from(envYmlOut, 'utf8').toString('base64'),
-        deadlineSeconds: Math.max(60, Math.ceil(_runBudget.effectiveMs / 1000)), env: safeEnv,
-      } : null;
-      proc = startRunProcess(runId, { keptBatch, podRun, args, cwd: runCwd, env: safeEnv });
-      if (podMode) {
-        podEnded = watchRunPod(proc);
-        firstLineSeen = watchFirstLine(runId, proc, runFirstLineLimitMs());
-        proc.on('pod', (address) => onRunPodAddress(runId, address, proc));
-        // #1312: the dispatcher made the run's Job, then its pod's container runs.
-        proc.once('started', () => runTimeline.mark(runId, 'job'));
-        proc.once('pod', () => runTimeline.mark(runId, 'pod'));
-      }
-    } catch (err) {
-      if (podMode) metrics.runPodsEnded.inc({ outcome: 'refused' });
-      processError = true;
-      runSecrets.revoke(runId);
-      logEvent(runId, 'error', `[runner] Process error: ${err.message}`);
-      resolve(1);
-      return;
-    }
+  run.seen = { authError: false, tokenFormat: false, processError: false };
+  return new Promise((resolve) => {
+    const started = startProcess(run);
+    if (!started) { resolve(1); return; }
+    const { proc, podEnded, firstLineSeen } = started;
     // Register for emergency-stop (killRun). Cleared in close/error below.
     _activeProcs.set(runId, proc);
-
-    // Use the SAME effective timeout we just injected as runHardDeadlineMs.
-    // Falling back to RUN_TIMEOUT_MS would let the worker get SIGTERMed mid-
-    // wait when a scenario opted into a longer expired-flow per-scenario
-    // max-wait (expiredBookingMaxWaitMinutes, expiredOfferMaxWaitMinutes, …).
-    const runTimeoutMs = _runBudget.effectiveMs;
-    // killRun escalates to SIGKILL when SIGTERM does not end the process.
-    const timeout = setTimeout(() => {
-      logEvent(runId, 'error', `[runner] Run timed out after ${runTimeoutMs}ms — killing process.`);
-      killRun(runId);
-    }, runTimeoutMs);
-
-    // A provider that stops answering leaves Bruno waiting on one request,
-    // silent, until the run's timeout (or for ever, if the process ignores
-    // SIGTERM). Bruno prints a line per request, so a long silence means a
-    // request got no answer: stop the run and say so. Not armed when the
-    // scenario waits on purpose (an expired-flow or receipt timer).
-    let lastOutputAt = Date.now();
-    const idleLimitMs = runIdleLimitMs(_runBudget);
-    if (idleLimitMs === 0 && _runBudget.armedTimers > 0) {
-      logEvent(runId, 'info', `[runner] No stop on silence for this run: ${_runBudget.armedTimers} expiry test(s) armed, which wait on purpose. RUN_TIMEOUT_MS still applies.`);
-    }
-    const idleWatch = idleLimitMs > 0 ? setInterval(() => {
-      if (Date.now() - lastOutputAt < idleLimitMs) return;
-      clearInterval(idleWatch);
-      logEvent(runId, 'error', `[runner] No output from Bruno for ${Math.round(idleLimitMs / 1000)}s: run stopped. Most often a request to the provider got no answer (unreachable, or blocking this server); the last step logged above is where it waited.`);
-      killRun(runId);
-    }, Math.min(IDLE_CHECK_EVERY_MS, Math.max(10, Math.floor(idleLimitMs / 4)))) : null;
-    const stopIdleWatch = () => { if (idleWatch) clearInterval(idleWatch); };
-
-    // #204 token-watchdog (Piece 3 / defense-in-depth): periodically refresh
-    // the per-tester cached access token while the run is in flight, so the
-    // server-side cache never expires under an in-flight Bruno process. The
-    // ticker calls resolveAccessToken with forceRefresh:false; resolve's own
-    // safety-margin check decides whether to refetch or no-op against cache.
-    // This is BELT to the BRACES of (a) 01.yml's per-scenario refresh-on-start
-    // (Piece 2) and (b) 06.yml's force-refresh after the expired-booking wait.
-    //
-    // Skipped for bearer-auth runs (no cache to keep warm). Skipped when
-    // userRow is null (probably an admin/run-as-other context that hit the
-    // run already). Tick interval = TOKEN_WATCHDOG_INTERVAL_MS env / config,
-    // default 300000 (5 min).
-    let tokenWatchdog = null;
-    if (userRow?.auth_mode === 'oauth2') {
-      const tickMs = Number.parseInt(getConfig('TOKEN_WATCHDOG_INTERVAL_MS', '300000'), 10) || 300000;
-      // Disabled when set to 0 (operator opt-out).
-      if (tickMs > 0) {
-        tokenWatchdog = setInterval(async () => {
-          // #540: no new token once the user may no longer use this company.
-          const scopeRefusal = refusedRunScope(runRow, companyId, effectiveUserId);
-          if (scopeRefusal) {
-            logEvent(runId, 'warn', `[token-watchdog] refresh skipped — ${scopeRefusal}`);
-            return;
-          }
-          try {
-            await resolveAccessToken(
-              userRow,
-              { info: (m) => logEvent(runId, 'info', `[token-watchdog] ${m}`),
-                error: (m) => logEvent(runId, 'error', `[token-watchdog] ${m}`) }
-              // no forceRefresh — let the safety-margin check decide
-            );
-          } catch (err) {
-            logEvent(runId, 'warn',
-              `[token-watchdog] tick failed: ${err?.message ? err.message : err} — Bruno can still get a fresh token via /v1/runs/${runId}/refresh-access-token at scenario start.`);
-          }
-        }, tickMs);
-        logEvent(runId, 'info', `[runner] Token watchdog armed (tick every ${tickMs}ms = ${Math.round(tickMs/1000)}s). Disable with TOKEN_WATCHDOG_INTERVAL_MS=0.`);
-      }
-    }
-    function stopTokenWatchdog() {
-      if (tokenWatchdog) { clearInterval(tokenWatchdog); tokenWatchdog = null; }
-    }
-
-    const logParser = new LogParser();
-    // Seed the parser's scenario state from the run record. Single-scenario
-    // runs (scenarioOverride set, or multi-scenario runs with one scenario_code)
-    // carry the scenario name on the runs row; every event inherits it even
-    // before Bruno emits its first scenario banner.
-    if (scenarioOverride) {
-      logParser.currentScenario = scenarioOverride;
-    } else if (runRow?.scenario_code) {
-      logParser.currentScenario = runRow.scenario_code;
-    }
-
-    proc.stdout.on('data', chunk => {
-      lastOutputAt = Date.now();
-      // #1312: a pod's first line comes once its work folder is ready. Only
-      // the moment is noted, never what the line says. The dispatcher's own
-      // words come on stderr: only the pod's line disarms #1336's limit.
-      if (podMode) runTimeline.mark(runId, 'output');
-      firstLineSeen();
-      const lines = chunk.toString().split('\n');
-      lines.forEach(line => {
-        if (!line.trim()) return;
-        const meta = logParser.parse(line);
-        const level = inferLevel(line, 'info');
-        logEvent(runId, level, line, meta);
-        onIntrusionLine(line, runRow, undefined, intrusionTag);
-        if (AUTH_401_PATTERN.test(line))    authErrorDetected = true;
-        if (TOKEN_FORMAT_PATTERN.test(line)) tokenFormatError  = true;
-      });
-    });
-    proc.stderr.on('data', chunk => {
-      lastOutputAt = Date.now();
-      const lines = chunk.toString().split('\n');
-      lines.forEach(line => {
-        if (!line.trim()) return;
-        const meta = logParser.parse(line);
-        const level = inferLevel(line, 'error');
-        logEvent(runId, level, line, meta);
-        onIntrusionLine(line, runRow, undefined, intrusionTag);
-        if (AUTH_401_PATTERN.test(line))    authErrorDetected = true;
-        if (TOKEN_FORMAT_PATTERN.test(line)) tokenFormatError  = true;
-      });
-    });
+    const timeout = armRunTimeout(run);
+    const silence = watchSilence(run);
+    const stopIdleWatch = silence.stop;
+    const stopTokenWatchdog = armTokenWatchdog(run);
+    followOutput(run, proc, { heard: silence.heard, firstLineSeen });
 
     proc.on('close', code => {
       runTimeline.mark(runId, 'exit');
@@ -1642,16 +1564,250 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
       _activeProcs.delete(runId);
       runSecrets.revoke(runId);            // S8-loopback: no child, no valid secret
       podEnded('refused');
-      processError = true;
+      run.seen.processError = true;
       logEvent(runId, 'error', `[runner] Process error: ${err.message}`);
       resolve(1);
     });
   });
+}
 
-  // 9. Clean up ephemeral env file
-  // When using workspace, the entire workspace directory is cleaned up later (step 10d).
-  // Individual env file deletion is only needed on Windows (no workspace).
-  // In pod mode none was written here.
+// The process is started. Null when it could not be: the reason is logged.
+function startProcess(run) {
+  const { runId, envName, envYmlOut, _runBudget, keptBatch, runCwd, podMode } = run;
+  // Relative --reporter-json path (no spaces issue); the run pod starts Bruno alike.
+  const args = bruRunArgs(envName, runId);
+  const safeEnv = processEnvOf(run);
+  // Started by kind through the launcher (worker/launcher.js), which
+  // keeps the shell off unless BRU_CMD is a Windows batch wrapper.
+  let proc;
+  let podEnded = () => {};
+  let firstLineSeen = () => {};
+  runTimeline.mark(runId, 'launched');
+  try {
+    const podRun = podMode ? {
+      runId, envName, envYml: Buffer.from(envYmlOut, 'utf8').toString('base64'),
+      deadlineSeconds: Math.max(60, Math.ceil(_runBudget.effectiveMs / 1000)), env: safeEnv,
+    } : null;
+    proc = startRunProcess(runId, { keptBatch, podRun, args, cwd: runCwd, env: safeEnv });
+    if (podMode) {
+      podEnded = watchRunPod(proc);
+      firstLineSeen = watchFirstLine(runId, proc, runFirstLineLimitMs());
+      proc.on('pod', (address) => onRunPodAddress(runId, address, proc));
+      // #1312: the dispatcher made the run's Job, then its pod's container runs.
+      proc.once('started', () => runTimeline.mark(runId, 'job'));
+      proc.once('pod', () => runTimeline.mark(runId, 'pod'));
+    }
+  } catch (err) {
+    if (podMode) metrics.runPodsEnded.inc({ outcome: 'refused' });
+    run.seen.processError = true;
+    runSecrets.revoke(runId);
+    logEvent(runId, 'error', `[runner] Process error: ${err.message}`);
+    return null;
+  }
+  return { proc, podEnded, firstLineSeen };
+}
+
+function processEnvOf({ runId, companyRow, accessToken, subscriptionKey, oauthExtra }) {
+  // Security: only the allowlisted env vars, never process.env — it holds
+  // ENCRYPTION_KEY, JWT_SECRET and the SMTP credentials (CHILD_ENV_ALLOWLIST).
+  const safeEnv = childBaseEnv();
+  // #306: hand the per-run credentials to Bruno via its process
+  // environment — never via the env yml on disk (see buildEnvYml). The
+  // collection's before-request hook (opencollection.yml) seeds them into
+  // Bruno's runtime vars with bru.getProcessEnv(), only while the runtime
+  // var is still empty — so a mid-run loopback token refresh (#204) is
+  // never clobbered by the stale spawn-time value.
+  safeEnv.OSCAR_ACCESS_TOKEN = accessToken;
+  if (subscriptionKey) safeEnv.OSCAR_SUBSCRIPTION_KEY = subscriptionKey;
+  if (oauthExtra)      safeEnv.OSCAR_OAUTH_EXTRA      = String(oauthExtra);
+  // S8-loopback: the secret that lets this child — and only while it runs —
+  // fetch its company's datafile and refresh its token. Carried via the
+  // environment like the token above, never written to the env file on disk.
+  // The collection sends it back as a header on both loopback calls; the
+  // routes bind it to this run's company. Revoked when the child exits.
+  safeEnv.OSCAR_RUN_SECRET = runSecrets.issue(runId, companyRow.id);
+  return safeEnv;
+}
+
+function armRunTimeout({ runId, _runBudget }) {
+  // Use the SAME effective timeout we just injected as runHardDeadlineMs.
+  // Falling back to RUN_TIMEOUT_MS would let the worker get SIGTERMed mid-
+  // wait when a scenario opted into a longer expired-flow per-scenario
+  // max-wait (expiredBookingMaxWaitMinutes, expiredOfferMaxWaitMinutes, …).
+  const runTimeoutMs = _runBudget.effectiveMs;
+  // killRun escalates to SIGKILL when SIGTERM does not end the process.
+  const timeout = setTimeout(() => {
+    logEvent(runId, 'error', `[runner] Run timed out after ${runTimeoutMs}ms — killing process.`);
+    killRun(runId);
+  }, runTimeoutMs);
+  return timeout;
+}
+
+// A provider that stops answering leaves Bruno waiting on one request,
+// silent, until the run's timeout (or for ever, if the process ignores
+// SIGTERM). Bruno prints a line per request, so a long silence means a
+// request got no answer: stop the run and say so. Not armed when the
+// scenario waits on purpose (an expired-flow or receipt timer).
+function watchSilence({ runId, _runBudget }) {
+  let lastOutputAt = Date.now();
+  const idleLimitMs = runIdleLimitMs(_runBudget);
+  if (idleLimitMs === 0 && _runBudget.armedTimers > 0) {
+    logEvent(runId, 'info', `[runner] No stop on silence for this run: ${_runBudget.armedTimers} expiry test(s) armed, which wait on purpose. RUN_TIMEOUT_MS still applies.`);
+  }
+  const idleWatch = idleLimitMs > 0 ? setInterval(() => {
+    if (Date.now() - lastOutputAt < idleLimitMs) return;
+    clearInterval(idleWatch);
+    logEvent(runId, 'error', `[runner] No output from Bruno for ${Math.round(idleLimitMs / 1000)}s: run stopped. Most often a request to the provider got no answer (unreachable, or blocking this server); the last step logged above is where it waited.`);
+    killRun(runId);
+  }, Math.min(IDLE_CHECK_EVERY_MS, Math.max(10, Math.floor(idleLimitMs / 4)))) : null;
+  const stopIdleWatch = () => { if (idleWatch) clearInterval(idleWatch); };
+  return { heard: () => { lastOutputAt = Date.now(); }, stop: stopIdleWatch };
+}
+
+// #204 token-watchdog (Piece 3 / defense-in-depth): periodically refresh
+// the per-tester cached access token while the run is in flight, so the
+// server-side cache never expires under an in-flight Bruno process. The
+// ticker calls resolveAccessToken with forceRefresh:false; resolve's own
+// safety-margin check decides whether to refetch or no-op against cache.
+// This is BELT to the BRACES of (a) 01.yml's per-scenario refresh-on-start
+// (Piece 2) and (b) 06.yml's force-refresh after the expired-booking wait.
+//
+// Skipped for bearer-auth runs (no cache to keep warm). Skipped when
+// userRow is null (probably an admin/run-as-other context that hit the
+// run already). Tick interval = TOKEN_WATCHDOG_INTERVAL_MS env / config,
+// default 300000 (5 min).
+// Gives what stops it.
+function armTokenWatchdog({ runId, companyId, runRow, userRow, effectiveUserId }) {
+  let tokenWatchdog = null;
+  if (userRow?.auth_mode === 'oauth2') {
+    const tickMs = Number.parseInt(getConfig('TOKEN_WATCHDOG_INTERVAL_MS', '300000'), 10) || 300000;
+    // Disabled when set to 0 (operator opt-out).
+    if (tickMs > 0) {
+      tokenWatchdog = setInterval(async () => {
+        // #540: no new token once the user may no longer use this company.
+        const scopeRefusal = refusedRunScope(runRow, companyId, effectiveUserId);
+        if (scopeRefusal) {
+          logEvent(runId, 'warn', `[token-watchdog] refresh skipped — ${scopeRefusal}`);
+          return;
+        }
+        try {
+          await resolveAccessToken(
+            userRow,
+            { info: (m) => logEvent(runId, 'info', `[token-watchdog] ${m}`),
+              error: (m) => logEvent(runId, 'error', `[token-watchdog] ${m}`) }
+            // no forceRefresh — let the safety-margin check decide
+          );
+        } catch (err) {
+          logEvent(runId, 'warn',
+            `[token-watchdog] tick failed: ${err?.message ? err.message : err} — Bruno can still get a fresh token via /v1/runs/${runId}/refresh-access-token at scenario start.`);
+        }
+      }, tickMs);
+      logEvent(runId, 'info', `[runner] Token watchdog armed (tick every ${tickMs}ms = ${Math.round(tickMs/1000)}s). Disable with TOKEN_WATCHDOG_INTERVAL_MS=0.`);
+    }
+  }
+  function stopTokenWatchdog() {
+    if (tokenWatchdog) { clearInterval(tokenWatchdog); tokenWatchdog = null; }
+  }
+  return stopTokenWatchdog;
+}
+
+// The process's output: each line logged at the level its words give (else
+// its stream's), and looked at for what the end of the run must say.
+function followOutput(run, proc, { heard, firstLineSeen }) {
+  const { runId, scenarioOverride, runRow, podMode, intrusionTag, seen } = run;
+  const logParser = new LogParser();
+  // Seed the parser's scenario state from the run record. Single-scenario
+  // runs (scenarioOverride set, or multi-scenario runs with one scenario_code)
+  // carry the scenario name on the runs row; every event inherits it even
+  // before Bruno emits its first scenario banner.
+  if (scenarioOverride) {
+    logParser.currentScenario = scenarioOverride;
+  } else if (runRow?.scenario_code) {
+    logParser.currentScenario = runRow.scenario_code;
+  }
+
+  const logLines = (chunk, streamFallback) => {
+    const lines = chunk.toString().split('\n');
+    lines.forEach(line => {
+      if (!line.trim()) return;
+      const meta = logParser.parse(line);
+      const level = inferLevel(line, streamFallback);
+      logEvent(runId, level, line, meta);
+      onIntrusionLine(line, runRow, undefined, intrusionTag);
+      if (AUTH_401_PATTERN.test(line))    seen.authError = true;
+      if (TOKEN_FORMAT_PATTERN.test(line)) seen.tokenFormat = true;
+    });
+  };
+
+  proc.stdout.on('data', chunk => {
+    heard();
+    // #1312: a pod's first line comes once its work folder is ready. Only
+    // the moment is noted, never what the line says. The dispatcher's own
+    // words come on stderr: only the pod's line disarms #1336's limit.
+    if (podMode) runTimeline.mark(runId, 'output');
+    firstLineSeen();
+    logLines(chunk, 'info');
+  });
+  proc.stderr.on('data', chunk => {
+    heard();
+    logLines(chunk, 'error');
+  });
+}
+
+// The end of a run: its files put away, its results stored, its final status
+// and what it says of itself.
+async function finishRun(run, exitCode) {
+  const { runId, workspaceDir } = run;
+  await removeEnvFile(run);
+  await linkReports(run);
+
+  // 10d. Clean up workspace (Linux only — includes env file)
+  if (workspaceDir) {
+    await cleanupWorkspace(runId);
+    logEvent(runId, 'info', '[runner] Workspace cleaned up.');
+  }
+  runTimeline.mark(runId, 'linked');
+
+  const checksStored = await storeResults(run);
+
+  // A run Bruno ended well but that left no check checked nothing: its results
+  // never reached the server (a run pod that could not send them), or the
+  // collection made no check (its data file was not read). It is not a pass.
+  const noChecks = exitCode === 0 && checksStored === 0;
+
+  // 11. Update run record.
+  // Guard with `AND status = 'RUNNING'`: if the run was emergency-stopped
+  // (POST /v1/runs/stop-all set it to CANCELLED) while bru.cmd was being
+  // killed, this write must NOT resurrect it to COMPLETED/FAILED.
+  const finalStatus = exitCode === 0 && !noChecks ? 'COMPLETED' : 'FAILED';
+  const finalUpd = writeRunStatus(
+    `UPDATE runs SET status = ?, exit_code = ?, completed_at = datetime('now') WHERE id = ? AND status = 'RUNNING'`,
+    [finalStatus, exitCode, runId]
+  );
+  if (finalUpd && Number(finalUpd.changes) === 0) {
+    // Row was already terminal (e.g. CANCELLED by emergency stop) — leave it.
+    logEvent(runId, 'info', '[runner] Final status not written — run already in a terminal state (likely cancelled).');
+    _resetLineCounter(runId);
+    return { exitCode };
+  }
+  runTimeline.mark(runId, 'done');
+
+  noteEndReason(run, exitCode, noChecks);
+
+  logEvent(runId, 'info', `[runner] Run finished — status=${finalStatus} exit=${exitCode}`);
+  noteRunTimes(runId);
+
+  // Free the per-run line counter to prevent unbounded Map growth
+  _resetLineCounter(runId);
+
+  return { exitCode };
+}
+
+// 9. Clean up ephemeral env file
+// When using workspace, the entire workspace directory is cleaned up later (step 10d).
+// Individual env file deletion is only needed on Windows (no workspace).
+// In pod mode none was written here.
+async function removeEnvFile({ runId, workspaceDir, podMode, envFilePath }) {
   if (!workspaceDir && !podMode) {
     let envDeleted = false;
     for (let attempt = 1; attempt <= 3 && !envDeleted; attempt++) {
@@ -1670,8 +1826,11 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     }
     logEvent(runId, 'info', `[runner] Ephemeral env file ${envDeleted ? 'deleted' : 'DELETION FAILED'}.`);
   }
+}
 
-  // 10. Link HTML report artifacts (linkScenarioReports says which).
+// 10. Link HTML report artifacts (linkScenarioReports says which).
+async function linkReports(run) {
+  const { runId, envName, podMode, runArtifactDir, runRealDir, valDir, runStartTime, runCwd, bruJsonFile } = run;
   const dateStr  = new Date().toISOString().slice(0, 10).replaceAll('-', '');
   const envShort = envName.replace(/^OTST_/i, '').replace(/_Env$/i, '');
   const prefix   = `${dateStr}_${envShort}`;
@@ -1691,15 +1850,11 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     //      We run it for completeness; its output is used as fallback if reportGenerator.js produced nothing.
     await mergeAndStoreResults({ runId, runCwd, valDir, bruJsonFile, envName, mergeReportName, htmlArtifactLinked, runArtifactDir, reports });
   }
+}
 
-  // 10d. Clean up workspace (Linux only — includes env file)
-  if (workspaceDir) {
-    await cleanupWorkspace(runId);
-    logEvent(runId, 'info', '[runner] Workspace cleaned up.');
-  }
-  runTimeline.mark(runId, 'linked');
-
-  // 10e. Extract structured assertion results into DB
+// 10e. Extract structured assertion results into DB
+// Gives the number of checks stored: null when it is not known.
+async function storeResults({ runId, companyRow }) {
   let checksStored = null;                       // null: not known (the extraction failed)
   try {
     const { extractStructuredResults } = require('../reports/structureResults');
@@ -1736,29 +1891,14 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
   } catch (err) {
     logEvent(runId, 'error', `[runner] Failed to store structured results: ${err.message}`);
   }
+  return checksStored;
+}
 
-  // A run Bruno ended well but that left no check checked nothing: its results
-  // never reached the server (a run pod that could not send them), or the
-  // collection made no check (its data file was not read). It is not a pass.
-  const noChecks = exitCode === 0 && checksStored === 0;
-
-  // 11. Update run record.
-  // Guard with `AND status = 'RUNNING'`: if the run was emergency-stopped
-  // (POST /v1/runs/stop-all set it to CANCELLED) while bru.cmd was being
-  // killed, this write must NOT resurrect it to COMPLETED/FAILED.
-  const finalStatus = exitCode === 0 && !noChecks ? 'COMPLETED' : 'FAILED';
-  const finalUpd = writeRunStatus(
-    `UPDATE runs SET status = ?, exit_code = ?, completed_at = datetime('now') WHERE id = ? AND status = 'RUNNING'`,
-    [finalStatus, exitCode, runId]
-  );
-  if (finalUpd && Number(finalUpd.changes) === 0) {
-    // Row was already terminal (e.g. CANCELLED by emergency stop) — leave it.
-    logEvent(runId, 'info', '[runner] Final status not written — run already in a terminal state (likely cancelled).');
-    _resetLineCounter(runId);
-    return { exitCode };
-  }
-  runTimeline.mark(runId, 'done');
-
+// An end that is not a test result is said in the run's row and in its log:
+// the first of these that holds, in this order.
+function noteEndReason(run, exitCode, noChecks) {
+  const { runId, userRow, accessToken } = run;
+  const { tokenFormat: tokenFormatError, authError: authErrorDetected, processError } = run.seen;
   if (tokenFormatError) {
     dbRun(`UPDATE runs SET error_message = 'TOKEN_FORMAT_ERROR' WHERE id = ?`, [runId]);
     logEvent(runId, 'error',
@@ -1793,14 +1933,6 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
     logEvent(runId, 'error',
       `[runner] ⚠️ The run did not go to its end (exit ${exitCode}): ${RunExit.exitMeaning(exitCode)}. This is not a result of the test: the checks above are those made before it stopped. Run the scenario again.`);
   }
-
-  logEvent(runId, 'info', `[runner] Run finished — status=${finalStatus} exit=${exitCode}`);
-  noteRunTimes(runId);
-
-  // Free the per-run line counter to prevent unbounded Map growth
-  _resetLineCounter(runId);
-
-  return { exitCode };
 }
 
 module.exports = { executeRun, killRun, refusedRunScope, podOutcomeOf, computeEffectiveRunTimeoutMs, LogParser, inferLevel, buildEnvYml, yamlQuoted, refusedScenarioCode, CHILD_ENV_ALLOWLIST, runIdleLimitMs, runFirstLineLimitMs, WORKSPACES_DIR, serverUrls };

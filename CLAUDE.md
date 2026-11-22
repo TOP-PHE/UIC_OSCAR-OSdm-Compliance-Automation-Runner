@@ -2396,7 +2396,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   comments out; the function's own first and last lines count), in the `src`,
   `public` and library blocks, not the tests. What was over them is ESLint's
   own baseline (bulk suppressions, ESLint 9.24+): `eslint-suppressions.json`
-  (found by itself in the folder ESLint starts in: 107 + 22) and
+  (found by itself in the folder ESLint starts in: 105 + 20 since #1390) and
   `eslint-library-suppressions.json` (`--suppressions-location`, 79 + 21
   since #1388),
   paths with forward slashes from that folder. **One more function over a
@@ -2434,6 +2434,32 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   list made a string): pass a change over, never crash. **Jest, a replay and
   such a run together overload this PC**: a replay scenario went from 9 to
   49 s; run them one after the other.
+- **`runSteps()` is split by stage** (#1390, 1.11.572; M2, second function).
+  `runSteps()` reads as the run does: `loadRun`, `markRunning`, the refusals
+  (`refusalBeforeStart`), `prepareRun` (token, tester's values, data file,
+  working folder, environment file), `runProcess` (one function per watcher:
+  `armRunTimeout`, `watchSilence`, `armTokenWatchdog`, `followOutput`), then
+  `finishRun`. **The stages share one object, `run`**: a stage takes what it
+  needs by name and adds what the next ones need (`Object.assign(run, …)`);
+  what the output showed is `run.seen`. A run that cannot go on before its
+  process ends in `failRun(runId, reason)`, never in a status written by
+  hand (`run-log-batches.test.js` counts the three writers). **How a split
+  of a server function was proved** (scratch files, not in the repository):
+  - a Jest set-up file (`--setupFilesAfterEnv`) records after each test what
+    the runs left (log lines decrypted and in order, the runs' rows, the
+    artifacts, the mocked `spawn` / `RemoteProcess` calls), old and new code
+    on the same tests, the two records compared. A test's own `afterEach`
+    clears the mocks before the set-up's reads them: keep the reference to
+    `mock.calls` taken in `beforeEach`, which a clear leaves as it is;
+  - one fault at a time in the new code, a copy of the module and of each
+    test file per fault, Jest in a process of its own for each, ended at the
+    first failed test by a test environment whose `handleTestEvent` exits.
+  **Two unchanged copies go with every such run as a control**: twice they
+  did not pass and the count was void. Several Jest processes share
+  `os.tmpdir()/oscar-test-collection` (give each its own `TEMP`), and a
+  record that holds the machine's `PATH` differs between `npx jest` and
+  `node jest.js` (record the machine's variables by name only).
+  `runner.test.js` gained 34 tests for what the faults showed no test held.
 - **CI required checks:** Lint/audit/test, CodeQL, Trivy (image scan), Docker
   build, Gitleaks, SonarCloud scan, Bruno-collection validation, PR labeler,
   **`SonarQube Quality Gate check`** (added to required list 2026-07-02 via
