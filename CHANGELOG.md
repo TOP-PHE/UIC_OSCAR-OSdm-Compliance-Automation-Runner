@@ -655,6 +655,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The five places that marked a run FAILED before its process starts are one, `failRun()`.
   - The largest new function has 10 paths (`noteEndReason`) and 39 lines (`runProcess`); `runSteps()` itself has 3 and 12.
   - The messages, the statuses and their order are those of before.
+  - SonarCloud measures another thing than the lint (cognitive complexity, S3776) and counted one of the new functions, `removeEnvFile()`, at 16 for 15 allowed: its body sat inside one `if`. It leaves early instead, the body one level less deep and otherwise the same (18 faults of 18 seen in it afterwards).
 - **The lint's record goes down.** `runner.js`: 5 functions over the path limit become 3 (`logEvent`, `LogParser.parse`, `computeEffectiveRunTimeoutMs`, not touched here), 2 over the line limit become none. The server's totals in `lint-config.test.js` go from 107 and 22 to 105 and 20.
 
 ### How it was checked

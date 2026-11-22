@@ -1808,24 +1808,23 @@ async function finishRun(run, exitCode) {
 // Individual env file deletion is only needed on Windows (no workspace).
 // In pod mode none was written here.
 async function removeEnvFile({ runId, workspaceDir, podMode, envFilePath }) {
-  if (!workspaceDir && !podMode) {
-    let envDeleted = false;
-    for (let attempt = 1; attempt <= 3 && !envDeleted; attempt++) {
-      try {
-        await fs.promises.unlink(envFilePath);
-        envDeleted = true;
-      } catch (err) {
-        logEvent(runId, 'warn', `[runner] Env file deletion attempt ${attempt} failed: ${err.code}`);
-        if (attempt < 3) await new Promise(r => setTimeout(r, 500));
-      }
+  if (workspaceDir || podMode) return;
+  let envDeleted = false;
+  for (let attempt = 1; attempt <= 3 && !envDeleted; attempt++) {
+    try {
+      await fs.promises.unlink(envFilePath);
+      envDeleted = true;
+    } catch (err) {
+      logEvent(runId, 'warn', `[runner] Env file deletion attempt ${attempt} failed: ${err.code}`);
+      if (attempt < 3) await new Promise(r => setTimeout(r, 500));
     }
-    if (!envDeleted) {
-      // #306: not a credential leak — the env yml carries no secrets any more
-      // (credentials travel via the child process environment). Hygiene only.
-      logEvent(runId, 'warn', '[runner] Failed to delete ephemeral env file after 3 attempts. The file carries no credentials (#306); leftover is cosmetic.');
-    }
-    logEvent(runId, 'info', `[runner] Ephemeral env file ${envDeleted ? 'deleted' : 'DELETION FAILED'}.`);
   }
+  if (!envDeleted) {
+    // #306: not a credential leak — the env yml carries no secrets any more
+    // (credentials travel via the child process environment). Hygiene only.
+    logEvent(runId, 'warn', '[runner] Failed to delete ephemeral env file after 3 attempts. The file carries no credentials (#306); leftover is cosmetic.');
+  }
+  logEvent(runId, 'info', `[runner] Ephemeral env file ${envDeleted ? 'deleted' : 'DELETION FAILED'}.`);
 }
 
 // 10. Link HTML report artifacts (linkScenarioReports says which).
