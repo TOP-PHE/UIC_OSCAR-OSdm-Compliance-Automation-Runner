@@ -45,7 +45,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [javascript-typescript]
+        # actions: the workflow files themselves (#1375). They were analysed
+        # until May 2026, then dropped from this list: their alerts stayed open
+        # and nothing added to a workflow since was looked at.
+        language: [javascript-typescript, actions]
 
     steps:
       - name: Checkout
