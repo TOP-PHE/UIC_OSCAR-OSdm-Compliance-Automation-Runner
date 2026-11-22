@@ -643,6 +643,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.572] — 2026-11-22
+
+`runSteps()` of the runner split by stage, behaviour unchanged (#1390; point M2 of the code quality review for #221, second function). Not released on its own: listed in `compatibility.json` (2026.612) without moving `current_release`. Collection unchanged.
+
+### Changed
+- **`runSteps()` is 26 functions instead of one.** It was the whole of a run: 382 lines of code and 78 paths, with some thirty variables shared from top to bottom, and a process stage of 136 lines inside it. `npm run lint` allows 100 lines and 15 paths.
+  - `runSteps()` now reads as the run does: the run and its rows (`loadRun`), marked RUNNING (`markRunning`), its artifact folder, the refusals before anything starts (`refusalBeforeStart`), what it needs before its process (`prepareRun`: the token, the tester's values, the data file, the working folder, the environment file, the place of its results), the process (`runProcess`), then its end (`finishRun`: the environment file removed, the reports linked, the results stored, the final status and what it says of itself).
+  - The process stage is one function per thing that watches it: the run's time limit (`armRunTimeout`), the silence of Bruno (`watchSilence`), the token kept fresh (`armTokenWatchdog`), the output logged line by line (`followOutput`). The two handlers of the output, one per stream, are one.
+  - What the stages share is one object, `run`: each stage takes what it needs by name and adds what the next ones need.
+  - The five places that marked a run FAILED before its process starts are one, `failRun()`.
+  - The largest new function has 10 paths (`noteEndReason`) and 39 lines (`runProcess`); `runSteps()` itself has 3 and 12.
+  - The messages, the statuses and their order are those of before.
+  - SonarCloud measures another thing than the lint (cognitive complexity, S3776) and counted one of the new functions, `removeEnvFile()`, at 16 for 15 allowed: its body sat inside one `if`. It leaves early instead, the body one level less deep and otherwise the same (18 faults of 18 seen in it afterwards).
+- **The lint's record goes down.** `runner.js`: 5 functions over the path limit become 3 (`logEvent`, `LogParser.parse`, `computeEffectiveRunTimeoutMs`, not touched here), 2 over the line limit become none. The server's totals in `lint-config.test.js` go from 107 and 22 to 105 and 20.
+
+### How it was checked
+- **The moved code was not typed again.** A script assembled the new functions from the line ranges of the old one: 58 ranges, 2,624 of the old function's 3,307 tokens (comments included), the same token for token.
+- **Everything a run does in the runner's tests, before and after.** A Jest set-up file (not in the repository) records, test by test, what the runs of that test left: each line logged, decrypted, in order, with its level and labels; the runs' rows; the artifacts and the counts of stored results; and how the process was started (the command, its arguments, its folder, the names of its environment and the values of the run's own variables). The old and the new runner, on the same 180 tests: the same record (1,603 log lines, 182 runs, 148 processes started). Three records of one code are the same.
+- **The comparison and the tests see a fault.** 325 faults were put in the new code, one at a time (a condition negated, the answers of a `? :` swapped, `&&` and `||` exchanged, a comparison turned round, a statement removed, a number changed, a returned value emptied), each run with two unchanged copies beside as a control.
+  - With the 146 tests of before: 250 seen (200 by a failed test, 50 by the record only), 75 not.
+  - The 75 named what no test held. 34 tests were written for them, on the old code first: 311 seen.
+  - 14 are left. Twelve change nothing a test can see: a limit that differs only at one millisecond (2), the period of a timer and the rounding of a time said or measured (4), a margin of two seconds on a file's date, a value read the same whether null or not given, a variable emptied after its timer is stopped, a counter's entry freed (2), a condition whose two halves refuse the same id with the same words. One is the mode of the environment file, which Windows does not keep: its test runs on Linux. One is a warning that cannot be reached: the data file it speaks of is refused earlier when it cannot be read.
+  - Two earlier counts were void and were thrown away: the two unchanged copies did not pass. The Jest processes shared one temporary folder (each has its own now), then the record held the machine's `PATH`, which differs with the way Jest is started (the machine's variables are recorded by name only).
+
+### Tests
+- `runner.test.js`: 34 tests added (180 with `runner-watchdog-scope.test.js`), for what a run does that none reached: a run whose id is not an id, a job without a user, dedicated headers that cannot be read, the requestor in the environment file, a working folder that cannot be made or is left half made, the folders made when they are not there (and not made for a pod run), a process that cannot be started here or handed to the dispatcher, the end of a process by itself, without an exit code, or lost (the run can no longer be stopped, its time limit and its silence no longer count, its token is no longer asked, its secret is withdrawn), a silent run stopped once, the token watchdog's ticks, the pod's deadline, an environment file that will not go, the scenario a run's lines carry, a wait cut to the server's longest run, the measures of the results' storing.
+- `run-log-batches.test.js` counted seven places where the runner writes a status: there are three now, and five refusals that end in `failRun()`. The test says so.
+
+### Not done here
+- The three other functions of `runner.js` over the path limit, and the other functions of M2 (the delegates of `scenarios.js`, `postCreateBookingResponse`, `mergeTesterSave`): one pull request each.
+
 ## [collection-OTST_V2.0.269] — 2026-11-22
 
 `parseScenarioData()` split by stage, behaviour unchanged (#1388; point M2 of the code quality review for #221). Not released on its own: listed in `compatibility.json` (2026.611) without moving `current_release`. Server unchanged.

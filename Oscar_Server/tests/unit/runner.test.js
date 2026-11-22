@@ -2415,3 +2415,734 @@ describe('executeRun — records its versions and the scenario it ran (#956)', (
     expect(getRunRow(runId).scenario_hash).toBeNull();
   });
 });
+
+// ── #1390: the stages of a run that no test above reaches ─────────────────────
+// Each was a line no test ran, found by coverage and by putting one fault at
+// a time in runSteps() before it was split by stage.
+describe('executeRun — the stages no other test reaches (#1390)', () => {
+  const allEvents = (runId) => require('../../src/db/db')
+    .all('SELECT level, message, scenario_name FROM run_events WHERE run_id = ? ORDER BY id ASC', [runId])
+    .map((r) => ({ level: r.level, message: colDecrypt(r.message), scenario: r.scenario_name }));
+
+  // A run of a company of its own, started, with its fake process.
+  async function startedRun({ company = {}, job = {} } = {}) {
+    const { companyId, userId } = seedCompanyUser(company);
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-1390');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const done = executeRun({ runId, companyId, userId, ...job });
+    await waitForSpawnCalls(1);
+    return { runId, companyId, userId, fakeProc, done };
+  }
+
+  test('a run whose id is not an id is not run: nothing is asked for, nothing is started', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    run(`INSERT INTO runs (id, company_id, user_id, status) VALUES ('not-a-run-id', ?, ?, 'QUEUED')`, [companyId, userId]);
+    try {
+      await expect(executeRun({ runId: 'not-a-run-id', companyId, userId })).rejects.toThrow('executeRun: invalid runId format');
+      expect(resolveAccessToken).not.toHaveBeenCalled();
+      expect(spawn).not.toHaveBeenCalled();
+    } finally {
+      run(`DELETE FROM run_events WHERE run_id = 'not-a-run-id'`);
+      run(`DELETE FROM runs WHERE id = 'not-a-run-id'`);
+    }
+  });
+
+  test('dedicated headers that cannot be read are left out with a warning, and the run goes on', async () => {
+    const { runId, fakeProc, done } = await startedRun({ company: { extraHeaders: colEncrypt('{ not json') } });
+    const envFile = fs.readdirSync(ENVS_DIR).find((f) => f.includes(runId.slice(0, 8)));
+    const yml = fs.readFileSync(path.join(ENVS_DIR, envFile), 'utf8');
+    fakeProc.emit('close', 0);
+    expect((await done).exitCode).toBe(0);
+    expect(getRunRow(runId).status).toBe('COMPLETED');
+    expect(allEvents(runId).filter((e) => e.level === 'warn' && e.message.startsWith('[runner] Ignoring malformed company extra_headers: '))).toHaveLength(1);
+    // No header is written: the environment file has no dedicated-header variable.
+    expect(yml).not.toContain('__extraHeaders');
+  });
+
+  test('dedicated headers stored as something else than a list are left out, without a word', async () => {
+    const { runId, fakeProc, done } = await startedRun({ company: { extraHeaders: colEncrypt(JSON.stringify({ name: 'X-One', value: 'v' })) } });
+    const envFile = fs.readdirSync(ENVS_DIR).find((f) => f.includes(runId.slice(0, 8)));
+    const yml = fs.readFileSync(path.join(ENVS_DIR, envFile), 'utf8');
+    fakeProc.emit('close', 0);
+    await done;
+    expect(yml).not.toContain('__extraHeaders');
+    expect(yml).not.toContain('X-One');
+    expect(allEvents(runId).filter((e) => /extra_headers/.test(e.message))).toEqual([]);
+  });
+
+  test('a process that cannot be started: the run is FAILED and marked as not a result, its secret withdrawn', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-1390');
+    spawn.mockImplementationOnce(() => { throw new Error('spawn bru ENOENT'); });
+
+    const result = await executeRun({ runId, companyId, userId });
+
+    expect(result).toEqual({ exitCode: 1 });
+    const row = getRunRow(runId);
+    expect([row.status, row.exit_code, row.error_message]).toEqual(['FAILED', 1, 'RUN_PROCESS_ERROR']);
+    const events = allEvents(runId);
+    expect(events.filter((e) => e.level === 'error' && e.message === '[runner] Process error: spawn bru ENOENT')).toHaveLength(1);
+    expect(events.filter((e) => e.level === 'error' && e.message.includes('The run did not go to its end: its process could not be started'))).toHaveLength(1);
+    expect(events.some((e) => e.message === '[runner] Run finished — status=FAILED exit=1')).toBe(true);
+    // The secret the process was to have is no longer good, and the run is not one that can be stopped.
+    const secret = spawn.mock.calls[0][2].env.OSCAR_RUN_SECRET;
+    expect(secret).toEqual(expect.any(String));
+    expect(runSecrets.verify(runId, secret)).toBeNull();
+    expect(killRun(runId)).toBe(false);
+  });
+
+  test('an environment file that cannot be deleted is tried three times, then left, and the run ends as it was', async () => {
+    const { runId, fakeProc, done } = await startedRun();
+    const realUnlink = fs.promises.unlink;
+    const unlink = jest.spyOn(fs.promises, 'unlink').mockImplementation((file) => (
+      String(file).endsWith('_Env.yml') ? Promise.reject(Object.assign(new Error('busy'), { code: 'EBUSY' })) : realUnlink(file)));
+    try {
+      fakeProc.emit('close', 0);
+      expect((await done).exitCode).toBe(0);
+    } finally {
+      unlink.mockRestore();
+    }
+    expect(getRunRow(runId).status).toBe('COMPLETED');
+    const messages = allEvents(runId).map((e) => `${e.level}: ${e.message}`);
+    const about = messages.filter((m) => /[Ee]nv file/.test(m) && !m.includes('written'));
+    expect(about).toEqual([
+      'warn: [runner] Env file deletion attempt 1 failed: EBUSY',
+      'warn: [runner] Env file deletion attempt 2 failed: EBUSY',
+      'warn: [runner] Env file deletion attempt 3 failed: EBUSY',
+      'warn: [runner] Failed to delete ephemeral env file after 3 attempts. The file carries no credentials (#306); leftover is cosmetic.',
+      'info: [runner] Ephemeral env file DELETION FAILED.',
+    ]);
+    for (const f of fs.readdirSync(ENVS_DIR).filter((name) => name.includes(runId.slice(0, 8)))) fs.rmSync(path.join(ENVS_DIR, f), { force: true });
+  });
+
+  test('an environment file deleted at the second try says so once', async () => {
+    const { runId, fakeProc, done } = await startedRun();
+    const realUnlink = fs.promises.unlink;
+    let refusals = 1;
+    const unlink = jest.spyOn(fs.promises, 'unlink').mockImplementation((file) => {
+      if (String(file).endsWith('_Env.yml') && refusals > 0) { refusals -= 1; return Promise.reject(Object.assign(new Error('busy'), { code: 'EPERM' })); }
+      return realUnlink(file);
+    });
+    try {
+      fakeProc.emit('close', 0);
+      await done;
+    } finally {
+      unlink.mockRestore();
+    }
+    const about = allEvents(runId).map((e) => `${e.level}: ${e.message}`).filter((m) => /[Ee]nv file/.test(m) && !m.includes('written'));
+    expect(about).toEqual([
+      'warn: [runner] Env file deletion attempt 1 failed: EPERM',
+      'info: [runner] Ephemeral env file deleted.',
+    ]);
+    expect(fs.readdirSync(ENVS_DIR).filter((name) => name.includes(runId.slice(0, 8)))).toEqual([]);
+  });
+
+  test('without a scenario named by the job, the lines of the run carry the scenario of its row; a job\'s scenario comes first', async () => {
+    const first = await startedRun();
+    // No scenario on the row either: the lines carry none.
+    first.fakeProc.stdout.emit('data', Buffer.from('a line of the run\n'));
+    first.fakeProc.emit('close', 0);
+    await first.done;
+    expect(allEvents(first.runId).find((e) => e.message === 'a line of the run').scenario).toBeNull();
+
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    run(`UPDATE runs SET scenario_code = 'ROW_SCENARIO' WHERE id = ?`, [runId]);
+    resolveAccessToken.mockResolvedValueOnce('tok-1390');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const done = executeRun({ runId, companyId, userId });
+    await waitForSpawnCalls(2);
+    fakeProc.stdout.emit('data', Buffer.from('a line of the run\n'));
+    fakeProc.stderr.emit('data', Buffer.from('a line on the other stream\n'));
+    fakeProc.emit('close', 0);
+    await done;
+    const events = allEvents(runId);
+    expect(events.find((e) => e.message === 'a line of the run')).toMatchObject({ level: 'info', scenario: 'ROW_SCENARIO' });
+    expect(events.find((e) => e.message === 'a line on the other stream')).toMatchObject({ level: 'error', scenario: 'ROW_SCENARIO' });
+  });
+
+  test('a wait asked beyond the server\'s longest run is cut to it, and said', async () => {
+    const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'runner-1390-'));
+    const datafile = path.join(dir, 'datafile.json');
+    fs.writeFileSync(datafile, JSON.stringify({ scenariosToRun: 'ALL', scenarios: [{ code: 'LONG_WAIT', expiredOfferTest: true, expiredOfferMaxWaitMinutes: 60 }] }));
+    try {
+      const { companyId, userId } = seedCompanyUser();
+      run('UPDATE companies SET datafile_path = ? WHERE id = ?', [datafile, companyId]);
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockResolvedValueOnce('tok-1390');
+      const fakeProc = makeFakeProc();
+      spawn.mockReturnValueOnce(fakeProc);
+      const done = executeRun({ runId, companyId, userId, scenarioOverride: 'LONG_WAIT' });
+      await waitForSpawnCalls(1);
+      fakeProc.emit('close', 0);
+      await done;
+      const events = allEvents(runId);
+      // 60 minutes and one more asked, 30 minutes at most.
+      expect(events.filter((e) => e.level === 'info' && e.message.startsWith('[runner] Effective RUN_TIMEOUT_MS = 1800000ms (1800s); base=600000ms hardMax=1800000ms; source: scenario '))).toHaveLength(1);
+      expect(events.filter((e) => e.level === 'warn' && e.message.startsWith('[runner] expired-flow per-scenario max-wait requested 3660000ms but RUN_HARD_MAX_TIMEOUT_MS clamps to 1800000ms.'))).toHaveLength(1);
+      expect(events.filter((e) => /computeEffectiveRunTimeoutMs hit an error/.test(e.message))).toEqual([]);
+      // One expiry test armed: the run is not stopped for its silence.
+      expect(events.filter((e) => e.message.startsWith('[runner] No stop on silence for this run: 1 expiry test(s) armed'))).toHaveLength(1);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('a run with no wait asked says its time limit and nothing more about it', async () => {
+    const { runId, fakeProc, done } = await startedRun();
+    fakeProc.emit('close', 0);
+    await done;
+    const events = allEvents(runId);
+    expect(events.filter((e) => e.message.startsWith('[runner] Effective RUN_TIMEOUT_MS = 600000ms (600s); base=600000ms hardMax=1800000ms; source: RUN_TIMEOUT_MS (no in-scope scenario requested an extension'))).toHaveLength(1);
+    expect(events.filter((e) => /clamps to|hit an error|No stop on silence/.test(e.message))).toEqual([]);
+  });
+
+  test('the results are stored through the three measures the run gives, and their count is said', async () => {
+    const observed = jest.spyOn(stepMetrics.runResultsBytes, 'observe');
+    let given = null;
+    extractSpy.mockImplementation(async (runId, companyId, measures) => {
+      given = {
+        runId,
+        companyId,
+        read: measures.timeRead(() => 'what the read gave'),
+        slice: measures.timeSlice(() => 'what the slice gave'),
+      };
+      measures.onFileRead(4321);
+      return { suites: 2, requests: 5, assertions: 7 };
+    });
+    const { runId, companyId, fakeProc, done } = await startedRun();
+    fakeProc.emit('close', 0);
+    await done;
+    expect(given).toEqual({ runId, companyId, read: 'what the read gave', slice: 'what the slice gave' });
+    expect(observed).toHaveBeenCalledWith(4321);
+    observed.mockRestore();
+    expect(allEvents(runId).filter((e) => e.level === 'info' && e.message === '[runner] Stored 7 assertions across 2 suites and 5 requests.')).toHaveLength(1);
+  });
+
+  test('a slice that fails is still counted, and the failure is the store\'s', async () => {
+    extractSpy.mockImplementation(async (runId, companyId, measures) => {
+      measures.timeSlice(() => { throw new Error('a slice failed'); });
+      return { suites: 0, requests: 0, assertions: 0 };
+    });
+    const { runId, fakeProc, done } = await startedRun();
+    fakeProc.emit('close', 0);
+    await done;
+    expect(allEvents(runId).filter((e) => e.level === 'error' && e.message === '[runner] Failed to store structured results: a slice failed')).toHaveLength(1);
+    // Bruno ended well and the checks could not be read: the run stays as Bruno ended it.
+    expect(getRunRow(runId).status).toBe('COMPLETED');
+  });
+
+  describe('the token kept fresh while the run goes', () => {
+    beforeEach(() => { run(`INSERT OR REPLACE INTO server_config (key, value) VALUES ('TOKEN_WATCHDOG_INTERVAL_MS', '30')`); });
+    afterEach(() => { run(`INSERT OR REPLACE INTO server_config (key, value) VALUES ('TOKEN_WATCHDOG_INTERVAL_MS', '0')`); });
+
+    async function waitForTokenCalls(times) {
+      const start = Date.now();
+      while (resolveAccessToken.mock.calls.length < times) {
+        if (Date.now() - start > 4000) throw new Error(`the token was asked ${resolveAccessToken.mock.calls.length} time(s), not ${times}`);
+        await new Promise((r) => setTimeout(r, 5));
+      }
+    }
+
+    test('an OAuth run asks for its token again at each tick, says what the token source says, and stops asking when it ends', async () => {
+      const { companyId, userId } = seedCompanyUser({ authMode: 'oauth2' });
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockImplementation(async (user, logger) => {
+        const nth = resolveAccessToken.mock.calls.length;
+        if (nth === 2) { logger.info('the cached token is still good'); logger.error('a word of error'); }
+        if (nth === 3) throw new Error('the token source is away');
+        return 'tok-oauth';
+      });
+      const fakeProc = makeFakeProc();
+      spawn.mockReturnValueOnce(fakeProc);
+      const done = executeRun({ runId, companyId, userId });
+      await waitForSpawnCalls(1);
+      await waitForTokenCalls(4);
+      fakeProc.emit('close', 0);
+      await done;
+      const asked = resolveAccessToken.mock.calls.length;
+      await new Promise((r) => setTimeout(r, 120));
+      expect(resolveAccessToken.mock.calls.length).toBe(asked);
+
+      // A tick asks with the run's user and no forced refresh.
+      expect(resolveAccessToken.mock.calls[1]).toHaveLength(2);
+      expect(resolveAccessToken.mock.calls[1][0]).toBe(resolveAccessToken.mock.calls[0][0]);
+      const events = allEvents(runId);
+      expect(events.filter((e) => e.level === 'info' && e.message === '[runner] Token watchdog armed (tick every 30ms = 0s). Disable with TOKEN_WATCHDOG_INTERVAL_MS=0.')).toHaveLength(1);
+      expect(events.filter((e) => e.level === 'info' && e.message === '[token-watchdog] the cached token is still good')).toHaveLength(1);
+      expect(events.filter((e) => e.level === 'error' && e.message === '[token-watchdog] a word of error')).toHaveLength(1);
+      expect(events.filter((e) => e.level === 'warn' && e.message === `[token-watchdog] tick failed: the token source is away — Bruno can still get a fresh token via /v1/runs/${runId}/refresh-access-token at scenario start.`)).toHaveLength(1);
+      expect(getRunRow(runId).status).toBe('COMPLETED');
+    });
+
+    test('a run with a static token has no watchdog', async () => {
+      const { runId, fakeProc, done } = await startedRun();
+      await new Promise((r) => setTimeout(r, 100));
+      fakeProc.emit('close', 0);
+      await done;
+      expect(resolveAccessToken).toHaveBeenCalledTimes(1);
+      expect(allEvents(runId).filter((e) => /Token watchdog armed/.test(e.message))).toEqual([]);
+    });
+  });
+
+  describe('RUN_ISOLATION=isolated', () => {
+    const keys = ['RUN_ISOLATION', 'RUN_AGENT_TOKEN', 'RUN_WORKSPACES_DIR'];
+    const saved = {};
+    beforeEach(() => {
+      for (const k of keys) saved[k] = process.env[k];
+      process.env.RUN_ISOLATION = 'isolated';
+      process.env.RUN_AGENT_TOKEN = 't'.repeat(40);
+      process.env.RUN_WORKSPACES_DIR = path.resolve(__dirname, '../../data/workspaces');
+    });
+    afterEach(() => { for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; } });
+
+    test('a working folder that cannot be made: the run is FAILED with the reason, and nothing is started', async () => {
+      const { WORKSPACES_DIR } = require('../../src/worker/runner');
+      const { companyId, userId } = seedCompanyUser();
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockResolvedValueOnce('tok-1390');
+      const realRealpath = fs.promises.realpath;
+      const realpath = jest.spyOn(fs.promises, 'realpath').mockImplementation((p, ...rest) => (
+        path.resolve(String(p)) === path.resolve(WORKSPACES_DIR) ? Promise.reject(new Error('the folders are away')) : realRealpath(p, ...rest)));
+      let result;
+      try {
+        result = await executeRun({ runId, companyId, userId });
+      } finally {
+        realpath.mockRestore();
+      }
+      const reason = "The run's working folder could not be made: the folders are away";
+      expect(result).toEqual({ exitCode: 1, error: reason });
+      const row = getRunRow(runId);
+      expect([row.status, row.error_message, row.exit_code]).toEqual(['FAILED', reason, null]);
+      expect(allEvents(runId).filter((e) => e.level === 'error' && e.message === `[runner] ${reason}`)).toHaveLength(1);
+      expect(RemoteProcess).not.toHaveBeenCalled();
+      expect(spawn).not.toHaveBeenCalled();
+      expect(fs.existsSync(path.join(WORKSPACES_DIR, runId))).toBe(false);
+    });
+  });
+});
+
+// ── #1390: what a run leaves behind when it ends, and what it is started with ──
+// Found by putting one fault at a time in the stages of a run: each of these
+// held no test.
+describe('executeRun — the ends of a run and what it is started with (#1390)', () => {
+  const { flushRunLogs } = require('../../src/worker/runLog');
+  const setConfig = (key, value) => run(`INSERT INTO server_config (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [key, value]);
+  const clearConfig = (...keys) => keys.forEach((k) => run('DELETE FROM server_config WHERE key = ?', [k]));
+  const allEvents = (runId) => {
+    flushRunLogs();
+    return require('../../src/db/db')
+      .all('SELECT level, message, scenario_name FROM run_events WHERE run_id = ? ORDER BY id ASC', [runId])
+      .map((r) => ({ level: r.level, message: colDecrypt(r.message), scenario: r.scenario_name }));
+  };
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  async function startedRun({ company = {}, job = {} } = {}) {
+    const { companyId, userId } = seedCompanyUser(company);
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-1390');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const done = executeRun({ runId, companyId, userId, ...job });
+    await waitForSpawnCalls(1);
+    return { runId, companyId, userId, fakeProc, done };
+  }
+
+  test('a job that names no user runs as the user of its run', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-1390');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const done = executeRun({ runId, companyId });
+    await waitForSpawnCalls(1);
+    fakeProc.emit('close', 0);
+    expect((await done).exitCode).toBe(0);
+    const email = get('SELECT email FROM users WHERE id = ?', [userId]).email;
+    expect(resolveAccessToken.mock.calls[0][0].email).toBe(email);
+    expect(allEvents(runId)[0].message).toBe(`[runner] Run started — company=${get('SELECT slug FROM companies WHERE id = ?', [companyId]).slug} user=${email} auth_mode=bearer`);
+  });
+
+  test('a run without its company, and a company without the run, are both an error', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    await expect(executeRun({ runId, companyId: uuidv4(), userId })).rejects.toThrow('Run or company not found in DB.');
+    await expect(executeRun({ runId: uuidv4(), companyId, userId })).rejects.toThrow('Run or company not found in DB.');
+    expect(getRunRow(runId).status).toBe('QUEUED');
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  test('the tester\'s requestor is written in the environment file; without one, none is', async () => {
+    const { encrypt } = require('../../src/db/db');
+    const { readEnvYml, valueIn } = require('../helpers/env-yml');
+    const ymlOf = async (requestor) => {
+      const { companyId, userId } = seedCompanyUser();
+      if (requestor) run('UPDATE tester_credentials SET requestor_enc = ? WHERE user_id = ? AND company_id = ?', [encrypt(requestor), userId, companyId]);
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockResolvedValueOnce('tok-1390');
+      const fakeProc = makeFakeProc();
+      spawn.mockReturnValueOnce(fakeProc);
+      const done = executeRun({ runId, companyId, userId });
+      await waitForSpawnCalls(spawn.mock.calls.length + 1);
+      const envFile = fs.readdirSync(ENVS_DIR).find((f) => f.includes(runId.slice(0, 8)));
+      const text = fs.readFileSync(path.join(ENVS_DIR, envFile), 'utf8');
+      fakeProc.emit('close', 0);
+      await done;
+      return text;
+    };
+    expect(valueIn(readEnvYml(await ymlOf('the-requestor-1390')), 'requestor')).toBe('the-requestor-1390');
+    expect(await ymlOf(null)).not.toContain('requestor');
+  });
+
+  test('the folders of the environment files and of the reports are made when they are not there', async () => {
+    fs.rmSync(ENVS_DIR, { recursive: true, force: true });
+    fs.rmSync(VAL_DIR, { recursive: true, force: true });
+    try {
+      const { runId, fakeProc, done } = await startedRun();
+      const written = fs.readdirSync(ENVS_DIR).filter((f) => f.includes(runId.slice(0, 8)));
+      expect(written).toHaveLength(1);
+      expect(fs.existsSync(VAL_DIR)).toBe(true);
+      // The environment file is its owner's to read and write, no one else's (Windows keeps no such mode).
+      if (process.platform !== 'win32') expect(fs.statSync(path.join(ENVS_DIR, written[0])).mode % 512).toBe(384);
+      fakeProc.emit('close', 0);
+      expect((await done).exitCode).toBe(0);
+    } finally {
+      fs.mkdirSync(ENVS_DIR, { recursive: true });
+      fs.mkdirSync(VAL_DIR, { recursive: true });
+    }
+  });
+
+  test('the lines of a run carry the scenario its job names, before the one of its row', async () => {
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    run(`UPDATE runs SET scenario_code = 'ROW_SCENARIO' WHERE id = ?`, [runId]);
+    resolveAccessToken.mockResolvedValueOnce('tok-1390');
+    const fakeProc = makeFakeProc();
+    spawn.mockReturnValueOnce(fakeProc);
+    const done = executeRun({ runId, companyId, userId, scenarioOverride: 'SEED_SCENARIO' });
+    await waitForSpawnCalls(1);
+    fakeProc.stdout.emit('data', Buffer.from('a line of the run\n'));
+    fakeProc.emit('close', 0);
+    await done;
+    expect(allEvents(runId).find((e) => e.message === 'a line of the run').scenario).toBe('SEED_SCENARIO');
+  });
+
+  describe('once the process has ended', () => {
+    afterEach(() => clearConfig('RUN_TIMEOUT_MS', 'RUN_IDLE_TIMEOUT_MS'));
+
+    test('by itself: the run cannot be stopped any more, and its time limit and its silence no longer count', async () => {
+      setConfig('RUN_TIMEOUT_MS', '300');
+      setConfig('RUN_IDLE_TIMEOUT_MS', '200');
+      const { runId, fakeProc, done } = await startedRun();
+      fakeProc.emit('close', 0);
+      expect((await done).exitCode).toBe(0);
+      expect(killRun(runId)).toBe(false);
+      await sleep(700);
+      expect(fakeProc.kill).not.toHaveBeenCalled();
+      expect(allEvents(runId).filter((e) => /Run timed out|No output from Bruno/.test(e.message))).toEqual([]);
+      expect(getRunRow(runId).status).toBe('COMPLETED');
+    });
+
+    test('lost (an error of the process): the same, and its secret is withdrawn', async () => {
+      setConfig('RUN_TIMEOUT_MS', '300');
+      setConfig('RUN_IDLE_TIMEOUT_MS', '200');
+      const { runId, fakeProc, done } = await startedRun();
+      const secret = spawn.mock.calls[0][2].env.OSCAR_RUN_SECRET;
+      expect(runSecrets.verify(runId, secret)).toEqual(expect.any(String));
+      fakeProc.emit('error', new Error('the process was lost'));
+      expect((await done).exitCode).toBe(1);
+      expect(runSecrets.verify(runId, secret)).toBeNull();
+      expect(killRun(runId)).toBe(false);
+      await sleep(700);
+      expect(fakeProc.kill).not.toHaveBeenCalled();
+      const events = allEvents(runId);
+      expect(events.filter((e) => /Run timed out|No output from Bruno/.test(e.message))).toEqual([]);
+      expect(events.filter((e) => e.level === 'error' && e.message === '[runner] Process error: the process was lost')).toHaveLength(1);
+      expect(getRunRow(runId).error_message).toBe('RUN_PROCESS_ERROR');
+    });
+
+    test('a process that ends without an exit code is a failed run, exit 1', async () => {
+      const { runId, fakeProc, done } = await startedRun();
+      fakeProc.emit('close', null);
+      expect(await done).toEqual({ exitCode: 1 });
+      const row = getRunRow(runId);
+      expect([row.status, row.exit_code]).toEqual(['FAILED', 1]);
+    });
+
+    test('a silent run is stopped once, not at every look', async () => {
+      setConfig('RUN_IDLE_TIMEOUT_MS', '80');
+      const { runId, fakeProc, done } = await startedRun();
+      await waitForKillCall(fakeProc);
+      // The process is slow to die: several looks go by before it ends.
+      await sleep(300);
+      expect(fakeProc.kill).toHaveBeenCalledTimes(1);
+      fakeProc.emit('close', 143);
+      await done;
+      expect(allEvents(runId).filter((e) => /No output from Bruno for \d+s: run stopped/.test(e.message))).toHaveLength(1);
+    });
+  });
+
+  describe('an OAuth run and its token', () => {
+    afterEach(() => { run(`INSERT OR REPLACE INTO server_config (key, value) VALUES ('TOKEN_WATCHDOG_INTERVAL_MS', '0')`); });
+
+    test('a lost process ends the asking for a token too', async () => {
+      run(`INSERT OR REPLACE INTO server_config (key, value) VALUES ('TOKEN_WATCHDOG_INTERVAL_MS', '30')`);
+      const { companyId, userId } = seedCompanyUser({ authMode: 'oauth2' });
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockResolvedValue('tok-oauth');
+      const fakeProc = makeFakeProc();
+      spawn.mockReturnValueOnce(fakeProc);
+      const done = executeRun({ runId, companyId, userId });
+      await waitForSpawnCalls(1);
+      const start = Date.now();
+      while (resolveAccessToken.mock.calls.length < 3 && Date.now() - start < 4000) await sleep(5);
+      fakeProc.emit('error', new Error('the process was lost'));
+      await done;
+      const asked = resolveAccessToken.mock.calls.length;
+      expect(asked).toBeGreaterThanOrEqual(3);
+      await sleep(150);
+      expect(resolveAccessToken.mock.calls.length).toBe(asked);
+    });
+
+    test('the tick of the watchdog is said in seconds, rounded', async () => {
+      run(`INSERT OR REPLACE INTO server_config (key, value) VALUES ('TOKEN_WATCHDOG_INTERVAL_MS', '1500')`);
+      const { companyId, userId } = seedCompanyUser({ authMode: 'oauth2' });
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockResolvedValue('tok-oauth');
+      const fakeProc = makeFakeProc();
+      spawn.mockReturnValueOnce(fakeProc);
+      const done = executeRun({ runId, companyId, userId });
+      await waitForSpawnCalls(1);
+      fakeProc.emit('close', 0);
+      await done;
+      expect(allEvents(runId).filter((e) => e.message === '[runner] Token watchdog armed (tick every 1500ms = 2s). Disable with TOKEN_WATCHDOG_INTERVAL_MS=0.')).toHaveLength(1);
+      expect(resolveAccessToken).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  test('an environment file that will not go is tried again after half a second, twice', async () => {
+    const { fakeProc, done, runId } = await startedRun();
+    const realUnlink = fs.promises.unlink;
+    const unlink = jest.spyOn(fs.promises, 'unlink').mockImplementation((file) => (
+      String(file).endsWith('_Env.yml') ? Promise.reject(Object.assign(new Error('busy'), { code: 'EBUSY' })) : realUnlink(file)));
+    const timers = jest.spyOn(global, 'setTimeout');
+    let waits;
+    try {
+      fakeProc.emit('close', 0);
+      await done;
+      waits = timers.mock.calls.filter((call) => call[1] === 500).length;
+    } finally {
+      timers.mockRestore();
+      unlink.mockRestore();
+    }
+    expect(waits).toBe(2);
+    for (const f of fs.readdirSync(ENVS_DIR).filter((name) => name.includes(runId.slice(0, 8)))) fs.rmSync(path.join(ENVS_DIR, f), { force: true });
+  });
+
+  describe('the measures of the results\' storing', () => {
+    // Each clock the run asks for, with what was done to it.
+    function watchedClocks() {
+      const clocks = {};
+      const spy = jest.spyOn(stepMetrics, 'runWorkClock').mockImplementation((kind) => {
+        clocks[kind] = { timed: 0, done: 0 };
+        return { time: (fn) => { clocks[kind].timed += 1; return fn(); }, done: () => { clocks[kind].done += 1; } };
+      });
+      return { clocks, restore: () => spy.mockRestore() };
+    }
+
+    test('a file read and two slices: both clocks are closed once, each slice\'s own time is observed', async () => {
+      const watched = watchedClocks();
+      const slices = jest.spyOn(stepMetrics.resultsSliceSeconds, 'observe');
+      extractSpy.mockImplementation(async (runId, companyId, measures) => {
+        measures.timeRead(() => 1);
+        measures.onFileRead(10);
+        measures.timeSlice(() => 2);
+        measures.timeSlice(() => 3);
+        return { suites: 1, requests: 1, assertions: 1 };
+      });
+      try {
+        const { fakeProc, done } = await startedRun();
+        fakeProc.emit('close', 0);
+        await done;
+        expect(watched.clocks).toEqual({ results_read: { timed: 1, done: 1 }, results_store: { timed: 2, done: 1 } });
+        expect(slices).toHaveBeenCalledTimes(2);
+        for (const call of slices.mock.calls) {
+          expect(call[0]).toBeGreaterThanOrEqual(0);
+          expect(call[0]).toBeLessThan(5);
+        }
+      } finally {
+        slices.mockRestore();
+        watched.restore();
+      }
+    });
+
+    test('no file read: the read\'s clock is left open, the store\'s is closed, even when the storing fails', async () => {
+      const watched = watchedClocks();
+      extractSpy.mockImplementation(async () => { throw new Error('nothing to read'); });
+      try {
+        const { fakeProc, done } = await startedRun();
+        fakeProc.emit('close', 0);
+        await done;
+        expect(watched.clocks).toEqual({ results_read: { timed: 0, done: 0 }, results_store: { timed: 0, done: 1 } });
+      } finally {
+        watched.restore();
+      }
+    });
+  });
+
+  describe('RUN_ISOLATION=isolated', () => {
+    const keys = ['RUN_ISOLATION', 'RUN_AGENT_TOKEN', 'RUN_WORKSPACES_DIR'];
+    const saved = {};
+    beforeEach(() => {
+      for (const k of keys) saved[k] = process.env[k];
+      process.env.RUN_ISOLATION = 'isolated';
+      process.env.RUN_AGENT_TOKEN = 't'.repeat(40);
+      process.env.RUN_WORKSPACES_DIR = path.resolve(__dirname, '../../data/workspaces');
+    });
+    afterEach(() => {
+      for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+      RemoteProcess.mockReset();
+    });
+
+    test('a run that ends leaves no working folder', async () => {
+      const { WORKSPACES_DIR } = require('../../src/worker/runner');
+      const { companyId, userId } = seedCompanyUser();
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockResolvedValueOnce('tok-1390');
+      const calls = [];
+      RemoteProcess.mockImplementation(function FakeRemote(agent, request) {
+        const proc = makeFakeProc();
+        calls.push({ request, proc });
+        return proc;
+      });
+      const done = executeRun({ runId, companyId, userId });
+      const start = Date.now();
+      while (calls.length === 0 && Date.now() - start < 4000) await sleep(10);
+      expect(calls).toHaveLength(1);
+      expect(fs.existsSync(path.join(WORKSPACES_DIR, runId, 'environments'))).toBe(true);
+      calls[0].proc.emit('close', 0);
+      await done;
+      expect(fs.existsSync(path.join(WORKSPACES_DIR, runId))).toBe(false);
+      expect(allEvents(runId).filter((e) => e.message === '[runner] Workspace cleaned up.')).toHaveLength(1);
+    });
+
+    test('a working folder half made is removed when the run is refused', async () => {
+      const { WORKSPACES_DIR } = require('../../src/worker/runner');
+      const { companyId, userId } = seedCompanyUser();
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockResolvedValueOnce('tok-1390');
+      const realMkdir = fs.promises.mkdir;
+      let made = false;
+      // The folder of the run is made; the folder of its environment files is refused, a moment later.
+      const mkdir = jest.spyOn(fs.promises, 'mkdir').mockImplementation((dir, ...rest) => {
+        if (path.basename(String(dir)) === 'environments' && String(dir).includes(runId)) {
+          made = fs.existsSync(path.join(WORKSPACES_DIR, runId));
+          return new Promise((resolve, reject) => { setTimeout(() => reject(new Error('no room left')), 60); });
+        }
+        return realMkdir(dir, ...rest);
+      });
+      let result;
+      try {
+        result = await executeRun({ runId, companyId, userId });
+      } finally {
+        mkdir.mockRestore();
+      }
+      expect(made).toBe(true);
+      expect(result).toEqual({ exitCode: 1, error: "The run's working folder could not be made: no room left" });
+      expect(fs.existsSync(path.join(WORKSPACES_DIR, runId))).toBe(false);
+      expect(RemoteProcess).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('RUN_ISOLATION=pod', () => {
+    const podMetrics = require('../../src/utils/metrics');
+    const refusedPods = async () => (await podMetrics.runPodsEnded.get()).values.find((v) => v.labels.outcome === 'refused')?.value || 0;
+    const keys = ['RUN_ISOLATION', 'RUN_AGENT_TOKEN', 'RUN_AGENT_HOST', 'RUN_SERVER_URL', 'INTERNAL_PORT', 'JSON_SCHEMA_URL'];
+    const saved = {};
+    beforeEach(() => {
+      for (const k of keys) saved[k] = process.env[k];
+      Object.assign(process.env, {
+        RUN_ISOLATION: 'pod', RUN_AGENT_TOKEN: 't'.repeat(40), RUN_AGENT_HOST: 'oscar-dispatcher',
+        RUN_SERVER_URL: 'http://oscar-internal:3003', INTERNAL_PORT: '3003',
+      });
+      delete process.env.JSON_SCHEMA_URL;
+    });
+    afterEach(() => {
+      for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
+      RemoteProcess.mockReset();
+      clearConfig('RUN_TIMEOUT_MS');
+    });
+
+    async function podRequest(change = () => {}) {
+      const { companyId, userId } = seedCompanyUser();
+      change(companyId);
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockResolvedValueOnce('tok-pod');
+      const calls = [];
+      RemoteProcess.mockImplementation(function FakeRemote(agent, request) {
+        const proc = makeFakeProc();
+        calls.push({ request, proc });
+        return proc;
+      });
+      const done = executeRun({ runId, companyId, userId, scenarioOverride: 'SEED_SCENARIO' });
+      const start = Date.now();
+      while (calls.length === 0 && Date.now() - start < 4000) await sleep(10);
+      expect(calls).toHaveLength(1);
+      calls[0].proc.emit('close', 0);
+      await done;
+      return calls[0].request;
+    }
+
+    test('the pod\'s deadline is the run\'s time limit in whole seconds, a minute at least', async () => {
+      setConfig('RUN_TIMEOUT_MS', '30000');
+      expect((await podRequest()).deadlineSeconds).toBe(60);
+      setConfig('RUN_TIMEOUT_MS', '90500');
+      expect((await podRequest()).deadlineSeconds).toBe(91);
+      setConfig('RUN_TIMEOUT_MS', '1700000');
+      expect((await podRequest()).deadlineSeconds).toBe(1700);
+    });
+
+    test('nothing is made here for a pod run: no folder of environment files, none of reports', async () => {
+      fs.rmSync(ENVS_DIR, { recursive: true, force: true });
+      fs.rmSync(VAL_DIR, { recursive: true, force: true });
+      try {
+        await podRequest();
+        expect(fs.existsSync(ENVS_DIR)).toBe(false);
+        expect(fs.existsSync(VAL_DIR)).toBe(false);
+      } finally {
+        fs.mkdirSync(ENVS_DIR, { recursive: true });
+        fs.mkdirSync(VAL_DIR, { recursive: true });
+      }
+    });
+
+    test('a run that cannot be handed to the dispatcher is counted as refused, and marked as not a result', async () => {
+      const before = await refusedPods();
+      const { companyId, userId } = seedCompanyUser();
+      const runId = seedRun(companyId, userId);
+      resolveAccessToken.mockResolvedValueOnce('tok-pod');
+      RemoteProcess.mockImplementation(() => { throw new Error('the dispatcher is away'); });
+      const result = await executeRun({ runId, companyId, userId });
+      expect(result).toEqual({ exitCode: 1 });
+      expect(getRunRow(runId).error_message).toBe('RUN_PROCESS_ERROR');
+      expect(allEvents(runId).filter((e) => e.message === '[runner] Process error: the dispatcher is away')).toHaveLength(1);
+      expect(await refusedPods()).toBe(before + 1);
+    });
+  });
+
+  test('a run started here that cannot be started is not counted among the pods refused', async () => {
+    const podMetrics = require('../../src/utils/metrics');
+    const refusedPods = async () => (await podMetrics.runPodsEnded.get()).values.find((v) => v.labels.outcome === 'refused')?.value || 0;
+    const before = await refusedPods();
+    const { companyId, userId } = seedCompanyUser();
+    const runId = seedRun(companyId, userId);
+    resolveAccessToken.mockResolvedValueOnce('tok-1390');
+    spawn.mockImplementationOnce(() => { throw new Error('spawn bru ENOENT'); });
+    await executeRun({ runId, companyId, userId });
+    expect(await refusedPods()).toBe(before);
+  });
+});
