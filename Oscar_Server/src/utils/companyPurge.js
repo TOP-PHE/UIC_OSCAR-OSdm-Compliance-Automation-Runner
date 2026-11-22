@@ -31,6 +31,7 @@ const THROUGH_RUNS = ['run_assertions', 'run_requests', 'run_suites'];
 // checks before the requests and suites they point to.
 const BY_PARENT = [
   'DELETE FROM run_events WHERE run_id IN (SELECT id FROM runs WHERE company_id = ?)',
+  'DELETE FROM run_warning_lines WHERE run_id IN (SELECT id FROM runs WHERE company_id = ?)',
   'DELETE FROM run_artifacts WHERE run_id IN (SELECT id FROM runs WHERE company_id = ?)',
   ...THROUGH_RUNS.map(table => `DELETE FROM ${table} WHERE run_id IN (SELECT id FROM runs WHERE company_id = ?)`),
   'DELETE FROM finding_comment WHERE finding_id IN (SELECT id FROM finding WHERE company_id = ?)',

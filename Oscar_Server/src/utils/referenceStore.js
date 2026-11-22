@@ -14,16 +14,17 @@
  * They are read from the collection the runs use (COLLECTION_PATH), which
  * refresh-collection.yml pulls from the repository on every push to main:
  * no call to GitHub. In a checkout the repository's own copy is the fallback,
- * as for the data file schema (datafileSchema.js). Each read is fresh, since
- * the collection is updated in place without a restart.
+ * as for the data file schema (datafileSchema.js). The collection is updated
+ * in place without a restart: each file is looked at at each call, and read
+ * and parsed again only when it changed (keptJsonFile.js).
  *
  * A reference is named by one of a fixed list (`simulator-alpha`…), never by
  * a path from the request.
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const R = require('./referenceConfiguration');
+const { keptJson } = require('./keptJsonFile');
 
 const NAMES = Object.freeze(R.PROVIDERS.map(R.referenceName));
 
@@ -35,17 +36,33 @@ function dataBaseCandidates() {
   ];
 }
 
+// A reference's version is a digest over its provider's part of the data
+// file: computed once for the two files as they are, and kept while both are
+// the same objects (keptJson gives the same object back while a file has not
+// changed). The Run page and Test Config ask for the list of references at
+// each load: it used to read and parse the 1.9 MB data file once per name.
+const keptVersions = new Map();   // name -> { reference, datafile, version }
+
+function versionOf(name, reference, datafile) {
+  const kept = keptVersions.get(name);
+  if (kept?.reference === reference && kept?.datafile === datafile) return kept.version;
+  const version = R.versionOf(reference, datafile);
+  keptVersions.set(name, { reference, datafile, version });
+  return version;
+}
+
 /**
  * The reference `name` with its data file: { reference, datafile, version }
  * or null when the name is not one of the list or no copy can be read.
+ * `reference` and `datafile` are frozen and shared: work on a copy.
  */
 function loadReference(name) {
   if (!NAMES.includes(name)) return null;
   for (const dir of dataBaseCandidates()) {
     try {
-      const reference = JSON.parse(fs.readFileSync(path.join(dir, 'reference', `${name}.json`), 'utf8'));
-      const datafile = JSON.parse(fs.readFileSync(path.join(dir, R.DATAFILE_NAME), 'utf8'));
-      return { reference, datafile, version: R.versionOf(reference, datafile) };
+      const reference = keptJson(path.join(dir, 'reference', `${name}.json`));
+      const datafile = keptJson(path.join(dir, R.DATAFILE_NAME));
+      return { reference, datafile, version: versionOf(name, reference, datafile) };
     } catch {
       // Not in this copy: the next one.
     }

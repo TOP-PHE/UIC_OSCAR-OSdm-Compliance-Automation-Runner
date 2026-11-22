@@ -30,6 +30,26 @@ const INSERT_SQL = `INSERT INTO run_events (run_id, ts, level, message,
    event_kind, attempt_index, attempt_total, scenario_name)
  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
+// A warning line is also kept on its own, under the id its log line gets
+// (api/helpers/runWarnings.js): the readers of a run's warnings then read
+// those few rows, not the run's whole log. In the same transaction as the
+// line, so a run has both or neither.
+const WARNING_SQL = 'INSERT INTO run_warning_lines (event_id, run_id, request_name, message) VALUES (?, ?, ?, ?)';
+// Where INSERT_SQL has the values a warning line keeps.
+const RUN_ID = 0;
+const LEVEL = 2;
+const MESSAGE = 3;
+const REQUEST_NAME = 7;
+
+// Writes one line, and its copy when it is a warning. `statements` holds the
+// prepared INSERTs of one flush; the second is prepared at the first warning.
+function writeLine(db, statements, row) {
+  const written = statements.line.run(...row);
+  if (row[LEVEL] !== 'warn') return;
+  statements.warning = statements.warning || db.prepare(WARNING_SQL);
+  statements.warning.run(written.lastInsertRowid, row[RUN_ID], row[REQUEST_NAME], row[MESSAGE]);
+}
+
 let waiting = [];
 let timer = null;
 
@@ -55,19 +75,23 @@ function queueRunLogLine(values) {
 // back, and the lines are written one by one inside it, as before.
 function writeTogether(rows) {
   const store = require('../db/db');
-  const insert = store.db.prepare(INSERT_SQL);
+  const statements = { line: store.db.prepare(INSERT_SQL), warning: null };
   store.transaction(() => {
-    for (const row of rows) insert.run(...row);
+    for (const row of rows) writeLine(store.db, statements, row);
   });
 }
 
 // One line at a time, each on its own: a line that cannot be written (its run
 // deleted meanwhile) costs only itself. A log line never stops a run.
 function writeOneByOne(rows) {
-  let insert;
-  try { insert = database().prepare(INSERT_SQL); } catch { return; }
+  let db;
+  let statements;
+  try {
+    db = database();
+    statements = { line: db.prepare(INSERT_SQL), warning: null };
+  } catch { return; }
   for (const row of rows) {
-    try { insert.run(...row); } catch { /* never block a run on its log */ }
+    try { writeLine(db, statements, row); } catch { /* never block a run on its log */ }
   }
 }
 
@@ -96,4 +120,4 @@ function waitingRunLogLines() {
   return waiting.length;
 }
 
-module.exports = { queueRunLogLine, flushRunLogs, waitingRunLogLines, FLUSH_MS, INSERT_SQL };
+module.exports = { queueRunLogLine, flushRunLogs, waitingRunLogLines, FLUSH_MS, INSERT_SQL, WARNING_SQL };

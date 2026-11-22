@@ -28,6 +28,7 @@
  */
 
 const { all, colDecrypt } = require('../../db/db');
+const { warningRowsOf } = require('./runWarnings');
 const { flushRunLogs } = require('../../worker/runLog');
 const { problemOf } = require('../../utils/findingSuggestions');
 const { isWarningLine } = require('../../utils/aiAnalysis');
@@ -103,8 +104,7 @@ function addWarning(found, step, line) {
 }
 
 function warningsOf(runId) {
-  const rows = all(`SELECT request_name, message FROM run_events WHERE run_id = ? AND level = 'warn' ORDER BY id ASC LIMIT ?`,
-    [runId, MAX_EVENTS]);
+  const rows = warningRowsOf([runId], MAX_EVENTS);
   const found = { warnings: [], deviations: [], more: false };
   for (const row of rows) {
     for (const line of warningLinesOf(row)) addWarning(found, row.request_name, line);

@@ -1216,9 +1216,11 @@ async function runSteps({ runId, companyId, userId, scenarioOverride }) {
   if (!runRow || !companyRow) throw new Error('Run or company not found in DB.');
   if (!userRow)               throw new Error('User row not found for run — cannot resolve credentials.');
 
-  // Mark as RUNNING
+  // Mark as RUNNING. warn_lines_kept: this server keeps the run's warning
+  // lines on their own as it logs them (runLog.js), so its readers need not
+  // walk its log (api/helpers/runWarnings.js).
   writeRunStatus(
-    `UPDATE runs SET status = 'RUNNING', started_at = datetime('now') WHERE id = ?`,
+    `UPDATE runs SET status = 'RUNNING', started_at = datetime('now'), warn_lines_kept = 1 WHERE id = ?`,
     [runId]
   );
   logEvent(runId, 'info', `[runner] Run started — company=${companyRow.slug} user=${userRow.email} auth_mode=${userRow.auth_mode}`);

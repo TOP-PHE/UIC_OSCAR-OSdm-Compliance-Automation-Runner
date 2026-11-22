@@ -45,6 +45,7 @@ const { armed, ALWAYS_REQUIRED } = require('../../utils/capabilities');
 const { offerOptionCoverageOf, withOfferOptions } = require('../../utils/offerOptionCoverage');
 const { offerOptionReportsOf } = require('../helpers/offerOptionReports');
 const { runScopeSql } = require('../helpers/run-access');
+const { warningRowsOf } = require('../helpers/runWarnings');
 const { coverageWorkbook } = require('../../utils/coverageWorkbook');
 const { fileNameFor } = require('../../utils/fileNames');
 const { problemOf } = require('../../utils/findingSuggestions');
@@ -185,8 +186,7 @@ function warningLinesOf(latest) {
   let read = 0;
   for (let i = 0; i < ids.length && read < MAX_WARNING_EVENTS; i += 500) {
     const chunk = ids.slice(i, i + 500);
-    const rows = all(`SELECT run_id, message FROM run_events WHERE level = 'warn' AND run_id IN (${chunk.map(() => '?').join(',')}) ORDER BY id ASC LIMIT ?`,
-      [...chunk, MAX_WARNING_EVENTS - read]);
+    const rows = warningRowsOf(chunk, MAX_WARNING_EVENTS - read);
     read += rows.length;
     for (const row of rows) {
       let text = '';

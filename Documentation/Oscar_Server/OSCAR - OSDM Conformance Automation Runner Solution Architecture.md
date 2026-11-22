@@ -258,6 +258,7 @@ Core tables:
 - roles
 - runs
 - run_events
+- run_warning_lines
 - run_artifacts
 - reports
 - report_comparisons
@@ -653,6 +654,10 @@ Implements the Section 5.5 comparison model:
 
 -- run_events          -- log lines streamed during execution
 --   id, run_id, ts, level ('stdout'|'stderr'|'info'), message
+
+-- run_warning_lines  -- a run's warning lines, kept a second time by the log's writer
+--   event_id (the id of the line in run_events), run_id, request_name, message
+--   read instead of the log for the runs marked runs.warn_lines_kept (1.11.571)
 
 -- run_artifacts       -- links to files produced by the run
 --   id, run_id, type ('html_report'|'json_results'), filename, path

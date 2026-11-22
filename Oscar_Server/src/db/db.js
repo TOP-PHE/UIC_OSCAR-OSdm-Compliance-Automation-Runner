@@ -1364,6 +1364,17 @@ const MIGRATIONS = [
       )`);
       db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_test_suite_name ON test_suite(company_id, lower(name))');
   }},
+  { version: 61, name: 'warning-lines-kept', up: () => {
+      // The readers of a run's warnings walked its whole log (run_events has
+      // one index, by run). The writer of the log now keeps each warning line
+      // in run_warning_lines too (schema.sql: a new, small table), and the
+      // runner marks a run when it starts. 0 for every run of before: those
+      // are read from their log, as they were. Adding a column with a
+      // constant default rewrites no row. No index is made on run_events: it
+      // is the largest table, and making one reads it whole with the server
+      // unable to write meanwhile.
+      _safeAlter('ALTER TABLE runs ADD COLUMN warn_lines_kept INTEGER NOT NULL DEFAULT 0');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

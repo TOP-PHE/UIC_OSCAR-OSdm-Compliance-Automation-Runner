@@ -4,6 +4,17 @@
   "current_release": "2026.603",
   "releases": [
     {
+      "release": "2026.610",
+      "date": "2026-11-22",
+      "server": "1.11.571",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.571 (#1383): a run's warning lines are kept a second time by the log's writer (run_warning_lines, migration 61) and read from there for the runs started by this version; the coverage report, the AI analysis and a run's detail no longer walk those runs' whole logs (1.9 s to 48 ms for 300 runs on the bench). The runs of before are read from their log, as before; no index is made on the log table. The list of reference configurations is read once per version of its files (101 ms to 10.5 ms a call). Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.609",
       "date": "2026-11-22",
       "server": "1.11.570",
