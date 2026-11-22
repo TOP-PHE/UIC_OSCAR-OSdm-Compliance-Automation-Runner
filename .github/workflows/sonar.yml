@@ -119,12 +119,29 @@ jobs:
           mkdir -p OSCAR_API_TestTool/coverage
           node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=OSCAR_API_TestTool/coverage/lcov.info "OSCAR_API_TestTool/tests/*.test.js"
 
+      # The version Sonar files this analysis under. Its "previous version"
+      # new-code period starts where the version last changed, so the number
+      # follows Oscar_Server/package.json. Written by hand in
+      # sonar-project.properties, it stayed at 1.11.178 for four months and
+      # the gate counted all that time as new code. Digits and dots only: the
+      # value goes into the scan's arguments.
+      - name: Read the server's version
+        id: server
+        run: |
+          version=$(node -p "require('./Oscar_Server/package.json').version")
+          case "$version" in
+            ''|*[!0-9.]*) echo "Oscar_Server/package.json: the version is not digits and dots" >&2; exit 1 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: SonarCloud Scan
         if: ${{ github.actor != 'dependabot[bot]' }}
         # sonarqube-scan-action replaces the deprecated sonarcloud-github-action,
         # which was only a wrapper around it (#1064). It needs no GITHUB_TOKEN:
         # the SonarQube Cloud GitHub App decorates pull requests.
         uses: SonarSource/sonarqube-scan-action@e805d875275f728fac1885b413934be6d7c63f65 # v8.4.1
+        with:
+          args: -Dsonar.projectVersion=${{ steps.server.outputs.version }}
         env:
           # Repository secret. Generate at https://sonarcloud.io/account/security
           # and store under repo settings → secrets and variables → actions.

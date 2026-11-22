@@ -34,7 +34,6 @@ function buildApp() {
   app.use('/v1/company',         require('../../src/api/routes/company'));
   app.use('/v1/company',         require('../../src/api/routes/company-findings'));
   app.use('/v1/runs',            require('../../src/api/routes/runs'));
-  // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, _next) => res.status(500).json({ status: 500, detail: err.message }));
   return app;
 }

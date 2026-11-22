@@ -110,7 +110,7 @@ function run(offerParts, bookedParts, partType = 'admission') {
   mockResults = [];
   mockLogs = [];
   withBrunoExpect(() => validateBookedOfferParts(offerParts, bookedParts, partType, ['PREBOOKED']));
-  return { results: mockResults, logs: mockLogs, ids: bru.getEnvVar('admissionReservationAncillaryBookingPartsIds') };
+  return { results: mockResults, logs: mockLogs, ids: global.bru.getEnvVar('admissionReservationAncillaryBookingPartsIds') };
 }
 
 beforeEach(() => {

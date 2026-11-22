@@ -31,7 +31,6 @@ function buildApp(validationChains) {
     validate(validationChains),
     (req, res) => res.status(200).json({ ok: true })
   );
-  // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, _next) => res.status(500).json({ error: err.message }));
   return app;
 }

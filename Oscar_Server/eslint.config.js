@@ -6,6 +6,21 @@
  * Auto-fix: `npm run lint:fix`
  */
 
+const BUG_RULES = require('./eslint.bug-rules');
+
+const readonly = names => Object.fromEntries(names.map(name => [name, 'readonly']));
+
+// What a test or a script may name without requiring it: Node's globals and Jest's.
+const NODE_GLOBALS = readonly([
+  'require', '__dirname', '__filename', 'process', 'Buffer', 'console', 'global', 'globalThis',
+  'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'setImmediate', 'clearImmediate', 'queueMicrotask',
+  'URL', 'URLSearchParams', 'AbortController', 'AbortSignal', 'fetch', 'Headers', 'Request', 'Response',
+  'FormData', 'Blob', 'structuredClone', 'TextEncoder', 'TextDecoder', 'performance', 'atob', 'btoa', 'crypto',
+]);
+const JEST_GLOBALS = readonly([
+  'describe', 'test', 'it', 'expect', 'beforeAll', 'afterAll', 'beforeEach', 'afterEach', 'jest',
+]);
+
 module.exports = [
   {
     files: ['src/**/*.js'],
@@ -93,6 +108,19 @@ module.exports = [
       // reference — e.g. a fixed XSS sink that lost its esc() call).
       'no-unused-vars': 'off',
     },
+  },
+  {
+    // The tests and the scripts: the bug rules only (eslint.bug-rules.js), the
+    // set the Bruno library is read with (eslint.library.config.js). Nothing
+    // read these 360 files before; a test that names something that does not
+    // exist fails only when its line runs, and one that is skipped never does.
+    files: ['tests/**/*.js', 'scripts/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'commonjs',
+      globals: { ...NODE_GLOBALS, ...JEST_GLOBALS, module: 'writable', exports: 'writable' },
+    },
+    rules: BUG_RULES,
   },
   {
     // public/vendor/ is third-party bundled libraries (ES modules, minified) —

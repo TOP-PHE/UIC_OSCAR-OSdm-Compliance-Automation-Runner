@@ -24,7 +24,6 @@ function buildAppWithRoute(mountPath, routerPath) {
   app.use(express.json());
   app.use(mountPath, require(routerPath));
   // Generic JSON 500 so failed promises don't dump HTML stack traces in tests
-  // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, _next) => {
     res.status(500).json({ status: 500, title: 'Internal Server Error', detail: err.message });
   });
