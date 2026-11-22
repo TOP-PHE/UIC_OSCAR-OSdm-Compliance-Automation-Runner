@@ -4,6 +4,9 @@ This guide wires up automated production rollout for the OSCAR server and
 its Bruno collection. Once configured, you do *not* SSH into the VPS for
 day-to-day updates — pushing a Git tag or merging a PR is enough.
 
+The whole GitHub and CI set-up (environments, required checks, apps,
+SonarCloud) is recorded in *OSCAR - GitHub and CI set-up*.
+
 ## Overview
 
 | Trigger                                     | Action                                                              |

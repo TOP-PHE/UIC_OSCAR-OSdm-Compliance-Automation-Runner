@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The GitHub and CI set-up is recorded** (#1372, maintainer's request). Documentation only, no version. New page *OSCAR - GitHub and CI set-up*, read from GitHub's API on 2026-11-22: repository settings, the protection of `main` and its seven required checks (and the checks that run without being required), the release tag ruleset and its one bypass, the four environments with their rules and secret names (never values), the GitHub Apps, every workflow, SonarCloud and its gate, the security features and Dependabot, the test environments, the commands to read it all again and the order to set it up from nothing. Linked from `CONTRIBUTING.md` and *auto-deploy-setup.md*.
 - **A production smoke test through the test automation API** (#1359). CI and documentation, no version.
   - `.github/workflows/production-smoke.yml`: after each successful promotion, and every morning, production is asked for three GAMMA scenarios through the API by the example client, as a company's CI would. After a promotion it first waits until `/health` shows the promoted release (Watchtower takes about five minutes). The client's report is the job's summary, and its exit code the verdict.
   - A Company API account of its own in *UIC Simulateurs*, given GAMMA only, and a GitHub environment of its own, `oscar-smoke` (no reviewer, `main` only): never `production`, which asks a reviewer. Without its secrets the job says so and passes.
