@@ -261,7 +261,7 @@ MAX_CONCURRENT_RUNS=1
 | `ALLOWED_ORIGINS` | (all) | Comma-separated CORS whitelist |
 | `APP_URL` | `http://localhost:3001` | Base URL for email verification links |
 | `NODE_ENV` | (unset) | Set to `production` for SMTP email sending |
-| `PLATFORM_BOOTSTRAP_TOKEN` | (unset) | One-time token for creating admin users |
+| `PLATFORM_BOOTSTRAP_TOKEN` | (unset) | Token for creating the first administrator. The route creates no other account once one exists (server 1.11.566); remove the token afterwards. While it is still set, the server says so at each start and *Server Config* shows it |
 
 #### SMTP (required for invitations, password resets and alerts)
 

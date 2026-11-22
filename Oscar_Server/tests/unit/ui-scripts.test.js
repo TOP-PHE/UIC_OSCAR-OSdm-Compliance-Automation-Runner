@@ -913,6 +913,30 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
     });
   });
 
+  describe('admin.html — a bootstrap token left in the environment (#1365)', () => {
+    const bootstrapTokenNote = loadFunction('admin.html', 'bootstrapTokenNote');
+    const page = read('admin.html');
+
+    test('nothing unless the server says the token is set', () => {
+      for (const value of [false, undefined, null, 'true', 1]) expect(bootstrapTokenNote(value)).toBe('');
+    });
+
+    test('set: what it is, that it creates no account, and how to remove it', () => {
+      const note = bootstrapTokenNote(true);
+      expect(note).toMatch(/still set in the server's environment/);
+      expect(note).toMatch(/creates no account any more/);
+      expect(note).toContain('<code>PLATFORM_BOOTSTRAP_TOKEN</code>');
+      expect(note).toContain('docker compose up -d oscar');
+      expect(note).not.toContain('restart oscar');
+    });
+
+    test("drawn with the server information, from the server's own flag", () => {
+      expect(page).toContain('bootstrapTokenNote(si.bootstrap_token_set)');
+      const admin = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'api', 'routes', 'admin.js'), 'utf8');
+      expect(admin).toContain('bootstrap_token_set: bootstrapToken.tokenSet()');
+    });
+  });
+
   describe('index.html — back to Grafana or Prometheus once signed in (#1199)', () => {
     const nextAfterSignIn = loadFunction('index.html', 'nextAfterSignIn', { URLSearchParams });
     const page = read('index.html');

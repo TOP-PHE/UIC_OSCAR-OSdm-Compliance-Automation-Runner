@@ -1400,6 +1400,17 @@ function smtpAlertingNote(mode) {
   return '💡 <strong>One mail server for everything.</strong> It sends OSCAR\'s own e-mails (invitations, password resets) and Alertmanager\'s alerts to administrators (' + how + ').';
 }
 
+// A bootstrap token left in the server's environment (#1365,
+// server_info.bootstrap_token_set). The administrator reading this exists, so
+// the token creates no account any more: the note says how to remove it.
+function bootstrapTokenNote(set) {
+  if (set !== true) return '';
+  return '<div class="kpi" style="grid-column:1/-1;text-align:left;font-size:12px;padding:10px 14px;color:#7c5800;background:#fff8e1;border-left:3px solid #f9a825">' +
+    '⚠️ <strong>The bootstrap token is still set in the server\'s environment.</strong> It was there to create the first administrator and creates no account any more. ' +
+    'Remove it: empty <code>PLATFORM_BOOTSTRAP_TOKEN</code> in the server\'s environment (the <code>.env</code> file on a Docker host; the Secret on Kubernetes), then create the server again (<code>docker compose up -d oscar</code>; on Kubernetes, restart it).' +
+    '</div>';
+}
+
 // The id of a Server Config field. A setting the page only shows (#1363: the
 // mail server's) gets another id than the fields saveConfig() collects.
 function configFieldId(key, cfg) {
@@ -1477,7 +1488,8 @@ async function loadConfig() {
     + `<div class="kpi" style="grid-column:1/-1;text-align:left;font-size:12px;padding:10px 14px">
          <div style="margin-bottom:4px"><strong style="color:#546e7a">Collection:</strong> <span class="mono">${esc(si.collection_path)}</span></div>
          <div><strong style="color:#546e7a">Bruno CLI:</strong> <span class="mono">${esc(si.bru_cmd)}</span></div>
-       </div>`;
+       </div>`
+    + bootstrapTokenNote(si.bootstrap_token_set);
 
   // Config form — group by category
   const smtpKeys     = Object.entries(data.config).filter(([_, cfg]) => cfg.group === 'smtp');

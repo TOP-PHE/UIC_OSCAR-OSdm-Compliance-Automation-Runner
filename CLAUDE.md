@@ -1171,6 +1171,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   decides where OSCAR sends something belongs to the environment the same
   way; `mail-settings.test.js` lists the files of `src/` that write
   `server_config`, and a new writer fails it.
+- **The bootstrap route creates the first administrator only** (#1365,
+  1.11.566). `POST /v1/auth/bootstrap/platform-user` is the one route that
+  makes an account with a password sent, on the word of
+  `PLATFORM_BOOTSTRAP_TOKEN`. Once an *active* administrator exists
+  (`utils/bootstrapToken.js` `administratorExists()`, the status
+  `sessionUser()` asks) it answers 409 and creates nobody, for a certifier
+  too; with none it works, which is the way back in for an installation
+  locked out. The order is fixed and tested: the token (401), then the
+  administrator rule, then the body. A refusal is audited
+  (`bootstrap_refused:administrator_exists`). A token still set is said at
+  each start and on Server Config (`server_info.bootstrap_token_set`). The
+  guides had promised this behaviour for months while the code answered for
+  as long as the token was set: **a guide that states what a route refuses
+  needs a test of that refusal**. Tests that need an administrator insert the
+  row; only `auth-routes.test.js` and the kind CI's `smoke.sh` call the route.
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;

@@ -4,6 +4,17 @@
   "current_release": "2026.603",
   "releases": [
     {
+      "release": "2026.605",
+      "date": "2026-11-22",
+      "server": "1.11.566",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.566 (#1365): POST /v1/auth/bootstrap/platform-user creates the first administrator only. Once an active administrator exists it answers 409 and creates nobody; with none (a new installation, or every administrator suspended) it works as before. A token still set while an administrator exists is said at each start and shown on Admin, Server Config, with how to remove it. Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.604",
       "date": "2026-11-22",
       "server": "1.11.565",

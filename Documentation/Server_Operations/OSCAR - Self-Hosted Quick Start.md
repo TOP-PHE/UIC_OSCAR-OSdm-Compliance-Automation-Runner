@@ -146,7 +146,7 @@ ENCRYPTION_KEY=$(openssl rand -hex 32) && echo "ENCRYPTION_KEY=$ENCRYPTION_KEY"
 JWT_SECRET=$(openssl rand -hex 32) && echo "JWT_SECRET=$JWT_SECRET"
 
 # 3. Bootstrap token used to create the very first admin account.
-#    Needed once. The server accepts it for as long as it is set: Step 6 clears it.
+#    Needed once: it creates the first administrator only. Step 6 clears it.
 PLATFORM_BOOTSTRAP_TOKEN=$(openssl rand -base64 36 | tr -d '=+/') && echo "PLATFORM_BOOTSTRAP_TOKEN=$PLATFORM_BOOTSTRAP_TOKEN"
 ```
 
@@ -159,8 +159,9 @@ you'll delete after Step 6 below). You'll paste them into the next step.
 > secret at its first start and keeps it in the database, so the `.env`
 > line is not what signs sessions. To end every session, see *Security
 > Operations Policy* 3.3 (users just log in again).
-> `PLATFORM_BOOTSTRAP_TOKEN` is needed once, to create the first admin. The
-> server accepts it for as long as it is set, so Step 6 clears it.
+> `PLATFORM_BOOTSTRAP_TOKEN` is needed once, to create the first admin:
+> once an administrator exists the route creates nobody (server 1.11.566).
+> It is then a secret with no use, and Step 6 clears it.
 
 ---
 
@@ -303,9 +304,12 @@ Expected response:
 Now sign in at `https://oscar.example.org` with the credentials you just
 created. You'll land on the admin welcome page with full access.
 
-After this, **clear the bootstrap token** so it can't be reused. The server
-accepts the token for as long as it is set: emptying the line is not
-enough, the container must be created again.
+After this, **clear the bootstrap token**. From server 1.11.566 the route
+creates the first administrator only: once one exists it answers `409` and
+creates nobody. A token left in `.env` is then a secret with no use; the
+server says so at each start and *Server Config* shows it until it is
+removed. Emptying the line is not enough: the container must be created
+again.
 
 ```bash
 # 1. Empty the line in the file. Prints 0 once it is empty.

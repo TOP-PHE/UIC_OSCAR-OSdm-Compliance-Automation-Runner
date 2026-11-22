@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-22-first-administrator",
+    "date": "November 22, 2026",
+    "tag": "Operations",
+    "title": "For administrators: the bootstrap token creates the first administrator only",
+    "summary": "Once an administrator exists, the installation route creates no other account. A token still set on the server is shown on Server Config, with how to remove it.",
+    "content": "This concerns whoever installs and operates an OSCAR server. Testers and Test Managers have nothing to do.\n\nAn installation creates its first administrator with a token set on the server. That route now creates this first administrator only: once an administrator exists, it answers that one exists and creates nobody. Further administrators and certifiers are invited from Admin, Manage Users, as before, and choose their own password from the link they receive.\n\nIf the token is still set on your server, Admin, Server Config now says so at the top of the page, with the two steps that remove it; the server also says it each time it starts. Removing it changes nothing else.\n\nIf no administrator can sign in any more, the route works again once every administrator is suspended: this is the way back in for whoever can set the token on the server."
+  },
+  {
     "id": "2026-11-22-mail-server-settings",
     "date": "November 22, 2026",
     "tag": "Operations",
