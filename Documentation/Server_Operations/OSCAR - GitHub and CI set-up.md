@@ -49,7 +49,8 @@ does not hold a PR on them:
 
 | Check | Why it matters |
 |---|---|
-| `CodeQL` (the results check) | A new alert in a PR's diff shows here, not in `Analyze`. A large diff re-reports a file's old alerts |
+| `CodeQL` (the results check) | A new alert in a PR's diff shows here, not in `Analyze`. A large diff re-reports a file's old alerts. On a PR, CodeQL reports on the changed lines only: the whole reading is the next analysis of `main` |
+| `Analyze (actions)` (CodeQL) | The workflow files themselves, analysed again since #1375 (they had left the list of languages in May 2026, and their alerts stayed open unseen). Not among the required checks: adding it is a change to make in the branch protection |
 | `Kubernetes deployment (kind)`, `k3s on one machine` (CI · Kubernetes) | On their paths and weekly. Auto-merge once merged a PR with the k3s job red (#1337) |
 | `SonarCloud Code Analysis` from the *SonarQube Cloud* GitHub App | Its PR comment. The required check of the same name comes from the workflow |
 | `label` (PR labeler) | |
@@ -110,7 +111,7 @@ secrets and still report green.
 | `ci-server.yml` | CI · Server | push, PR | Lint, audit, unit and integration tests (server, simulator, MCP server, API test tool); Docker build; Trivy scan |
 | `ci-collection.yml` | CI · Bruno collection | push, PR | Validates the collection with the pinned Bruno CLI |
 | `ci-kubernetes.yml` | CI · Kubernetes | PR and push on its paths, weekly | OSCAR on kind (OpenShift-like and Kubernetes) and on k3s, a run on the simulator. Not required |
-| `codeql.yml` | CodeQL | push, PR, weekly | JavaScript analysis, config `.github/codeql/codeql-config.yml` |
+| `codeql.yml` | CodeQL | push, PR, weekly | Analysis of the JavaScript and of the workflow files (`javascript-typescript`, `actions`), config `.github/codeql/codeql-config.yml` |
 | `gitleaks.yml` | Gitleaks (secret scan) | push, PR | Every commit of the PR |
 | `sonar.yml` | SonarCloud | push, PR | Tests with coverage (server, simulator, MCP, API test tool), then the scan |
 | `labeler.yml` | PR labeler | `pull_request_target` | Labels by path (`.github/labeler.yml`) |
@@ -137,13 +138,29 @@ the script.
   coverage reports).
 - **Scan:** `sonar.yml` with `sonarqube-scan-action`, token `SONAR_TOKEN`
   (repository secret). On a PR, only the changed files are analysed.
-- **Quality gate "OSCAR Gate"**, set in SonarCloud, not in the repository:
-  - coverage of new code **≥ 83 %**;
-  - duplication of new code **< 4 %**;
-  - **one new bug fails it**; code smells do not.
+- **Quality gate "OSCAR Gate"**, set in SonarCloud, not in the repository.
+  Its conditions on new code, as SonarCloud answers them (§ 10):
 
-  `sonar-project.properties` records why and the history of the coverage
-  floor. Raise the floor there and in SonarCloud together.
+  | Condition | Fails when | Read on 2026-11-22 |
+  |---|---|---|
+  | Reliability rating | worse than A: **one new bug fails it** | A |
+  | Security rating | worse than A: one new vulnerability fails it | A |
+  | Maintainability rating | worse than A. Code smells alone do not fail it while the rating stays A | A |
+  | Coverage | below **35 %** | 95.2 % |
+  | Duplicated lines | above 4 % | 0.1 % |
+  | Security hotspots reviewed | below 100 % | 100 % |
+
+  **The coverage floor is not the one the repository documents.**
+  `sonar-project.properties` records a floor raised step by step to 83 %; the
+  gate in SonarCloud still says 35 %. Until it is set to 83 % in SonarCloud
+  (*Quality Gates → OSCAR Gate*, an administrator of the organization), new
+  code may go far under the documented floor without failing. Change the two
+  together from then on.
+- **New code** is what changed since the previous *version* of the project
+  (SonarCloud's "previous version" period). The version is
+  `sonar.projectVersion`, kept by hand in `sonar-project.properties`: read on
+  2026-11-22, it was still 1.11.178, so the period started on 2 July 2026 and
+  the gate counted four and a half months of code as new.
 - **Reading a PR's issues** needs no token (the project is public):
   `https://sonarcloud.io/api/issues/search?componentKeys=TOP-PHE_UIC_OSCAR_Temporary&pullRequest=<N>&resolved=false`
   (`&branch=main` for `main`).
@@ -163,7 +180,8 @@ the script.
 - **Several Dependabot npm PRs at once:** they are combined into one PR
   (cherry-picked unchanged) rather than rebased one after another
   (`CLAUDE.md`, § 2).
-- **CodeQL**, **Gitleaks** and **Trivy**, as required checks (§ 2).
+- **CodeQL**, **Gitleaks** and **Trivy**, as required checks (§ 2). CodeQL
+  reads the JavaScript and the workflow files; only the first is required.
 
 ## 9. Test environments outside GitHub
 
@@ -195,6 +213,13 @@ gh api repos/$R/environments --jq '.environments[].name'
 gh api repos/$R/environments/production/secrets --jq '[.secrets[].name]'
 gh api repos/$R/actions/secrets --jq '[.secrets[].name]'
 gh api repos/$R --jq '.security_and_analysis'
+```
+
+SonarCloud's gate, with no token (the project is public): each condition, its
+threshold and its value on `main`, and where the "new code" period starts.
+
+```bash
+curl -s 'https://sonarcloud.io/api/qualitygates/project_status?projectKey=TOP-PHE_UIC_OSCAR_Temporary&branch=main' | jq '.projectStatus | {status, conditions: [.conditions[] | {metricKey, comparator, errorThreshold, actualValue}], period}'
 ```
 
 ## 11. Setting it up again from nothing
