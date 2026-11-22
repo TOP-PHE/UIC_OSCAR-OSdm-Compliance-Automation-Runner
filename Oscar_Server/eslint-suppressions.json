@@ -1,0 +1,298 @@
+{
+  "public/js/ai-analysis.js": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "public/js/checklist-config.js": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "public/js/findings.js": {
+    "complexity": {
+      "count": 3
+    }
+  },
+  "public/js/reference-config.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "public/js/scenario-copy.js": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "public/js/scenarios.js": {
+    "complexity": {
+      "count": 29
+    },
+    "max-lines-per-function": {
+      "count": 14
+    }
+  },
+  "public/js/trace-context.js": {
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "public/nav.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/api/helpers/batchFailures.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/api/helpers/credentialsInput.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/api/routes/admin.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/api/routes/api.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/api/routes/company-checklist.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/api/routes/company-findings.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/api/routes/company-places.js": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/api/routes/company-providers.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/api/routes/company-scenario-copy.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/api/routes/company-test-framework.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/api/routes/company-test-resources.js": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/api/routes/company.js": {
+    "complexity": {
+      "count": 3
+    }
+  },
+  "src/api/routes/reports.js": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/api/routes/runs.js": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/db/checkIndexes.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/db/db.js": {
+    "complexity": {
+      "count": 3
+    }
+  },
+  "src/reports/structureResults.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/run-dispatcher/dispatcher.js": {
+    "complexity": {
+      "count": 2
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/run-pod/keptPod.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/run-pod/runPod.js": {
+    "complexity": {
+      "count": 2
+    }
+  },
+  "src/runner-agent/protocol.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/server.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/services/timetable-discovery.js": {
+    "complexity": {
+      "count": 4
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/utils/aiAnalysis.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/aiAnalysisDownload.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/aiConfig.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/backupStatus.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/catalogueMatch.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/clientAssertion.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/configurationBundle.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/coveragePoints.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/coverageWorkbook.js": {
+    "complexity": {
+      "count": 3
+    }
+  },
+  "src/utils/datafileOwnership.js": {
+    "complexity": {
+      "count": 1
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "src/utils/fareDeclarations.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/findingSuggestions.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/frameworkCoverage.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/frameworkGating.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/offerOptionDiscovery.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/scenarioCatalogue.js": {
+    "complexity": {
+      "count": 3
+    }
+  },
+  "src/utils/simulatorMetricsText.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/testRequests.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/utils/testSuites.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/worker/access-token.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/worker/auth-profiles.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/worker/remoteProcess.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/worker/runOutput.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "src/worker/runner.js": {
+    "complexity": {
+      "count": 5
+    },
+    "max-lines-per-function": {
+      "count": 2
+    }
+  }
+}
