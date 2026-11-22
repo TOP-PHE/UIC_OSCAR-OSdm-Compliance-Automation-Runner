@@ -91,6 +91,13 @@ const bootstrapToken = require('./utils/bootstrapToken');
 const bootstrapStart = bootstrapToken.startLine(bootstrapToken.tokenSet(), bootstrapToken.administratorExists());
 if (bootstrapStart) log[bootstrapStart.level](bootstrapStart.text);
 
+// #1371: the setting that turns off the policy keeping OSCAR's outbound calls
+// on public https addresses is said when it is on. It is meant for a
+// development PC or providers on a private network.
+const { generalJsonParser, tooLargeText } = require('./utils/bodyLimits');
+const { allowPrivate: privateTargetsAllowed, PRIVATE_TARGETS_WARNING } = require('./utils/urlPolicy');
+if (privateTargetsAllowed()) log.warn(PRIVATE_TARGETS_WARNING);
+
 // ── Attach queue event listeners ──────────────────────────────────────────────
 const queue = require('./worker/queue');
 const metricsForQueue = require('./utils/metrics');
@@ -313,7 +320,9 @@ if (ALLOWED_ORIGINS.length === 0 && process.env.NODE_ENV === 'production') {
 }
 app.use(cors(corsOptions(ALLOWED_ORIGINS)));
 
-app.use(express.json({ limit: '5mb' }));  // 5 MB — covers largest expected datafile
+// #1371: 1 MB for every route. The data file save reads up to 5 MB with a
+// parser of its own, after its authorisation (utils/bodyLimits.js).
+app.use(generalJsonParser());
 app.use(express.urlencoded({ extended: true }));
 
 // ── File-download rate limiter (CodeQL js/missing-rate-limiting) ──────────────
@@ -1118,7 +1127,7 @@ app.use((err, req, res, _next) => {
   }
   if (err.type === 'entity.too.large') {
     log.warn({ path: req.path, method: req.method }, 'request body over the limit');
-    return res.status(413).json({ status: 413, title: 'Payload Too Large', detail: 'The request body is larger than 5 MB.' });
+    return res.status(413).json({ status: 413, title: 'Payload Too Large', detail: tooLargeText(err.limit) });
   }
   log.error({ err, path: req.path, method: req.method }, 'Unhandled error');
   if (err.code === 'LIMIT_FILE_SIZE') {

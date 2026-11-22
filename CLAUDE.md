@@ -1217,6 +1217,23 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   idx_runs_active` with that index's exact `status IN ('QUEUED',
   'RUNNING')`: left to itself SQLite takes `idx_runs_user_id` and walks the
   account's whole history.
+- **A JSON body is 1 MB at most; the data file save reads its 5 MB after its
+  authorisation** (#1371, 1.11.569). `utils/bodyLimits.js`:
+  `generalJsonParser()` is the public app's only JSON parser and skips one
+  request, `PUT /v1/company/datafile/json` (`isDatafileSave()`), whose own
+  `datafileJsonParser()` sits in the route after the limiter and
+  `authorizeDatafileWrite()`. **A new route that needs a larger JSON body
+  gets a parser of its own after its authorisation, and its path in
+  `isDatafileSave()`'s place**; `body-limits.test.js` lists the users of
+  `datafileJsonParser()`. A test app whose own `express.json()` already read
+  the body makes the route's parser a no-op, so route tests are unchanged.
+  **supertest resets a request still being sent when an early answer comes**
+  (`read ECONNRESET` for a 20 MB body refused before it is read): a real
+  client gets its answer; test such a case with `app.listen(0)` and `fetch`.
+  `ALLOW_PRIVATE_TARGETS` is said at each start and on Server Config
+  (`server_info.private_targets_allowed`), with the bootstrap token's and the
+  mail settings' notes: **a setting that turns a protection off is shown
+  while it is on.**
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;

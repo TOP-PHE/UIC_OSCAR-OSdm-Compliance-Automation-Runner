@@ -4,6 +4,17 @@
   "current_release": "2026.603",
   "releases": [
     {
+      "release": "2026.608",
+      "date": "2026-11-22",
+      "server": "1.11.569",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.569 (#1371): the general JSON body limit is 1 MB; the Test Config save (PUT /v1/company/datafile/json) keeps 5 MB with a parser of its own that runs after the route's authorisation, and a 413 names the limit that applied. ALLOW_PRIVATE_TARGETS, which turns off the policy keeping OSCAR's outbound calls on public https addresses, is said at each start and shown on Admin, Server Config while it is on. Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.607",
       "date": "2026-11-22",
       "server": "1.11.568",

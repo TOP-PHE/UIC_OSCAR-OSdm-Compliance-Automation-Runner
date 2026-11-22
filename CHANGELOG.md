@@ -613,6 +613,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.569] — 2026-11-22
+
+The 5 MB JSON limit only where a data file is saved; `ALLOW_PRIVATE_TARGETS` said when it is on (#1371). Not released on its own: listed in `compatibility.json` (2026.608) without moving `current_release`.
+
+### Changed
+- **The general JSON body limit is 1 MB.** One parser of 5 MB came first on every route, sized for the largest data file: a body of that size was read and parsed on the server's one thread before any route's authentication or rate limit. `utils/bodyLimits.js` `generalJsonParser()` reads at most 1 MB and leaves one request alone, the Test Config save.
+- **`PUT /v1/company/datafile/json` keeps 5 MB, read after its authorisation.** Its own parser (`datafileJsonParser()`) comes after the limiter and `authorizeDatafileWrite()`: a caller who may not save is answered before a byte of the body is read, as the data file upload already did. Measured with a real client on a real port: a refused caller gets its answer whatever it sends (20 of 20 at each size up to 20 MB).
+- **A `413` names the limit that applied** (`tooLargeText()`): 1 MB for a route, 5 MB for the save. It said 5 MB everywhere.
+- **`ALLOW_PRIVATE_TARGETS` is said when it is on**: a warning at each start (`PRIVATE_TARGETS_WARNING`, `utils/urlPolicy.js`) and a note above the server information on *Admin → Server Config* (`server_info.private_targets_allowed`). It turns off the policy that keeps OSCAR's outbound calls on public https addresses, and nothing showed it.
+
+### Documentation
+- *Security Operations Policy* and *Server Admin Guide* (the setting; the guide said it "is read per request, so no restart is needed", which holds for the process but not for a container, whose environment is set when it is created), `OSCAR_Deploy/.env.example`.
+- No news entry: nothing changes for testers or Test Managers, and the administrator's note is on the page.
+
+### Tests
+- `body-limits.test.js` (new): which request is the save; an app wired as the server is (under and over each limit, a refused caller with no body read, a real client sending 20 MB); the server's wiring; the setting's warning. `server.test.js`: the two tests that sent a refused body to the save without a session now use an ordinary route, and a third says the save answers 401 first. `ui-scripts.test.js`: the page's note.
+
+---
+
 ## [server-1.11.568] — 2026-11-22
 
 A ceiling on the runs an account has waiting (#1369). Not released on its own: listed in `compatibility.json` (2026.607) without moving `current_release`.

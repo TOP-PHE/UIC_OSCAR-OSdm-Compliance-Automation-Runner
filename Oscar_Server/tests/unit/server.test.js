@@ -111,18 +111,36 @@ describe('GET /health', () => {
 describe('request bodies the JSON parser refuses', () => {
   test('"null" and broken JSON: 400 with the reason, not 500', async () => {
     for (const body of ['null', '{"scenarios": [', 'not json']) {
-      const res = await request(app).put('/v1/company/datafile/json')
+      const res = await request(app).post('/v1/auth/login')
         .set('Content-Type', 'application/json').send(body);
       expect(res.status).toBe(400);
       expect(res.body.detail).toBe('The request body is not valid JSON.');
     }
   });
 
-  test('a body over 5 MB: 413 with the reason', async () => {
-    const res = await request(app).put('/v1/company/datafile/json')
-      .set('Content-Type', 'application/json').send(JSON.stringify({ x: 'a'.repeat(5 * 1024 * 1024 + 10) }));
+  // #1371: 1 MB for every route; the reason names the limit that applied.
+  test('a body over 1 MB on a route: 413 with the reason', async () => {
+    const res = await request(app).post('/v1/auth/login')
+      .set('Content-Type', 'application/json').send(JSON.stringify({ x: 'a'.repeat(1024 * 1024 + 10) }));
     expect(res.status).toBe(413);
-    expect(res.body.detail).toBe('The request body is larger than 5 MB.');
+    expect(res.body.detail).toBe('The request body is larger than 1 MB.');
+  });
+
+  test('a body just under 1 MB is read', async () => {
+    const res = await request(app).post('/v1/auth/login')
+      .set('Content-Type', 'application/json').send(JSON.stringify({ x: 'a'.repeat(900 * 1024) }));
+    expect(res.status).toBe(400);
+    expect(res.body.detail).not.toMatch(/larger than/);
+  });
+
+  // The data file save reads its body after its authorisation: a caller
+  // who is not signed in is told so, whatever it sends, and nothing is parsed.
+  test('the data file save, not signed in: 401 for broken JSON and for a body of 2 MB', async () => {
+    for (const body of ['not json', JSON.stringify({ x: 'a'.repeat(2 * 1024 * 1024) })]) {
+      const res = await request(app).put('/v1/company/datafile/json')
+        .set('Content-Type', 'application/json').send(body);
+      expect(res.status).toBe(401);
+    }
   });
 });
 
