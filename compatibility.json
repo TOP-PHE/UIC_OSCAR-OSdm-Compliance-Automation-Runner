@@ -4,6 +4,17 @@
   "current_release": "2026.603",
   "releases": [
     {
+      "release": "2026.606",
+      "date": "2026-11-22",
+      "server": "1.11.567",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.567 (#1367): a Company API account's assertion is held to five minutes counted from OSCAR's clock (an exp further ahead, or an iat later than now, is refused, with a minute of tolerance); an access token names the key its assertion was signed with, and revoking that key ends the tokens obtained with it at once, the account's other key and its tokens going on. Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.605",
       "date": "2026-11-22",
       "server": "1.11.566",
