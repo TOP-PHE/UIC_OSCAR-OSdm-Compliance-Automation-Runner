@@ -23,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Workflows: a read-only token in three workflows; CodeQL reads the workflow files again** (#1375). CI only, no version.
+  - **Seen:** five code-scanning alerts on the workflows' token had been open on `main` since 7 May. `sonar.yml`, `ci-server.yml` and `ci-collection.yml` named no `permissions`, so their token took the repository's default. The fifth alert was about a job of `refresh-collection.yml` that has had its block for months.
+  - **Why it never closed:** the workflow files were no longer analysed. `codeql.yml` listed `javascript-typescript` only; the alerts' last analysis (category `/language:actions`) was of 7 May. Nothing added to a workflow since then was looked at, and the workflows hold the deploy keys and the release steps.
+  - **Now:** `permissions: contents: read` at the top of the three workflows (their jobs check out, build and test; the image scan keeps its own block), and `actions` among the languages of `codeql.yml`. Alerts that are fixed close by themselves from the next analysis of `main`, and new ones show on a pull request.
+
 - **Guides: an edited `.env` needs `docker compose up -d`, not `restart`; the session secret is not rotated through `.env`** (#1361). Documentation and one comment in a deployment example, no version.
   - **Seen:** *Self-Hosted Quick Start* (step 6 and its troubleshooting table) said to clear `PLATFORM_BOOTSTRAP_TOKEN` in `.env`, then `docker compose restart oscar`. *Security Operations Policy* 3.3 rotated `JWT_SECRET` by writing a new value in `.env`, then the same restart.
   - **Why it did nothing:**
