@@ -7,8 +7,9 @@
 
 # The way in: k3s's Traefik, on https only (k3s/traefik-config.yaml sends
 # http there), with a Let's Encrypt certificate it obtains for the host
-# below, and the body limit of the VPS's nginx (middleware.yaml, named
-# <namespace>-<name>: OSCAR's namespace is oscar).
+# below, the body limit of the VPS's nginx (middleware.yaml) and its
+# compression of text answers (compression.yaml). A middleware is named
+# <namespace>-<name>: OSCAR's namespace is oscar.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -20,7 +21,7 @@ metadata:
     traefik.ingress.kubernetes.io/router.entrypoints: websecure
     traefik.ingress.kubernetes.io/router.tls: "true"
     traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
-    traefik.ingress.kubernetes.io/router.middlewares: oscar-oscar-limits@kubernetescrd
+    traefik.ingress.kubernetes.io/router.middlewares: oscar-oscar-limits@kubernetescrd,oscar-oscar-compress@kubernetescrd
 spec:
   ingressClassName: traefik
   rules:

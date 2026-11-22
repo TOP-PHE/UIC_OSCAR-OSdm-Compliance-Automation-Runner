@@ -1,0 +1,35 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+# Text answers are compressed here, by Traefik, as the VPS's nginx does
+# (gzip_types in OSCAR_Deploy/nginx/oscar.conf.example: the same list, plus
+# text/html, which nginx always compresses). OSCAR compresses nothing itself:
+# its one thread serves every page and every run, and should not pay for it.
+# The Test Config script is 556 KB as sent by OSCAR and about 150 KB on the
+# wire; a data file of 1.9 MB, about 110 KB.
+#
+# Only the types listed: a report archive or an image is already compressed.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: oscar-compress
+  labels:
+    app.kubernetes.io/name: oscar
+spec:
+  compress:
+    minResponseBodyBytes: 1024
+    includedContentTypes:
+      - text/html
+      - application/json
+      - application/problem+json
+      - application/javascript
+      - text/javascript
+      - text/css
+      - text/plain
+      - text/csv
+      - application/xml
+      - image/svg+xml

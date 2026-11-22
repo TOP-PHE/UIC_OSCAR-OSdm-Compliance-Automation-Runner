@@ -728,10 +728,35 @@ describe('k3s on one machine (overlays/k3s, k3s/)', () => {
     ]);
   });
 
+  // OSCAR compresses nothing itself (its one thread serves every page and
+  // every run): the proxy in front of it does, for the same types on the VPS
+  // and on k3s. nginx always compresses text/html, so its list leaves it out.
+  test('text answers are compressed at the proxy: nginx on the VPS, Traefik here, the same types', () => {
+    const compression = load('overlays/k3s/compression.yaml');
+    const nginxTypes = /^\s*gzip_types\s+([^;]+);/m.exec(nginx)[1].trim().split(/\s+/);
+    expect(nginx).toMatch(/^\s*gzip\s+on;/m);
+    expect(nginx).toMatch(/^\s*gzip_proxied\s+any;/m);
+    expect(nginx).toMatch(/^\s*gzip_vary\s+on;/m);
+    for (const type of ['application/json', 'text/javascript', 'application/javascript', 'text/css']) expect(nginxTypes).toContain(type);
+    expect(nginxTypes).not.toContain('text/html');
+    expect(compression.kind).toBe('Middleware');
+    expect([...compression.spec.compress.includedContentTypes].sort()).toEqual(['text/html', ...nginxTypes].sort());
+    expect(compression.spec.compress.minResponseBodyBytes).toBe(Number(/gzip_min_length\s+(\d+);/.exec(nginx)[1]));
+    expect(annotations['traefik.ingress.kubernetes.io/router.middlewares']).toBe(
+      `oscar-${middleware.metadata.name}@kubernetescrd,oscar-${compression.metadata.name}@kubernetescrd`);
+    expect(overlay.resources).toContain('compression.yaml');
+    // The k3s job asks a real Traefik for a compressed answer.
+    expect(steps).toContain("-H 'Accept-Encoding: gzip'");
+    expect(steps).toContain('test "$enc" = gzip');
+    // And the server itself compresses nothing.
+    const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'Oscar_Server/package.json'), 'utf8'));
+    expect(Object.keys(pkg.dependencies)).not.toContain('compression');
+  });
+
   test('the limits of the VPS\'s nginx: 50 MB of body, 660 s for a slow upload', () => {
     expect(middleware.spec.buffering.maxRequestBodyBytes).toBe(nginxBody * 1024 * 1024);
     // A middleware of OSCAR's namespace is named <namespace>-<name> by Traefik.
-    expect(annotations['traefik.ingress.kubernetes.io/router.middlewares']).toBe(`oscar-${middleware.metadata.name}@kubernetescrd`);
+    expect(annotations['traefik.ingress.kubernetes.io/router.middlewares'].split(',')).toContain(`oscar-${middleware.metadata.name}@kubernetescrd`);
     expect(overlay.resources).toEqual(expect.arrayContaining(['ingress.yaml', 'middleware.yaml']));
     expect(values.ports.websecure.transport.respondingTimeouts.readTimeout).toBe(`${nginxTimeout}s`);
   });
