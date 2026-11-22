@@ -1412,6 +1412,16 @@ function bootstrapTokenNote(set) {
     '</div>';
 }
 
+// ALLOW_PRIVATE_TARGETS is on (#1371, server_info.private_targets_allowed): the
+// policy that keeps OSCAR's outbound calls on public https addresses is off.
+function privateTargetsNote(set) {
+  if (set !== true) return '';
+  return '<div class="kpi" style="grid-column:1/-1;text-align:left;font-size:12px;padding:10px 14px;color:#7c5800;background:#fff8e1;border-left:3px solid #f9a825">' +
+    '⚠️ <strong>Private targets are allowed.</strong> <code>ALLOW_PRIVATE_TARGETS</code> is set in the server\'s environment: OSCAR\'s outbound calls (a provider\'s endpoint and token URL, an AI service, the simulator\'s administration) are not kept to public https addresses. ' +
+    'It is meant for a development PC or for providers on a private network. Otherwise remove it from the server\'s environment and create the server again.' +
+    '</div>';
+}
+
 // The id of a Server Config field. A setting the page only shows (#1363: the
 // mail server's) gets another id than the fields saveConfig() collects.
 function configFieldId(key, cfg) {
@@ -1490,7 +1500,8 @@ async function loadConfig() {
          <div style="margin-bottom:4px"><strong style="color:#546e7a">Collection:</strong> <span class="mono">${esc(si.collection_path)}</span></div>
          <div><strong style="color:#546e7a">Bruno CLI:</strong> <span class="mono">${esc(si.bru_cmd)}</span></div>
        </div>`
-    + bootstrapTokenNote(si.bootstrap_token_set);
+    + bootstrapTokenNote(si.bootstrap_token_set)
+    + privateTargetsNote(si.private_targets_allowed);
 
   // Config form — group by category
   const smtpKeys     = Object.entries(data.config).filter(([_, cfg]) => cfg.group === 'smtp');

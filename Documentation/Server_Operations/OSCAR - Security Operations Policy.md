@@ -458,7 +458,9 @@ they describe is real, and these controls cover it:
   connector and host it was typed for (`keyRefusal()`).
 - **`ALLOW_PRIVATE_TARGETS=1`** turns the address rule off. It is for
   development and self-hosted boxes only, and must never be set on the
-  production server.
+  production server. From server 1.11.569 the server says so at each start
+  (a warning) and *Admin → Server Config* shows it above the server
+  information, for as long as it is on.
 
 Accepted alerts, for the record:
 - the AI connector's single `fetch` (`services/aiConnector.js`), accepted

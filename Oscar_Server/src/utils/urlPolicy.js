@@ -139,4 +139,9 @@ async function usableUrlRefusal(raw, label) {
   return null;
 }
 
-module.exports = { storedUrlRefusal, usableUrlRefusal, ipIsPublic, allowPrivate, DNS_LOOKUP_TIMEOUT_MS };
+// What the server says at its start while the policy is off (#1371).
+const PRIVATE_TARGETS_WARNING = "ALLOW_PRIVATE_TARGETS is on: OSCAR's outbound calls (a provider's endpoint and token URL, an AI service, "
+  + "the simulator's administration) are not kept to public https addresses. It is meant for a development PC or for providers "
+  + 'on a private network: remove it from the server\'s environment otherwise.';
+
+module.exports = { storedUrlRefusal, usableUrlRefusal, ipIsPublic, allowPrivate, DNS_LOOKUP_TIMEOUT_MS, PRIVATE_TARGETS_WARNING };

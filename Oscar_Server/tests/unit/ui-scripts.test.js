@@ -937,6 +937,27 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
     });
   });
 
+  describe('admin.html — private targets allowed (#1371)', () => {
+    const privateTargetsNote = loadFunction('admin.html', 'privateTargetsNote');
+    const page = read('admin.html');
+
+    test('nothing unless the server says the setting is on', () => {
+      for (const value of [false, undefined, null, 'true', 1]) expect(privateTargetsNote(value)).toBe('');
+    });
+
+    test('on: the setting, what it turns off, what it is for and how to remove it', () => {
+      const note = privateTargetsNote(true);
+      expect(note).toContain('<code>ALLOW_PRIVATE_TARGETS</code>');
+      expect(note).toMatch(/not kept to public https addresses/);
+      expect(note).toMatch(/development PC/);
+      expect(note).toMatch(/remove it from the server's environment/);
+    });
+
+    test("drawn with the server information, from the server's own flag", () => {
+      expect(page).toContain('privateTargetsNote(si.private_targets_allowed)');
+    });
+  });
+
   describe('index.html — back to Grafana or Prometheus once signed in (#1199)', () => {
     const nextAfterSignIn = loadFunction('index.html', 'nextAfterSignIn', { URLSearchParams });
     const page = read('index.html');

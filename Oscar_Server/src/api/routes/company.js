@@ -47,6 +47,7 @@ const { templatesAddedBy, saveRefusal, frameworkTemplateProblem } = require('../
 const { storedUrlRefusal } = require('../../utils/urlPolicy');
 const { getRunSelection, setRunSelection } = require('../../utils/runSelections');
 const { withDatafileLock } = require('../../utils/datafileLock');
+const { datafileJsonParser } = require('../../utils/bodyLimits');
 const { datafileVersion, etag, staleSaveRefusal } = require('../../utils/datafileVersion');
 const { schemaProblems, loadDatafileSchema } = require('../../utils/datafileSchema');
 const { isOsdmVersion } = require('../../utils/osdmVersion');
@@ -1004,16 +1005,19 @@ router.post('/datafile/previous/restore', datafileMutationLimiter, authorizeData
 });
 
 // ── PUT /v1/company/datafile/json — save datafile as JSON body from UI ────────
-// NOTE: body is already parsed by the global express.json({limit:'5mb'}) in
-// server.js.  Do NOT add a second express.json() here — it would try to parse
-// an already-consumed stream.
+// #1371: this is the one route whose JSON may reach 5 MB. The general parser
+// of server.js (1 MB) leaves it alone, and its own parser comes here, after
+// the limiter and the authorisation: a caller who may not save is refused
+// before a byte of the body is read (utils/bodyLimits.js). In an app whose
+// general parser already read the body, as the tests' app does, this one
+// does nothing.
 // S3 (v1.11.195): this route blocked certification_user and nobody else, so an
 // administrator could rewrite ANY company's datafile by naming it in
 // ?company_id= / X-Company-Id — a cross-tenant write, and a breach of issue #60.
 // Now savePolicy: administrators and certifiers are refused, and testers and
 // Test Managers write their own company only. See authorizeDatafileWrite for
 // why testers keep this route and what that still leaves open.
-router.put('/datafile/json', datafileMutationLimiter, authorizeDatafileWrite(savePolicy), async (req, res) => {
+router.put('/datafile/json', datafileMutationLimiter, authorizeDatafileWrite(savePolicy), datafileJsonParser(), async (req, res) => {
   const { id: targetCompanyId, slug } = req.datafileCompany;
 
   // Validate body

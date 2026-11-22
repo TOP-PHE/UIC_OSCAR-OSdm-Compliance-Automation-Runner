@@ -1465,9 +1465,11 @@ an internal address is caught too.
 What to check on your deployment:
 
 - **If your providers are genuinely on `localhost` or your LAN** (a self-hosted
-  or development box), set `ALLOW_PRIVATE_TARGETS=1` in the server's `.env`. That
-  turns the policy off. It is read per request, so no restart is needed. A public
-  VPS deployment must **not** set it.
+  or development box), set `ALLOW_PRIVATE_TARGETS=1` in the server's `.env`, then
+  create the container again (`docker compose up -d oscar`; a `restart` keeps the
+  old environment). That turns the policy off. From server 1.11.569 the server
+  says so at each start and *Server Config* shows it while it is on. A public VPS
+  deployment must **not** set it.
 - A Test Manager saving a non-public endpoint now gets a 400 that says it must be
   a public https host. A tester saving a non-public `token_url` gets the same.
 - If a company's runs start failing with "This run was not started … public
