@@ -49,7 +49,7 @@ const runner = require('../../worker/runner');
 const { flushRunLogs } = require('../../worker/runLog');
 const RF = require('../../utils/runFilters');
 const { facetsFor } = require('../helpers/runCandidates');
-const { launchReadiness, enqueueBatch } = require('../helpers/runLaunch');
+const { launchReadiness, enqueueBatch, waitingRoomRefusal } = require('../helpers/runLaunch');
 
 const router = express.Router();
 router.use(requireAuth, enforceTenant);
@@ -260,6 +260,12 @@ async function queueBatch(req, res, { company, targetCompanyId, user, datafile, 
       : 'No scenario of the data file fits this selection.';
     return res.status(400).json({ status: 400, title: 'Bad Request', detail });
   }
+
+  // #1369: the runs this person already has queued or running, all companies
+  // together, plus these, must fit under the ceiling. Refused before anything
+  // is queued.
+  const full = waitingRoomRefusal(req.user.id, scenarioList.length);
+  if (full) return res.status(full[0]).json(full[1]);
 
   const { batchId, runs: createdRuns } = enqueueBatch({
     companyId: targetCompanyId, userId: req.user.id, company, credentials: user, codes: scenarioList, concurrentLimit,

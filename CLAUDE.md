@@ -1202,6 +1202,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `noTimestamp: claims.iat === undefined`. The token endpoint takes 30
   requests a minute from an address: a test file that asks many tokens is a
   file of its own.
+- **An account has a ceiling of runs waiting** (#1369, 1.11.568).
+  `waitingRoomRefusal(userId, wanted)` (`helpers/runLaunch.js`): the runs of
+  one person or one Company API account that are QUEUED or RUNNING, all
+  companies together, plus those asked, must not pass
+  `MAX_WAITING_RUNS_PER_ACCOUNT` (Server Config, 5,000; the code's default
+  and the schema's are pinned by `waiting-runs-ceiling.test.js`). Refused
+  with 429 `{ waiting, wanted, limit }` **before anything is queued**: in
+  `POST /v1/runs` after the codes are known, in `POST /v1/api/test-requests`
+  on every provider's runs together and before the `test_request` row, so
+  the Idempotency-Key is not used up. **A new route that queues runs calls
+  it.** A rate limit on a route says how often it is called, not how much is
+  waiting: the two are different limits. The count is `INDEXED BY
+  idx_runs_active` with that index's exact `status IN ('QUEUED',
+  'RUNNING')`: left to itself SQLite takes `idx_runs_user_id` and walks the
+  account's whole history.
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;
