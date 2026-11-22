@@ -103,6 +103,48 @@ describe('GET /health', () => {
   });
 });
 
+// The two disk checks are kept a few seconds (utils/healthChecks.js): a burst
+// of calls does not write a file each, and a failed check says a code only.
+describe('GET /health — the disk checks', () => {
+  const { forgetDiskChecks } = require('../../src/utils/healthChecks');
+  const probeWrites = spy => spy.mock.calls.filter(([file]) => String(file).endsWith('.health-check')).length;
+
+  afterEach(() => { jest.restoreAllMocks(); forgetDiskChecks(); });
+
+  test('five calls in a row write the probe file once', async () => {
+    forgetDiskChecks();
+    const spy = jest.spyOn(fs, 'writeFileSync');
+    for (let i = 0; i < 5; i++) {
+      const res = await request(app).get('/health');
+      expect(res.status).toBe(200);
+      expect(res.body.checks.data_dir).toEqual({ ok: true, status: 'writable' });
+    }
+    expect(probeWrites(spy)).toBe(1);
+  });
+
+  test('a data folder that cannot be written: 503 with the code, never the path', async () => {
+    forgetDiskChecks();
+    const real = fs.writeFileSync;
+    jest.spyOn(fs, 'writeFileSync').mockImplementation((file, ...rest) => {
+      if (String(file).endsWith('.health-check')) {
+        throw Object.assign(new Error(`EACCES: permission denied, open '${file}'`), { code: 'EACCES' });
+      }
+      return real(file, ...rest);
+    });
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe('degraded');
+    expect(res.body.checks.data_dir).toEqual({ ok: false, status: 'error', error: 'EACCES' });
+    expect(res.text).not.toContain('.health-check');
+    expect(res.text).not.toContain('permission denied');
+  });
+
+  test('the answer carries the rate limit of the route', async () => {
+    const res = await request(app).get('/health');
+    expect(res.headers['ratelimit-limit']).toBe('300');
+  });
+});
+
 // ── CORS fail-closed (tracker S7-cors) ───────────────────────────────────────
 // The test env leaves ALLOWED_ORIGINS unset, so the app is built fail-closed.
 // A cross-origin request must NOT get its origin reflected (the old behaviour
@@ -111,18 +153,47 @@ describe('GET /health', () => {
 describe('request bodies the JSON parser refuses', () => {
   test('"null" and broken JSON: 400 with the reason, not 500', async () => {
     for (const body of ['null', '{"scenarios": [', 'not json']) {
-      const res = await request(app).put('/v1/company/datafile/json')
+      const res = await request(app).post('/v1/auth/login')
         .set('Content-Type', 'application/json').send(body);
       expect(res.status).toBe(400);
       expect(res.body.detail).toBe('The request body is not valid JSON.');
     }
   });
 
-  test('a body over 5 MB: 413 with the reason', async () => {
-    const res = await request(app).put('/v1/company/datafile/json')
-      .set('Content-Type', 'application/json').send(JSON.stringify({ x: 'a'.repeat(5 * 1024 * 1024 + 10) }));
+  // #1371: 1 MB for every route; the reason names the limit that applied.
+  test('a body over 1 MB on a route: 413 with the reason', async () => {
+    const res = await request(app).post('/v1/auth/login')
+      .set('Content-Type', 'application/json').send(JSON.stringify({ x: 'a'.repeat(1024 * 1024 + 10) }));
     expect(res.status).toBe(413);
-    expect(res.body.detail).toBe('The request body is larger than 5 MB.');
+    expect(res.body.detail).toBe('The request body is larger than 1 MB.');
+  });
+
+  test('a body just under 1 MB is read', async () => {
+    const res = await request(app).post('/v1/auth/login')
+      .set('Content-Type', 'application/json').send(JSON.stringify({ x: 'a'.repeat(900 * 1024) }));
+    expect(res.status).toBe(400);
+    expect(res.body.detail).not.toMatch(/larger than/);
+  });
+
+  // The data file save reads its body after its authorisation: a caller
+  // who is not signed in is told so, whatever it sends, and nothing is parsed.
+  // With a real client on a real port: supertest closes its server as soon as
+  // an answer comes, which resets a request still being sent. With the 2 MB
+  // body that failed this test about one run in three on Windows.
+  test('the data file save, not signed in: 401 for broken JSON and for a body of 2 MB', async () => {
+    const listener = app.listen(0, '127.0.0.1');
+    await new Promise(resolve => listener.once('listening', resolve));
+    try {
+      const { port } = listener.address();
+      for (const body of ['not json', JSON.stringify({ x: 'a'.repeat(2 * 1024 * 1024) })]) {
+        const res = await fetch(`http://127.0.0.1:${port}/v1/company/datafile/json`,
+          { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body });
+        expect(res.status).toBe(401);
+        await res.arrayBuffer();
+      }
+    } finally {
+      await new Promise(resolve => listener.close(resolve));
+    }
   });
 });
 

@@ -28,22 +28,6 @@ const { compareRuns } = require('../../src/reports/diff');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function mockResultsFile(runId, results) {
-  // diff.js: const ARTIFACTS_DIR = path.resolve(__dirname, '../../data/artifacts');
-  // It builds: path.join(ARTIFACTS_DIR, runId, '.bru_results.json')
-  const ARTIFACTS_DIR = path.resolve(
-    __dirname,
-    '../../src/reports/../../data/artifacts'
-  );
-  const expectedPath = path.join(ARTIFACTS_DIR, runId, '.bru_results.json');
-
-  fs.existsSync.mockImplementation((p) => p === expectedPath);
-  fs.readFileSync.mockImplementation((p) => {
-    if (p === expectedPath) return JSON.stringify(results);
-    throw new Error(`Unexpected readFileSync call for: ${p}`);
-  });
-}
-
 function mockTwoRunsFiles(runIdA, resultsA, runIdB, resultsB) {
   const ARTIFACTS_DIR = path.resolve(
     __dirname,

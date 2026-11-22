@@ -131,9 +131,10 @@ module.exports = {
       get: {
         tags: ['Health'],
         summary: 'Health check',
-        description: 'Returns 200 if all subsystems healthy, 503 if degraded. Checks DB connectivity, queue, data dir, disk space.',
+        description: 'Returns 200 if all subsystems healthy, 503 if degraded. Checks DB connectivity, queue, data dir, disk space. The data folder and the free space are read at most every 10 seconds. A failed check carries an error code (EACCES, ENOSPC…); its reason is in the server log. 300 calls a minute per address.',
         responses: {
           200: { description: 'All systems OK' },
+          429: { description: 'More than 300 calls in a minute from this address' },
           503: { description: 'One or more checks failed' },
         },
       },
@@ -249,7 +250,7 @@ module.exports = {
           } } } },
           400: { description: 'Company config invalid (no datafile, missing creds, etc.)' },
           403: { description: 'Administrators and certifiers do not start runs: only the company\'s Test Managers and testers do' },
-          429: { description: 'Rate limit exceeded' },
+          429: { description: 'Rate limit exceeded; or the person would have more runs queued or running, all companies together, than MAX_WAITING_RUNS_PER_ACCOUNT allows (#1369): { waiting, wanted, limit }, nothing queued' },
         },
       },
     },

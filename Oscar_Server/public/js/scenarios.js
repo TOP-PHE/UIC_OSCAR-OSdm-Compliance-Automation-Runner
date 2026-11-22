@@ -4486,6 +4486,8 @@ function setTripFieldByPath(tIdx, path, value) {
   let obj = state.tripRequirements[tIdx];
   for (let i = 0; i < parts.length - 1; i++) {
     const key = Number.isNaN(Number(parts[i])) ? parts[i] : Number.parseInt(parts[i]);
+    // A path names a trip's own members: never one every object inherits.
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') return;
     // #359: autovivify missing intermediates so new optional sub-objects
     // (trip.searchCriteria.*) can be written into older datafiles that
     // don't have them yet. Next segment numeric → array, else object.
@@ -4493,6 +4495,7 @@ function setTripFieldByPath(tIdx, path, value) {
     obj = obj[key];
   }
   const lastKey = Number.isNaN(Number(parts[parts.length-1])) ? parts[parts.length-1] : Number.parseInt(parts[parts.length-1]);
+  if (lastKey === '__proto__' || lastKey === 'constructor' || lastKey === 'prototype') return;
   obj[lastKey] = value;
   markDirty();
 }

@@ -511,7 +511,16 @@ router.post('/login',
 });
 
 // ── GET /v1/auth/me ───────────────────────────────────────────────────────────
-router.get('/me', requireAuth, (req, res) => {
+// Every page asks it as it loads. The limit is per address and far above
+// that; it is named in the route's own chain, before the session is read.
+const sessionReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many requests in a short window. Please try again in a minute.' }
+});
+router.get('/me', sessionReadLimiter, requireAuth, (req, res) => {
   const user    = get('SELECT id, email, role, created_at FROM users    WHERE id = ?', [req.user.id]);
   const company = get('SELECT id, name, slug, auth_mode, api_base, datafile_updated_at FROM companies WHERE id = ?', [req.user.companyId]);
   if (!user) return res.status(404).json({ status: 404, title: 'Not Found' });

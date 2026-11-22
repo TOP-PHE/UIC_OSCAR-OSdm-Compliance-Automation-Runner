@@ -91,6 +91,13 @@ const bootstrapToken = require('./utils/bootstrapToken');
 const bootstrapStart = bootstrapToken.startLine(bootstrapToken.tokenSet(), bootstrapToken.administratorExists());
 if (bootstrapStart) log[bootstrapStart.level](bootstrapStart.text);
 
+// #1371: the setting that turns off the policy keeping OSCAR's outbound calls
+// on public https addresses is said when it is on. It is meant for a
+// development PC or providers on a private network.
+const { generalJsonParser, tooLargeText } = require('./utils/bodyLimits');
+const { allowPrivate: privateTargetsAllowed, PRIVATE_TARGETS_WARNING } = require('./utils/urlPolicy');
+if (privateTargetsAllowed()) log.warn(PRIVATE_TARGETS_WARNING);
+
 // ── Attach queue event listeners ──────────────────────────────────────────────
 const queue = require('./worker/queue');
 const metricsForQueue = require('./utils/metrics');
@@ -313,7 +320,9 @@ if (ALLOWED_ORIGINS.length === 0 && process.env.NODE_ENV === 'production') {
 }
 app.use(cors(corsOptions(ALLOWED_ORIGINS)));
 
-app.use(express.json({ limit: '5mb' }));  // 5 MB — covers largest expected datafile
+// #1371: 1 MB for every route. The data file save reads up to 5 MB with a
+// parser of its own, after its authorisation (utils/bodyLimits.js).
+app.use(generalJsonParser());
 app.use(express.urlencoded({ extended: true }));
 
 // ── File-download rate limiter (CodeQL js/missing-rate-limiting) ──────────────
@@ -1001,9 +1010,20 @@ app.use('/v1/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec, {
 // ── Health check ──────────────────────────────────────────────────────────────
 // Returns 200 OK if all subsystems are healthy, 503 if any check fails.
 // Useful for Docker/k8s liveness/readiness probes.
-app.get('/health', (req, res) => {
+// Its two disk checks are kept a few seconds (utils/healthChecks.js), and a
+// caller gets a failed check's code, never its words. The limit is far above
+// what probes, monitoring and the pages' version line ask.
+const { diskChecks, errorCode: healthErrorCode } = require('./utils/healthChecks');
+const healthLimiter = require('express-rate-limit')({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many health checks in a short window.' }
+});
+const warnHealth = (what, err) => log.warn({ err: err?.message }, what);
+app.get('/health', healthLimiter, (req, res) => {
   const queue_ = require('./worker/queue');
-  const fs2 = require('node:fs');
   const checks = {};
   let overallOk = true;
 
@@ -1012,38 +1032,19 @@ app.get('/health', (req, res) => {
     const row = dbGet('SELECT 1 AS ok');
     checks.database = { ok: !!row, status: 'ok' };
   } catch (err) {
-    checks.database = { ok: false, status: 'error', error: err.message };
+    warnHealth('health: the database did not answer', err);
+    checks.database = { ok: false, status: 'error', error: healthErrorCode(err) };
     overallOk = false;
   }
 
   // 2. Queue status
   checks.queue = { ok: true, depth: queue_.depth, running: queue_.running };
 
-  // 3. Data directory writable
-  try {
-    const testFile = path.join(__dirname, '../data/.health-check');
-    fs2.writeFileSync(testFile, 'ok');
-    fs2.unlinkSync(testFile);
-    checks.data_dir = { ok: true, status: 'writable' };
-  } catch (err) {
-    checks.data_dir = { ok: false, status: 'error', error: err.message };
-    overallOk = false;
-  }
-
-  // 4. Disk space (Linux only)
-  try {
-    const stats = fs2.statfsSync ? fs2.statfsSync(path.resolve(__dirname, '..')) : null;
-    if (stats) {
-      const freeMb = Math.floor((stats.bavail * stats.bsize) / (1024 * 1024));
-      checks.disk = { ok: freeMb > 100, free_mb: freeMb };
-      if (freeMb <= 100) overallOk = false;
-    } else {
-      checks.disk = { ok: true, status: 'not_checked' };
-    }
-  } catch {
-    // A failed disk check is reported, but it does not fail the health check.
-    checks.disk = { ok: true, status: 'check_failed_non_critical' };
-  }
+  // 3. Data directory writable, 4. free disk space (Linux only)
+  const disk = diskChecks({ warn: warnHealth });
+  checks.data_dir = disk.data_dir;
+  checks.disk = disk.disk;
+  if (!disk.ok) overallOk = false;
 
   // 5. Process info
   const memMb = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
@@ -1118,7 +1119,7 @@ app.use((err, req, res, _next) => {
   }
   if (err.type === 'entity.too.large') {
     log.warn({ path: req.path, method: req.method }, 'request body over the limit');
-    return res.status(413).json({ status: 413, title: 'Payload Too Large', detail: 'The request body is larger than 5 MB.' });
+    return res.status(413).json({ status: 413, title: 'Payload Too Large', detail: tooLargeText(err.limit) });
   }
   log.error({ err, path: req.path, method: req.method }, 'Unhandled error');
   if (err.code === 'LIMIT_FILE_SIZE') {

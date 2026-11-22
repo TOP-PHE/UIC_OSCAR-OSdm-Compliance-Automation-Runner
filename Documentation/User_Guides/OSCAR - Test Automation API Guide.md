@@ -204,7 +204,7 @@ Every provider is checked **before anything is queued**:
 | `404` | a provider the account is not given, or an unknown suite |
 | `409` | a provider cannot run now: endpoint suspended, or the endpoint, the account's credentials or the data file missing. The answer names it (`provider`, `missing`) |
 | `422` | the `Idempotency-Key` was used for another request |
-| `429` | more than 30 requests in 10 minutes |
+| `429` | more than 30 requests in 10 minutes; or the account would have more runs queued or running than the server allows an account (5,000 by default, all providers together, server 1.11.568). The answer then gives `waiting`, `wanted` and `limit`, and nothing was queued: wait for the runs to finish, then ask again. A pipeline that meets this is usually asking in a loop |
 
 A scenario code a provider does not have is listed in that provider's
 `not_found`. It is not a refusal.

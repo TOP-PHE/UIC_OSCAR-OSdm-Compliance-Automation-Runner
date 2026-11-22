@@ -16,7 +16,7 @@
  */
 
 const { randomUUID: uuidv4 } = require('node:crypto');
-const { run, get } = require('../../src/db/db');
+const { run } = require('../../src/db/db');
 const { enforceTenant } = require('../../src/api/middleware/tenant');
 
 function mockReqRes({ user, query = {}, headers = {}, body = {} }) {

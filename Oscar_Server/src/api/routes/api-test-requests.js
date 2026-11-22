@@ -37,7 +37,7 @@ const { randomUUID } = require('node:crypto');
 const { get, all, run } = require('../../db/db');
 const { auditLog } = require('../helpers/shared');
 const { canUseCompany } = require('../helpers/provider-access');
-const { launchReadiness, enqueueBatch } = require('../helpers/runLaunch');
+const { launchReadiness, enqueueBatch, waitingRoomRefusal } = require('../helpers/runLaunch');
 const { facetsFor } = require('../helpers/runCandidates');
 const { visibleCodes } = require('../../utils/datafileOwnership');
 const RF = require('../../utils/runFilters');
@@ -237,6 +237,13 @@ async function launchHandler(req, res) {
     return problem(res, 400, 'Bad Request', nothingToRunText(request, planned.plans),
       { not_found: planned.plans.map(p => ({ provider: p.companyId, name: companyName(p.companyId), codes: p.notFound })) });
   }
+
+  // #1369: the runs the account already has queued or running, plus those of
+  // every provider of this request, must fit under the ceiling. Refused
+  // before the request is recorded: its Idempotency-Key is not used up, and
+  // nothing is queued for any provider.
+  const full = waitingRoomRefusal(account.id, planned.plans.reduce((sum, p) => sum + p.codes.length, 0));
+  if (full) return res.status(full[0]).json(full[1]);
 
   // The key is taken before anything is queued: two calls at once with it queue once.
   const id = randomUUID();

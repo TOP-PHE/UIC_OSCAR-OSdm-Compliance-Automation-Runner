@@ -4,6 +4,39 @@
   "current_release": "2026.603",
   "releases": [
     {
+      "release": "2026.609",
+      "date": "2026-11-22",
+      "server": "1.11.570",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.570 (#1377): GET /health, GET /v1/auth/me and GET /v1/runs/:id/artifacts/:aid each name a rate limit in their own chain (300, 600 and 300 a minute per address). /health keeps its data folder and free space checks for 10 seconds, and a failed check answers an error code, its reason going to the server log. The fingerprint kept beside a tester's access token is a keyed digest: each tester's token is asked again once after the update. worker/access-token.js no longer holds a NUL character, which made git read it as binary. Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
+      "release": "2026.608",
+      "date": "2026-11-22",
+      "server": "1.11.569",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.569 (#1371): the general JSON body limit is 1 MB; the Test Config save (PUT /v1/company/datafile/json) keeps 5 MB with a parser of its own that runs after the route's authorisation, and a 413 names the limit that applied. ALLOW_PRIVATE_TARGETS, which turns off the policy keeping OSCAR's outbound calls on public https addresses, is said at each start and shown on Admin, Server Config while it is on. Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
+      "release": "2026.607",
+      "date": "2026-11-22",
+      "server": "1.11.568",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.568 (#1369): a ceiling on the runs one person or one Company API account has queued or running at once, all companies and providers together (Server Config, Max Waiting Runs per Account, 5,000 by default, 100 to 100,000). A launch from the Run page or through the API that would go over it is refused with 429 before anything is queued, saying how many are waiting, how many were asked and the limit. Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.606",
       "date": "2026-11-22",
       "server": "1.11.567",

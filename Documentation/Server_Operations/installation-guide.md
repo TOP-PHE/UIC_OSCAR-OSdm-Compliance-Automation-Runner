@@ -292,6 +292,12 @@ Expected:
 If `compatibility_status` is `"untested_combination"`, you're running a
 non-matrix combination — supported but not formally tested.
 
+A check that fails reads `"ok": false` with an `error` code (`EACCES`,
+`ENOSPC`…), and the answer is `503` with `"status": "degraded"`. The reason
+in full is in the server's log (`docker compose logs oscar`), not in the
+answer, which anyone can read. The data folder and the free space are read
+at most every 10 seconds.
+
 Open the UI at `https://oscar.example.org`, log in with the platform admin
 you created in step 5, and start onboarding companies.
 
