@@ -4503,7 +4503,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   Ubuntu's nginx with the example in front of a stand-in, and the k3s job asks
   Traefik for a compressed answer: neither Docker nor nginx is on the
   maintainer's PC. **An installed nginx is changed by hand**: the example is
-  copied once, at installation.
+  copied once, at installation. On production it was done with a file of its
+  own, `/etc/nginx/conf.d/oscar-compression.conf`, holding the `gzip_*` lines
+  without `gzip on;` (Ubuntu's `nginx.conf` has it at the http level, and a
+  second one there is a duplicate): the guide gives that command. A `grep -r`
+  over `sites-enabled` reads nothing: it does not follow the links there.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image**. **The VPS checkout follows the
   newest `release-*` tag on `main`, never `main`'s head** (2026-11-06):

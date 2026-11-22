@@ -46,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The guide's way to turn compression on, for an nginx already installed, is a file of its own** (#1393). Documentation only. The guide said to add the `gzip` lines to the site's file; on production that file was not shaped as the guide assumed. A file in `/etc/nginx/conf.d/` with the `gzip_*` lines, checked by `nginx -t` and removed when refused, did it: the Test Config script went from 555,602 to 150,043 bytes on the wire.
+
 - **The set-up page gives the quality gate coverage floor as it now is: 83 %** (#1391). Documentation only. The maintainer set it in SonarCloud on 2026-11-22; it had stayed at 35 % while the repository documented 83 %. The page also says that a changed gate shows in the answer of the API only after the next analysis.
 
 - **Workflows: a read-only token in three workflows; CodeQL reads the workflow files again** (#1375). CI only, no version.
