@@ -107,7 +107,7 @@ permissions `600` (root only).
 |---|---|---|---|
 | `ENCRYPTION_KEY` | At-rest encryption (creds + run_events + run_requests + scenarios + artifact files) | **NEVER ROTATE** under normal conditions | Without re-encryption pass, all encrypted data becomes unreadable |
 | `JWT_SECRET` | Web session tokens | On suspected leak; otherwise indefinite | All active web sessions invalidated; users must re-login |
-| `PLATFORM_BOOTSTRAP_TOKEN` | Creation of the first administrator via `POST /v1/auth/bootstrap/platform-user`. The route accepts the token for as long as it is set | Once the first administrator is created, it is cleared: the line emptied in `.env` **and the container created again** (`docker compose up -d oscar`; a `restart` keeps the old value) | The bootstrap endpoint returns 503 until set again |
+| `PLATFORM_BOOTSTRAP_TOKEN` | Creation of the first administrator via `POST /v1/auth/bootstrap/platform-user`. From server 1.11.566 the route creates that one only: with an active administrator it answers `409` and creates nobody | Once the first administrator is created, it is cleared: the line emptied in `.env` **and the container created again** (`docker compose up -d oscar`; a `restart` keeps the old value) | The bootstrap endpoint returns 503 until set again |
 | Brevo SMTP key | Outbound emails (alerts, password reset, verification) | When Brevo rotates / on suspected leak | Email delivery stops until re-configured |
 
 ### 3.2 `ENCRYPTION_KEY` — the most critical secret
@@ -350,7 +350,11 @@ If any of the four long-lived secrets is suspected leaked:
 - `PLATFORM_BOOTSTRAP_TOKEN` → no risk once it is cleared, since the server
   then accepts none. If it was still set: clear it (§ 3.1: empty the line
   and create the container again), then read the list of administrators and
-  certifiers for an account nobody knows
+  certifiers for an account nobody knows. From server 1.11.566 a token used
+  while an administrator exists creates no account, and the attempt is in the
+  audit log (`bootstrap_refused:administrator_exists`). From server 1.11.566 a token used
+  while an administrator exists creates no account, and the attempt is in the
+  audit log (`bootstrap_refused:administrator_exists`)
 - SMTP key → SEV-2, rotate in Brevo + write the new key in the server's
   environment (§ 3.4)
 

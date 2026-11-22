@@ -235,15 +235,102 @@ describe('POST /v1/auth/bootstrap/platform-user', () => {
     expect(res.status).toBe(400);
   });
 
-  test('201 creates an administrator, then 409 on duplicate email', async () => {
-    const ok = await request(app).post('/v1/auth/bootstrap/platform-user').set(hdr)
-      .send({ email: bootEmail, password: 'Str0ngPlatformPw!', role: 'administrator' });
-    expect(ok.status).toBe(201);
-    expect(ok.body.user.role).toBe('administrator');
+  // #1365: the route creates the first administrator only. Each test below
+  // starts from an installation with no active administrator.
+  describe('the first administrator only (#1365)', () => {
+    const boot = (body, token = hdr['x-platform-bootstrap-token']) => request(app)
+      .post('/v1/auth/bootstrap/platform-user').set('x-platform-bootstrap-token', token).send(body);
+    const administrators = () => get("SELECT COUNT(*) AS n FROM users WHERE role = 'administrator'").n;
+    const refusals = () => get("SELECT COUNT(*) AS n FROM auth_events WHERE event_type = 'bootstrap_refused:administrator_exists'").n;
+    const PASSWORD = 'Str0ngPlatformPw!';
+    let n = 0;
+    const email = () => `boot${Date.now()}-${++n}@acmecorp.com`;
 
-    const dup = await request(app).post('/v1/auth/bootstrap/platform-user').set(hdr)
-      .send({ email: bootEmail, password: 'Str0ngPlatformPw!', role: 'administrator' });
-    expect(dup.status).toBe(409);
+    beforeEach(() => {
+      // Earlier tests of this file, and of this block, leave administrators.
+      run("UPDATE users SET status = 'suspended' WHERE role = 'administrator'");
+      run("DELETE FROM auth_events WHERE event_type = 'bootstrap_refused:administrator_exists'");
+    });
+
+    test('with no administrator: 201, an active administrator', async () => {
+      const first = email();
+      const ok = await boot({ email: first, password: PASSWORD, role: 'administrator' });
+      expect(ok.status).toBe(201);
+      expect(ok.body.user.role).toBe('administrator');
+      expect(get('SELECT role, status FROM users WHERE email = ?', [first])).toEqual({ role: 'administrator', status: 'active' });
+    });
+
+    test('once one exists: 409 for another administrator, and nobody is created', async () => {
+      expect((await boot({ email: email(), password: PASSWORD })).status).toBe(201);
+      const before = administrators();
+      const second = email();
+      const res = await boot({ email: second, password: PASSWORD, role: 'administrator' });
+      expect(res.status).toBe(409);
+      expect(res.body.administrator_exists).toBe(true);
+      expect(res.body.detail).toMatch(/creates the first one only/);
+      expect(res.body.detail).toMatch(/Remove PLATFORM_BOOTSTRAP_TOKEN/);
+      expect(administrators()).toBe(before);
+      expect(get('SELECT id FROM users WHERE email = ?', [second])).toBeUndefined();
+    });
+
+    test('once one exists: 409 for a certifier too', async () => {
+      expect((await boot({ email: email(), password: PASSWORD })).status).toBe(201);
+      const certifier = email();
+      const res = await boot({ email: certifier, password: PASSWORD, role: 'certification_user' });
+      expect(res.status).toBe(409);
+      expect(get('SELECT id FROM users WHERE email = ?', [certifier])).toBeUndefined();
+    });
+
+    test('the refusal is written to the audit log, without what was sent', async () => {
+      expect((await boot({ email: email(), password: PASSWORD })).status).toBe(201);
+      expect(refusals()).toBe(0);
+      const asked = email();
+      await boot({ email: asked, password: PASSWORD });
+      expect(refusals()).toBe(1);
+      const line = get("SELECT user_id, company_id, email FROM auth_events WHERE event_type = 'bootstrap_refused:administrator_exists'");
+      expect(line).toEqual({ user_id: null, company_id: null, email: null });
+    });
+
+    test('a caller without the token learns nothing: 401 whether one exists or not', async () => {
+      const without = await boot({ email: email(), password: PASSWORD }, 'wrong');
+      expect((await boot({ email: email(), password: PASSWORD })).status).toBe(201);
+      const withOne = await boot({ email: email(), password: PASSWORD }, 'wrong');
+      expect([without.status, withOne.status]).toEqual([401, 401]);
+      expect(withOne.body).toEqual(without.body);
+      expect(refusals()).toBe(0);
+    });
+
+    test('the administrators all suspended: the route creates one again, the way back in', async () => {
+      expect((await boot({ email: email(), password: PASSWORD })).status).toBe(201);
+      expect((await boot({ email: email(), password: PASSWORD })).status).toBe(409);
+      run("UPDATE users SET status = 'suspended' WHERE role = 'administrator'");
+      expect((await boot({ email: email(), password: PASSWORD })).status).toBe(201);
+    });
+
+    test('an administrator that is not active does not count: pending, suspended', async () => {
+      for (const status of ['pending', 'suspended']) {
+        run(`INSERT INTO users (id, company_id, email, password_hash, role, status) VALUES (?, ?, ?, 'x', 'administrator', ?)`,
+          [uuidv4(), COMPANY_ID, email(), status]);
+      }
+      expect((await boot({ email: email(), password: PASSWORD })).status).toBe(201);
+    });
+
+    test('other roles being active change nothing: a Test Manager, a certifier', async () => {
+      for (const role of ['test_manager', 'certification_user', 'company_user']) {
+        run(`INSERT INTO users (id, company_id, email, password_hash, role, status) VALUES (?, ?, ?, 'x', ?, 'active')`,
+          [uuidv4(), COMPANY_ID, email(), role]);
+      }
+      expect((await boot({ email: email(), password: PASSWORD })).status).toBe(201);
+    });
+
+    test('with no administrator, an e-mail that has an account is still a 409 of its own', async () => {
+      const taken = email();
+      addUser(taken);
+      const res = await boot({ email: taken, password: PASSWORD });
+      expect(res.status).toBe(409);
+      expect(res.body.detail).toBe('Email already registered.');
+      expect(res.body.administrator_exists).toBeUndefined();
+    });
   });
 });
 

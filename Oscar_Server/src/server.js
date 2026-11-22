@@ -85,6 +85,12 @@ const mailStart = mailSettings.startLine(
   mailSettings.sourceOf(mailStored.SMTP_HOST), mailSettings.replacedByEnvironment(mailStored));
 log[mailStart.level](mailStart.text);
 
+// #1365: a bootstrap token left in the environment once an administrator
+// exists creates no account any more; said at each start until it is removed.
+const bootstrapToken = require('./utils/bootstrapToken');
+const bootstrapStart = bootstrapToken.startLine(bootstrapToken.tokenSet(), bootstrapToken.administratorExists());
+if (bootstrapStart) log[bootstrapStart.level](bootstrapStart.text);
+
 // ── Attach queue event listeners ──────────────────────────────────────────────
 const queue = require('./worker/queue');
 const metricsForQueue = require('./utils/metrics');

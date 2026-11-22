@@ -44,6 +44,7 @@ const path = require('node:path');
 const AccessRequests = require('../../utils/accessRequests');
 const alertmanagerConfig = require('../../utils/alertmanagerConfig');
 const mailSettings = require('../../utils/mailSettings');
+const bootstrapToken = require('../../utils/bootstrapToken');
 const { deploymentKind } = require('../../utils/deployment');
 const log = require('../../utils/logger').child({ module: 'admin' });
 
@@ -916,6 +917,9 @@ router.get('/config', (req, res) => {
     mail_source:     mail.source,
     mail_replaced:   mail.replaced,
     mail_warnings:   mail.warnings,
+    // #1365: the bootstrap token is still in the server's environment. An
+    // administrator reads this, so one exists and the token is of no use.
+    bootstrap_token_set: bootstrapToken.tokenSet(),
   };
   if (serverInfo.alerting_mode === 'kubernetes') serverInfo.alerting_commands = alertmanagerConfig.KUBERNETES_COMMANDS;
 

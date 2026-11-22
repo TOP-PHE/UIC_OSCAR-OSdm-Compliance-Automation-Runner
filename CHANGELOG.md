@@ -613,6 +613,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.566] — 2026-11-22
+
+The bootstrap route creates the first administrator only (#1365). Not released on its own: listed in `compatibility.json` (2026.605) without moving `current_release`.
+
+### Changed
+- **`POST /v1/auth/bootstrap/platform-user` creates nobody once an active administrator exists.** It answered for as long as `PLATFORM_BOOTSTRAP_TOKEN` was set, with the password sent, for an administrator or a certifier; the guides called it one-time (#1361 made them say what the server did). It now answers `409` (`administrator_exists: true`), saying that further administrators and certifiers are invited from *Admin → Manage Users* and that the token should be removed. The token is checked first, so a caller without it gets the same `401` whether an administrator exists or not; the rule comes before anything is read from the body.
+- **With no active administrator it works as before**: a new installation, or every administrator suspended or deleted. That is the way back in for an installation locked out, for whoever can set the token on the server. "Active" is the status a session asks (`sessionUser()`): an administrator counted is one who can sign in.
+- **A refusal is written to the audit log** (`bootstrap_refused:administrator_exists`, with the address and the user agent, never what was sent): someone holds the token.
+- **A token left in the environment is said.** At each start, as a warning while an administrator exists (`utils/bootstrapToken.js` `startLine()`); on *Admin → Server Config*, above the server information, with the two steps that remove it (`server_info.bootstrap_token_set`, `bootstrapTokenNote()`).
+
+### Documentation
+- *Self-Hosted Quick Start* (steps 2 and 6), *installation-guide.md* (section 5), *Security Operations Policy* (3.1, 5.5), *Server Admin Guide* (the variable's row), *k3s on one VPS* (what a `409` means), `OSCAR_Deploy/.env.example`, OpenAPI.
+- Not changed: `OSCAR_Deploy/scripts/oscar-user-management.ps1` (April 2026), which reads the token from the environment file at each run and calls routes that no longer exist.
+
+### Tests
+- `auth-routes.test.js`: the first administrator created; then `409` for another administrator and for a certifier, nobody created; the audit line; the same `401` without the token whether one exists or not; every administrator suspended, the route works again; an administrator that is not active, and other active roles, do not count; an e-mail that has an account is still its own `409`.
+- `bootstrap-token.test.js` (new): the module, the start line, the order of the route's checks. `ui-scripts.test.js`: the page's note.
+
+---
+
 ## [server-1.11.565] — 2026-11-22
 
 The mail server's settings come from the server's environment (#1363, maintainer's decision of 2026-11-22: the mail server is part of the deployment, as the encryption key and the collection path are, and is set where the server is installed). Not released on its own: listed in `compatibility.json` (2026.604) without moving `current_release`, so no release tag is made; it goes out with the next release (maintainer, 2026-11-22: a release holds a set of changes).

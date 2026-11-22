@@ -693,7 +693,9 @@ unset ADMIN_PASSWORD BOOTSTRAP_TOKEN
   with it at `https://$HOST`.
 - `HTTP 400`: the e-mail or the password does not meet the rules; the answer
   says which. Type the password again and rerun.
-- `HTTP 409`: that e-mail already has an account.
+- `HTTP 409`: an administrator already exists (the route creates the first
+  one only: invite the others from Admin → *Manage Users*), or that e-mail
+  already has an account. The answer says which.
 - `HTTP 401`: the token is not the one of step 5.
 - `HTTP 503`: the Secret holds no bootstrap token (always the case after
   section 6a).

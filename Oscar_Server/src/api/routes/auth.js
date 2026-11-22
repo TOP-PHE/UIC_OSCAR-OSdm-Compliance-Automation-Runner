@@ -29,6 +29,7 @@ const { sendVerificationEmail, sendPasswordResetEmail } = require('../../utils/m
 const AccessRequests = require('../../utils/accessRequests');
 const { isApiAccountRole } = require('../../utils/apiAccounts');
 const { resolveRole, ensurePlatformCompany } = require('../helpers/shared');
+const bootstrapToken = require('../../utils/bootstrapToken');
 const { loginAttempts } = require('../../utils/metrics');
 const { validate, v } = require('../middleware/validate');
 const log = require('../../utils/logger').child({ module: 'auth' });
@@ -399,6 +400,20 @@ router.post('/bootstrap/platform-user',
   const tokenValid = providedBuf.length === expectedBuf.length && crypto.timingSafeEqual(providedBuf, expectedBuf);
   if (!provided || !tokenValid) {
     return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid bootstrap token.' });
+  }
+
+  // #1365: the route is there for the first administrator. Once an active one
+  // exists it creates nobody, whatever is asked: every other account is made
+  // by invitation. Looked at after the token, so the answer says nothing to a
+  // caller without it; before the body's own checks, so nothing is created
+  // on any path.
+  if (bootstrapToken.administratorExists()) {
+    log.warn({ ip: req.ip }, 'Bootstrap route called with the token while an administrator exists: refused');
+    // In the audit log too: someone holds the token. Never the body sent.
+    try {
+      logAuthEvent({ eventType: 'bootstrap_refused:administrator_exists', ip: req.ip, userAgent: String(req.get('user-agent') || '').slice(0, 200) });
+    } catch { /* an audit line never changes the answer */ }
+    return res.status(409).json({ status: 409, title: 'Conflict', detail: bootstrapToken.ALREADY_AN_ADMINISTRATOR, administrator_exists: true });
   }
 
   const { email, password, role } = req.body || {};
