@@ -23,8 +23,11 @@ const { withBrunoExpect } = require('../helpers/bruno-chai');
 
 let envStore = {};
 let stops = 0;
+// Variables the environment does not give back, for the one case that needs it.
+let forgotten = [];
+let consoleLines = [];
 global.bru = {
-  getEnvVar:    (k) => (Object.hasOwn(envStore, k) ? envStore[k] : undefined),
+  getEnvVar:    (k) => (Object.hasOwn(envStore, k) && !forgotten.includes(k) ? envStore[k] : undefined),
   setEnvVar:    (k, v) => { envStore[k] = v; },
   deleteEnvVar: (k) => { delete envStore[k]; },
   getVar:       () => undefined,
@@ -51,12 +54,12 @@ const SEARCH_ONE = 'SIM_SALE_SEARCH_1ADT_38';
 const SPECIFICATION = 'SIM_SALE_CLASS_PER_LEG_1ADT_38';
 const NON_TRIP = 'SIM_NONTRIP_PLACES_1ADT_38';
 
-beforeEach(() => { envStore = {}; logs = []; stops = 0; mockBuildQueue.mockReset(); });
+beforeEach(() => { envStore = {}; logs = []; stops = 0; forgotten = []; consoleLines = []; mockBuildQueue.mockReset(); });
 
 // The parser calls Bruno's own `test` and `expect` as it goes.
 function run(file) {
   const jestTest = global.test;
-  const quiet = jest.spyOn(console, 'log').mockImplementation(() => {});
+  const quiet = jest.spyOn(console, 'log').mockImplementation((line) => { consoleLines.push(String(line)); });
   global.test = (name, fn) => { try { fn(); } catch { /* not what this file checks */ } };
   try {
     return { returned: withBrunoExpect(() => sp.parseScenarioData(file)), error: null };
@@ -111,9 +114,47 @@ describe('which scenario is loaded when OSCAR names none', () => {
     expect(third.error).toBeNull();
     expect(third.returned).toBeUndefined();
     expect(stops).toBe(1);
+    expect(consoleLines.filter((line) => line.includes('All 2 scenarios attempted') && line.includes('stopping run (index 2)'))).toHaveLength(1);
     expect(envStore.scenarioCode).toBe(SEARCH);
     expect(envStore.scenariosToRunIndex).toBe('2');
     expect(envStore.TripType).toBe('left as it was');
+  });
+
+  test('a list of one scenario stops the run at the second call', () => {
+    expect(withList([SEARCH]).error).toBeNull();
+    expect(envStore.scenarioCode).toBe(SEARCH);
+    envStore.TripType = 'left as it was';
+    expect(withList([SEARCH]).error).toBeNull();
+    expect(stops).toBe(1);
+    expect(envStore.TripType).toBe('left as it was');
+  });
+
+  test('an index past the list in an environment that lost the list starts again at the first scenario', () => {
+    envStore = { scenariosToRunIndex: '5' };
+    forgotten = ['__scenariosList'];
+    expect(withList([SPECIFICATION, SEARCH]).error).toBeNull();
+    expect(stops).toBe(0);
+    expect(envStore.scenarioCode).toBe(SPECIFICATION);
+    expect(envStore.scenariosToRunIndex).toBe('1');
+    expect(consoleLines.filter((line) => line.includes('Index 5 exceeds list length 2') && line.includes('resetting to 0'))).toHaveLength(1);
+  });
+
+  test('a code that is in the list and in no scenario: the error says which codes the file holds, twenty at most', () => {
+    // NaN equals nothing, itself included: the one code a list can hold that no scenario matches.
+    const fileOf = (others) => ({ scenariosToRun: 'ALL', scenarios: [{ code: Number.NaN }, ...Array.from({ length: others }, (_, i) => ({ code: `CODE_${i + 1}` }))] });
+    const twenty = run(fileOf(20));
+    expect(twenty.error.message).toBe('Scenario code "NaN" not found');
+    const first = logged('ERROR', ['Scenario "NaN" not found in the data file\'s scenarios[]']);
+    expect(first).toHaveLength(1);
+    expect(first[0]).toContain('Available code(s): [CODE_1, CODE_2, ');
+    expect(first[0]).toContain(', CODE_20]. Fix in the wizard');
+    expect(logged('ERROR', ['Stopping execution of further requests'])).toHaveLength(1);
+
+    logs = [];
+    envStore = {};
+    expect(run(fileOf(21)).error.message).toBe('Scenario code "NaN" not found');
+    expect(logged('ERROR', [', CODE_20, …]. Fix in the wizard'])).toHaveLength(1);
+    expect(logged('ERROR', ['CODE_21'])).toEqual([]);
   });
 
   test('the list may be text with commas; ALL is every scenario of the file, in its order', () => {
@@ -169,9 +210,19 @@ describe('which scenario is loaded when OSCAR names none', () => {
     expect(withList([SPECIFICATION, SEARCH]).error.message).toContain('scenarioTarget index 2 is out of range. effectiveList has 2 entries (0–1)');
     envStore = { scenarioTarget: 'NOT_IN_THE_FILE' };
     expect(withList([SPECIFICATION, SEARCH]).error.message).toContain('scenarioTarget "NOT_IN_THE_FILE" not found in scenarios list');
-    // "-1" is not an index: it is read as a code.
     envStore = { scenarioTarget: '-1' };
     expect(withList([SPECIFICATION, SEARCH]).error.message).toContain('scenarioTarget index -1 is out of range');
+    // "01" is not an index as it is written: it is read as a code.
+    envStore = { scenarioTarget: '01' };
+    expect(withList([SPECIFICATION, SEARCH]).error.message).toContain('scenarioTarget "01" not found in scenarios list');
+    // "0" is the first of the list.
+    envStore = { scenarioTarget: '0' };
+    expect(withList([SPECIFICATION, SEARCH]).error).toBeNull();
+    expect(envStore.scenarioCode).toBe(SPECIFICATION);
+    // An index is read in base ten.
+    envStore = { scenarioTarget: '10' };
+    expect(withList('ALL').error).toBeNull();
+    expect(envStore.scenarioCode).toBe(JSON.parse(TEXT).scenarios[10].code);
   });
 
   test('an index that is not a number, or below 0, starts at the first scenario', () => {
@@ -332,6 +383,14 @@ describe('a partial refund that cannot be made is said at the start', () => {
     parse(SEARCH, ({ scenario }) => { scenario.partialRefundByPax = true; scenario.passengersListId = 987654; });
     expect(logged('WARNING', ['partialRefundByPax is on', '#987654 was not found', 'passengersListId linkage'])).toHaveLength(1);
 
+    // A list that holds no list of passengers counts none.
+    logs = [];
+    parse(SEARCH_ONE, ({ scenario, file }) => {
+      scenario.partialRefundByPax = true;
+      file.passengersList.find((l) => l.id === scenario.passengersListId).passengers = null;
+    });
+    expect(logged('WARNING', ['passengersList #1 has only 0 passenger(s)'])).toHaveLength(1);
+
     // Two passengers, an id written as text: nothing to say.
     logs = [];
     parse(SEARCH, ({ scenario }) => { scenario.partialRefundByPax = true; });
@@ -343,11 +402,21 @@ describe('a partial refund that cannot be made is said at the start', () => {
     expect(logged('WARNING', ['partialRefundByLeg is on', 'has 1 leg(s)'])).toHaveLength(1);
 
     logs = [];
-    envStore = {};
-    parse(SPECIFICATION, ({ scenario }) => { scenario.partialRefundByLeg = true; scenario.partialRefundLegSelection = 'inbound'; });
-    expect(logged('WARNING', ["partialRefundLegSelection='inbound'", 'this trip is one-way'])).toHaveLength(1);
-    expect(logged('WARNING', ['leg(s)'])).toEqual([]);
-    expect(envStore.partialRefundLegSelection).toBe('first');
+    parse(SPECIFICATION, ({ scenario, trip }) => { scenario.partialRefundByLeg = true; trip.legs = 'none'; });
+    expect(logged('WARNING', ['partialRefundByLeg is on', 'has 0 leg(s)'])).toHaveLength(1);
+
+    for (const direction of ['inbound', 'outbound']) {
+      logs = [];
+      parse(SPECIFICATION, ({ scenario }) => { scenario.partialRefundByLeg = true; scenario.partialRefundLegSelection = direction; });
+      expect(logged('WARNING', [`partialRefundLegSelection='${direction}'`, 'this trip is one-way'])).toHaveLength(1);
+      expect(logged('WARNING', ['leg(s)'])).toEqual([]);
+      expect(envStore.partialRefundLegSelection).toBe('first');
+    }
+    // Another choice is kept as it is, without a word.
+    logs = [];
+    parse(SPECIFICATION, ({ scenario }) => { scenario.partialRefundByLeg = true; scenario.partialRefundLegSelection = 'last'; });
+    expect(logged('WARNING', ['partialRefund'])).toEqual([]);
+    expect(envStore.partialRefundLegSelection).toBe('last');
 
     // A return keeps the direction asked; a searched trip is checked later, at the offer.
     logs = [];
@@ -377,6 +446,8 @@ describe('a trip that cannot be built is named, and the scenario goes on', () =>
   test('a searched trip without its origin, destination or time', () => {
     parse(SEARCH, ({ trip }) => { delete trip.trip.origin; trip.trip.startDatetime = ''; });
     expect(logged('ERROR', ['tripRequirement #2 has tripType=SEARCH', '[trip.origin, trip.startDatetime]'])).toHaveLength(1);
+    expect(logged('ERROR', [])).toHaveLength(1);
+    expect(logged('DEBUG', ['tripRequirement #2.trip dump = {'])).toHaveLength(1);
     expect(envStore.TripType).toBe('SEARCH');
     expect(envStore.offerTripSearchCriteria).toBeUndefined();
     expect(envStore.__travelDay).toBeUndefined();
@@ -394,12 +465,16 @@ describe('a trip that cannot be built is named, and the scenario goes on', () =>
   test('a trip specification without legs, or with a leg that lacks a member', () => {
     parse(SPECIFICATION, ({ trip }) => { trip.legs = []; });
     expect(logged('ERROR', ['tripRequirement #4 has tripType=SPECIFICATION but .legs[] is empty or missing'])).toHaveLength(1);
+    expect(logged('ERROR', [])).toHaveLength(1);
+    expect(logged('DEBUG', ['tripRequirement #4 dump = {'])).toHaveLength(1);
     expect(envStore.offerTripSpecifications).toBeUndefined();
 
     logs = [];
     envStore = {};
     parse(SPECIFICATION, ({ trip }) => { delete trip.legs[1].destination; delete trip.legs[1].endDatetime; trip.legs.push(null); });
     expect(logged('ERROR', ['2 leg(s) are incomplete', 'legs[1] missing [destination, endDatetime]; legs[2] missing [leg (not an object)]'])).toHaveLength(1);
+    expect(logged('ERROR', [])).toHaveLength(1);
+    expect(logged('DEBUG', ['tripRequirement #4.legs dump = ['])).toHaveLength(1);
     expect(envStore.offerTripSpecifications).toBeUndefined();
 
     logs = [];
@@ -411,20 +486,25 @@ describe('a trip that cannot be built is named, and the scenario goes on', () =>
   test('offers without a trip that name neither stop places nor a zone', () => {
     parse(NON_TRIP, ({ trip }) => { delete trip.nonTrip; });
     expect(logged('ERROR', ['tripRequirement #45', 'name the stop places'])).toHaveLength(1);
+    expect(logged('ERROR', [])).toHaveLength(1);
+    expect(logged('DEBUG', ['tripRequirement #45 dump = {'])).toHaveLength(1);
     expect(envStore.TripType).toBe('NON_TRIP');
     expect(envStore.nonTripRequirement).toBeUndefined();
   });
 
   test('a complete trip of each kind is built, on the day ages are counted on', () => {
     expect(parse(SEARCH)).toBeNull();
+    expect(logged('INFO', ['processing a search'])).toHaveLength(1);
     expect(envStore.offerTripSearchCriteria).toEqual(expect.any(String));
     expect(envStore.__travelDay).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     envStore = {};
     expect(parse(SPECIFICATION)).toBeNull();
+    expect(logged('INFO', ['processing a specification'])).toHaveLength(1);
     expect(envStore.offerTripSpecifications).toEqual(expect.any(String));
     expect(envStore.__travelDay).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     envStore = {};
     expect(parse(NON_TRIP)).toBeNull();
+    expect(logged('INFO', ['processing a non-trip request'])).toHaveLength(1);
     expect(envStore.nonTripRequirement).toEqual(expect.any(String));
     expect(envStore.__travelDay).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(logged('ERROR', [])).toEqual([]);
@@ -432,7 +512,8 @@ describe('a trip that cannot be built is named, and the scenario goes on', () =>
 
   test('a trip whose time cannot be read: the error names the trip, and the passengers are still loaded', () => {
     expect(parse(SPECIFICATION, ({ trip }) => { trip.legs[0].startDatetime = 8; })).toBeNull();
-    expect(logged('ERROR', ['building TripType=SPECIFICATION criteria for tripRequirement #4 threw:'])).toHaveLength(1);
+    expect(logged('ERROR', ["building TripType=SPECIFICATION criteria for tripRequirement #4 threw: Data file error: tripRequirement (SPECIFICATION) leg 1 is missing a valid 'startDatetime' (got 8)"])).toHaveLength(1);
+    expect(logged('DEBUG', ['tripRequirement #4 dump = {'])).toHaveLength(1);
     expect(envStore.offerTripSpecifications).toBeUndefined();
     expect(JSON.parse(envStore.bookingPassengerReferences)).toEqual(['00001']);
   });
@@ -456,6 +537,27 @@ describe('the passengers, the criteria and the fulfilment options', () => {
     parse(SEARCH, ({ scenario }) => { scenario.passengerExternalRefFormat = 'PAX'; });
     expect(JSON.parse(envStore.bookingPassengerReferences)).toEqual(['00001', '00002']);
     expect(logged('WARNING', ['passengerExternalRefFormat set ("PAX")', 'probe ignored'])).toHaveLength(1);
+  });
+
+  test('an age on the day of travel gives the date of birth that is sent', () => {
+    const born = (years, daysAfter) => {
+      const d = new Date(`${envStore.__travelDay}T00:00:00Z`);
+      d.setUTCFullYear(d.getUTCFullYear() - years);
+      d.setUTCDate(d.getUTCDate() + daysAfter);
+      return d.toISOString().slice(0, 10);
+    };
+    parse(SEARCH, ({ passengers }) => {
+      Object.assign(passengers[0], { bornYearsBeforeTravel: 30, bornDaysAfter: 1, expectedPassengerType: 'ADULT' });
+      Object.assign(passengers[1], { bornYearsBeforeTravel: 12 });
+    });
+    const sent = JSON.parse(envStore.offerPassengerSpecifications).map((p) => p.dateOfBirth);
+    expect(sent).toEqual([born(30, 1), born(12, 0)]);
+    expect(JSON.parse(envStore.bookingPassengerSpecifications).map((p) => p.dateOfBirth)).toEqual(sent);
+    expect(logged('INFO', ['Passenger 00001: born ' + sent[0], '30 years before the day of travel plus 1 day(s); expected to be priced as ADULT'])).toHaveLength(1);
+    const second = logged('INFO', ['Passenger 00002: born ' + sent[1], '12 years before the day of travel']);
+    expect(second).toHaveLength(1);
+    expect(second[0]).not.toContain('plus');
+    expect(second[0]).not.toContain('expected to be priced');
   });
 
   test('each passenger is read back against the update values, or the booked ones when it gives none', () => {
