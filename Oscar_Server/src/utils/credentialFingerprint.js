@@ -40,10 +40,10 @@ const PURPOSE = 'oscar:credential-fingerprint:v2';
 const COST = Object.freeze({ N: 1024, r: 8, p: 1 });
 const LENGTH = 32;
 // The values are joined by a character none of them can hold in a form field.
-// Written with fromCharCode on purpose: typed as an escape, an editing tool
+// Written with fromCodePoint on purpose: typed as an escape, an editing tool
 // once stored the character itself, and git then read the file that held it
 // as binary (no diff in a review).
-const SEPARATOR = String.fromCharCode(0);
+const SEPARATOR = String.fromCodePoint(0);
 
 let kept = null;   // { hex, key }: the key is derived once per ENCRYPTION_KEY
 

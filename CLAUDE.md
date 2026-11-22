@@ -1255,7 +1255,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   matches, so the token is asked again once (`isCurrentForm()` chooses the log
   line). **`access-token.js` held a raw NUL**: an editing tool had stored the
   typed escape as the character, git read the file as binary and showed no
-  diff. Make such a character with `String.fromCharCode()`;
+  diff. Make such a character with `String.fromCodePoint()`;
   `credential-fingerprint.test.js` refuses a NUL in any source file. **In Git
   Bash an argument that starts with `//` loses a slash** (MSYS path
   conversion): `export MSYS_NO_PATHCONV=1` before passing a comment line as an

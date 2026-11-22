@@ -625,7 +625,7 @@ The code-scanning alerts left on `main`, read one by one (#1377). Not released o
 - **The trip editor's `setTripFieldByPath()` refuses `__proto__`, `constructor` and `prototype`** as a path segment. The paths come from the page's own fields; the helper no longer relies on that.
 
 ### Fixed
-- **`worker/access-token.js` held a NUL character**, stored months ago by an editing tool in place of the escape that was typed. The code worked, but git read the file as binary: every change to the module that resolves a tester's token showed as "Binary files differ" in a review. The character is now made with `String.fromCharCode(0)`, in the new module, and `credential-fingerprint.test.js` refuses a NUL in any source file of the server, the pages, the tests, the collection library, the simulator and the MCP server.
+- **`worker/access-token.js` held a NUL character**, stored months ago by an editing tool in place of the escape that was typed. The code worked, but git read the file as binary: every change to the module that resolves a tester's token showed as "Binary files differ" in a review. The character is now made with `String.fromCodePoint(0)`, in the new module, and `credential-fingerprint.test.js` refuses a NUL in any source file of the server, the pages, the tests, the collection library, the simulator and the MCP server.
 - Names nothing read: an import in `services/credentialTest.js`, a caught error in `worker/auth-profiles.js` (ESLint's one warning on `src/`), and five names in four test files, one of them a helper no test called.
 
 ### Tests
