@@ -108,7 +108,7 @@ secrets and still report green.
 
 | File | Name | Runs on | What it does |
 |---|---|---|---|
-| `ci-server.yml` | CI · Server | push, PR | Lint, audit, unit and integration tests (server, simulator, MCP server, API test tool); Docker build; Trivy scan |
+| `ci-server.yml` | CI · Server | push, PR | Lint (server, pages, tests, scripts and the Bruno library), audit, unit and integration tests (server, simulator, MCP server, API test tool); Docker build; Trivy scan |
 | `ci-collection.yml` | CI · Bruno collection | push, PR | Validates the collection with the pinned Bruno CLI |
 | `ci-kubernetes.yml` | CI · Kubernetes | PR and push on its paths, weekly | OSCAR on kind (OpenShift-like and Kubernetes) and on k3s, a run on the simulator. Not required |
 | `codeql.yml` | CodeQL | push, PR, weekly | Analysis of the JavaScript and of the workflow files (`javascript-typescript`, `actions`), config `.github/codeql/codeql-config.yml` |
@@ -157,10 +157,11 @@ the script.
   code may go far under the documented floor without failing. Change the two
   together from then on.
 - **New code** is what changed since the previous *version* of the project
-  (SonarCloud's "previous version" period). The version is
-  `sonar.projectVersion`, kept by hand in `sonar-project.properties`: read on
-  2026-11-22, it was still 1.11.178, so the period started on 2 July 2026 and
-  the gate counted four and a half months of code as new.
+  (SonarCloud's "previous version" period). The version is the server's:
+  `sonar.yml` reads it from `Oscar_Server/package.json` at each analysis and
+  passes it to the scan (#1381). Until then it was a number kept by hand in
+  `sonar-project.properties`, which stayed at 1.11.178 from 2 July to November
+  2026: the gate counted four and a half months of code as new.
 - **Reading a PR's issues** needs no token (the project is public):
   `https://sonarcloud.io/api/issues/search?componentKeys=TOP-PHE_UIC_OSCAR_Temporary&pullRequest=<N>&resolved=false`
   (`&branch=main` for `main`).

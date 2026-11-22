@@ -2347,6 +2347,27 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   by `tests/unit/db-migrations.test.js`, which boots the real migration path
   against throwaway DBs, including an "already-versioned DB missing a column"
   regression scenario). Always add a *new* migration instead.
+- **ESLint reads everything; SonarCloud's version follows `package.json`**
+  (#1381). `npm run lint` = `eslint src/ public/ tests/ scripts/`, then
+  `npm run lint:library`, then the pages' inline scripts. The tests, the
+  scripts and `Bruno_Collection/library-bruno` are read with
+  `eslint.bug-rules.js` only: every rule an error, none about layout. The
+  library's configuration is `Oscar_Server/eslint.library.config.js`, started
+  from the repository root (with `-c`, ESLint's base folder is the one it is
+  started from; a lint file inside `Bruno_Collection/` would be a collection
+  change). `SHARED_THROUGH_GLOBAL` there lists the 34 names library modules
+  use without requiring them (each ends with `Object.assign(globalThis,
+  module.exports)`): **it may only get shorter**. `lint-config.test.js` reads
+  the library without the list and asks that the undefined names be the list,
+  name for name; it starts ESLint's CLI with a configuration of a moment,
+  because **ESLint's API cannot be loaded under Jest** ("A dynamic import
+  callback was invoked without --experimental-vm-modules"). `sonar.yml`
+  passes `-Dsonar.projectVersion` from `Oscar_Server/package.json` (digits and
+  dots only): kept by hand in `sonar-project.properties`, it stayed at
+  1.11.178 from July to November 2026 and the gate counted all that time as
+  new code. **SonarCloud's gate has a 35 % coverage floor, not the 83 % the
+  properties file documents**; its conditions are read without a token from
+  `api/qualitygates/project_status` (*OSCAR - GitHub and CI set-up*, § 7, 10).
 - **CI required checks:** Lint/audit/test, CodeQL, Trivy (image scan), Docker
   build, Gitleaks, SonarCloud scan, Bruno-collection validation, PR labeler,
   **`SonarQube Quality Gate check`** (added to required list 2026-07-02 via
@@ -4764,7 +4785,7 @@ From `Oscar_Server/`:
 npm install
 npm start          # node src/server.js
 npm run dev        # node --watch src/server.js (auto-reload)
-npm run lint       # eslint src/ && node scripts/lint-inline-scripts.js
+npm run lint       # eslint on src/, public/, tests/, scripts/ and the Bruno library, then the pages' inline scripts
 npm test           # jest (tests/unit + tests/integration)
 ```
 Node 22+ required (built-in `node:sqlite`).
