@@ -174,7 +174,11 @@ describe('the runner and the live log write the waiting lines first', () => {
 
   test('every status the runner writes goes through writeRunStatus(), which writes the lines first', () => {
     expect(runner).not.toMatch(/\bdbRun\(\s*`UPDATE runs SET status/);
-    expect(runner.match(/writeRunStatus\(\s*`UPDATE runs SET status/g).length).toBeGreaterThanOrEqual(7);
+    // Three writers since #1390: RUNNING at the start, FAILED for a run that
+    // cannot go on (failRun), and the final status.
+    expect(runner.match(/writeRunStatus\(\s*`UPDATE runs SET status/g)).toHaveLength(3);
+    // The five refusals of a run before its process starts all end in failRun().
+    expect(runner.match(/\breturn failRun\(|= failRun\(/g).length).toBeGreaterThanOrEqual(5);
     expect(runner).toMatch(/function writeRunStatus\(sql, params\) \{\s+flushRunLogs\(\);\s+return dbRun\(sql, params\);/);
   });
 

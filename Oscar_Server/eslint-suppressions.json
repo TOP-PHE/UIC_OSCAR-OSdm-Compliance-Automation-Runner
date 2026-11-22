@@ -289,10 +289,7 @@
   },
   "src/worker/runner.js": {
     "complexity": {
-      "count": 5
-    },
-    "max-lines-per-function": {
-      "count": 2
+      "count": 3
     }
   }
 }

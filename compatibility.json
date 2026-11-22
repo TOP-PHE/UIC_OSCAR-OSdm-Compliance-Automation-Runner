@@ -4,6 +4,17 @@
   "current_release": "2026.610",
   "releases": [
     {
+      "release": "2026.612",
+      "date": "2026-11-22",
+      "server": "1.11.572",
+      "collection": "OTST_V2.0.269",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.572 (#1390): runSteps() of worker/runner.js, the whole of a run in one function of 382 lines of code and 78 paths, is split by stage into 26 functions (the run and its rows, the refusals before anything starts, the token, the working folder, the environment file, the process and what watches it, the reports, the results, the final status). Behaviour unchanged: everything a run does in the runner's tests (the lines it logs, its rows, the process it starts) is the same before and after, and the tests gained 34 cases for the stages none reached. Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.611",
       "date": "2026-11-22",
       "server": "1.11.571",
