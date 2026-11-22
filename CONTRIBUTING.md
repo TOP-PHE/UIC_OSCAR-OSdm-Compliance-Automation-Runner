@@ -80,6 +80,15 @@ npm test -- tests/unit/foo.test.js  # one file
   A library module that needs another one requires it: the list of names
   shared through the global object (`eslint.library.config.js`) may only get
   shorter.
+- **Size of a function**: `npm run lint` holds a new function to 15 paths
+  (ESLint's `complexity`) and 100 lines of code, in the server, the pages'
+  scripts and the library (`Oscar_Server/eslint.size-rules.js`). The functions
+  that were over a limit when it was set are recorded, file by file, in
+  `eslint-suppressions.json` and `eslint-library-suppressions.json`. When you
+  bring one under a limit, the lint asks you to lower the record:
+  `npm run lint:baseline`. The record is never raised by a command: letting a
+  function over a limit in is a line changed by hand in the JSON file and in
+  `tests/unit/lint-config.test.js`, where a reviewer sees it.
 - **Comments**: prose-style, explain *why* (the code shows *what*).
   Architecture decisions worth preserving go into the file's top comment.
 - **Tests**: unit tests under `tests/unit/`, integration under

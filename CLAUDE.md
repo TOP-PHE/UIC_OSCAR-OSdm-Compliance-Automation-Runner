@@ -2390,6 +2390,23 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   new code. **SonarCloud's gate has a 35 % coverage floor, not the 83 % the
   properties file documents**; its conditions are read without a token from
   `api/qualitygates/project_status` (*OSCAR - GitHub and CI set-up*, § 7, 10).
+- **A new function is held to two limits by `npm run lint`** (#1385):
+  `Oscar_Server/eslint.size-rules.js`, `complexity` 15 (variant `modified`: a
+  `switch` counts once) and `max-lines-per-function` 100 (blank lines and
+  comments out; the function's own first and last lines count), in the `src`,
+  `public` and library blocks, not the tests. What was over them is ESLint's
+  own baseline (bulk suppressions, ESLint 9.24+): `eslint-suppressions.json`
+  (found by itself in the folder ESLint starts in: 107 + 22) and
+  `eslint-library-suppressions.json` (`--suppressions-location`, 82 + 23),
+  paths with forward slashes from that folder. **One more function over a
+  limit in a file fails (exit 1, every one of the file listed); one less
+  fails too (exit 2, "suppressions left that do not occur anymore") until
+  `npm run lint:baseline` prunes.** No script passes `--suppress-all` or
+  `--suppress-rule` (a test): they would set any rule aside. The records
+  were made once with `--suppress-rule complexity --suppress-rule
+  max-lines-per-function`. Raising a count is a hand edit of the JSON and of
+  the totals in `lint-config.test.js`. It is cyclomatic complexity, not
+  Sonar's cognitive one (S3776): the two numbers differ for one function.
 - **CI required checks:** Lint/audit/test, CodeQL, Trivy (image scan), Docker
   build, Gitleaks, SonarCloud scan, Bruno-collection validation, PR labeler,
   **`SonarQube Quality Gate check`** (added to required list 2026-07-02 via
