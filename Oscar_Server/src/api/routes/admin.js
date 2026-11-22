@@ -957,19 +957,22 @@ function backToDefault(key) {
   return run('DELETE FROM server_config WHERE key = ?', [key]).changes > 0;
 }
 
+// A number setting of a save: empty is no value (#1338), else within its limits.
+function checkedNumber(key, schema, rawValue) {
+  if (isEmptyField(rawValue)) return { reset: true };
+  const value = Number(rawValue);
+  if (Number.isNaN(value)) return { error: `${key}: must be a number` };
+  if (schema.min != null && value < schema.min) return { error: `${key}: minimum is ${schema.min}` };
+  if (schema.max != null && value > schema.max) return { error: `${key}: maximum is ${schema.max}` };
+  return { value };
+}
+
 /**
  * What a save asks of one setting: { error }, { skip: true } (nothing asked),
  * { reset: true } (its stored value goes) or { value } (to store).
  */
 function checkedSetting(key, schema, rawValue) {
-  if (schema.type === 'number') {
-    if (isEmptyField(rawValue)) return { reset: true };
-    const value = Number(rawValue);
-    if (Number.isNaN(value)) return { error: `${key}: must be a number` };
-    if (schema.min != null && value < schema.min) return { error: `${key}: minimum is ${schema.min}` };
-    if (schema.max != null && value > schema.max) return { error: `${key}: maximum is ${schema.max}` };
-    return { value };
-  }
+  if (schema.type === 'number') return checkedNumber(key, schema, rawValue);
   const value = String(rawValue || '');
   if (schema.type === 'enum') {
     return schema.options?.includes(value)
