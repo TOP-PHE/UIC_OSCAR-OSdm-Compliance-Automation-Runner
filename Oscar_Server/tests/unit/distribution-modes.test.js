@@ -17,12 +17,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const {
-  DISTRIBUTION_MODES, declaredDistributionModes, distributionModeDeclared, distributionModesOf,
+  declaredDistributionModes, distributionModeDeclared, distributionModesOf,
   undeclaredDistributionModes, distributionModesProblem,
 } = require('../../src/utils/distributionModes');
 const { annotateDatafile } = require('../../src/utils/frameworkGating');
 const { catalogueFor } = require('../../src/utils/scenarioCatalogue');
-const { buildReference } = require('../../src/utils/referenceConfiguration');
 
 const ROOT = path.join(__dirname, '..', '..', '..');
 const DATA = path.join(ROOT, 'Bruno_Collection', 'data_base');

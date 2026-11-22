@@ -22,7 +22,7 @@
  * to the server log only; no log line is returned.
  */
 
-const { get, decrypt } = require('../db/db');
+const { get } = require('../db/db');
 const { tokenErrorText } = require('../utils/tokenErrors');
 const { credentialsFor } = require('../utils/testerCredentials');
 const { resolveAccessToken } = require('../worker/access-token');

@@ -194,6 +194,25 @@ describe('js/scenarios.js — setTripFieldByPath', () => {
     expect(trip).toEqual({ trip: { searchCriteria: { via: [{ viaPlace: { stopPlaceRef: 'urn:uic:stn:8500010' } }] } } });
   });
 
+  test('never writes a member every object inherits', () => {
+    const paths = ['__proto__.polluted', 'constructor.prototype.polluted', 'trip.__proto__.polluted',
+      'trip.constructor.polluted', '__proto__', 'trip.constructor', 'trip.prototype', 'polluted.__proto__'];
+    try {
+      for (const path of paths) {
+        const trip = { trip: {} };
+        const { set, context } = setter(trip);
+        set(0, path, 'yes');
+        expect(Object.prototype.polluted).toBeUndefined();
+        expect({}.polluted).toBeUndefined();
+        expect(Object.getPrototypeOf(trip)).toBe(Object.prototype);
+        expect(Object.keys(trip.trip)).toEqual([]);
+        expect(context.dirty).toBe(0);
+      }
+    } finally {
+      delete Object.prototype.polluted;
+    }
+  });
+
   test('a numeric last segment sets an array element', () => {
     const trip = { tags: ['a', 'b'] };
     const { set } = setter(trip);

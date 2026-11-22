@@ -103,6 +103,48 @@ describe('GET /health', () => {
   });
 });
 
+// The two disk checks are kept a few seconds (utils/healthChecks.js): a burst
+// of calls does not write a file each, and a failed check says a code only.
+describe('GET /health — the disk checks', () => {
+  const { forgetDiskChecks } = require('../../src/utils/healthChecks');
+  const probeWrites = spy => spy.mock.calls.filter(([file]) => String(file).endsWith('.health-check')).length;
+
+  afterEach(() => { jest.restoreAllMocks(); forgetDiskChecks(); });
+
+  test('five calls in a row write the probe file once', async () => {
+    forgetDiskChecks();
+    const spy = jest.spyOn(fs, 'writeFileSync');
+    for (let i = 0; i < 5; i++) {
+      const res = await request(app).get('/health');
+      expect(res.status).toBe(200);
+      expect(res.body.checks.data_dir).toEqual({ ok: true, status: 'writable' });
+    }
+    expect(probeWrites(spy)).toBe(1);
+  });
+
+  test('a data folder that cannot be written: 503 with the code, never the path', async () => {
+    forgetDiskChecks();
+    const real = fs.writeFileSync;
+    jest.spyOn(fs, 'writeFileSync').mockImplementation((file, ...rest) => {
+      if (String(file).endsWith('.health-check')) {
+        throw Object.assign(new Error(`EACCES: permission denied, open '${file}'`), { code: 'EACCES' });
+      }
+      return real(file, ...rest);
+    });
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe('degraded');
+    expect(res.body.checks.data_dir).toEqual({ ok: false, status: 'error', error: 'EACCES' });
+    expect(res.text).not.toContain('.health-check');
+    expect(res.text).not.toContain('permission denied');
+  });
+
+  test('the answer carries the rate limit of the route', async () => {
+    const res = await request(app).get('/health');
+    expect(res.headers['ratelimit-limit']).toBe('300');
+  });
+});
+
 // ── CORS fail-closed (tracker S7-cors) ───────────────────────────────────────
 // The test env leaves ALLOWED_ORIGINS unset, so the app is built fail-closed.
 // A cross-origin request must NOT get its origin reflected (the old behaviour
