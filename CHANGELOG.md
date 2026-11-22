@@ -615,7 +615,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-1.11.565] — 2026-11-22
 
-Release 2026.604 (`current_release`). The mail server's settings come from the server's environment (#1363, maintainer's decision of 2026-11-22: the mail server is part of the deployment, as the encryption key and the collection path are, and is set where the server is installed).
+The mail server's settings come from the server's environment (#1363, maintainer's decision of 2026-11-22: the mail server is part of the deployment, as the encryption key and the collection path are, and is set where the server is installed). Not released on its own: listed in `compatibility.json` (2026.604) without moving `current_release`, so no release tag is made; it goes out with the next release (maintainer, 2026-11-22: a release holds a set of changes).
 
 ### Changed
 - **The environment is read first for the mail settings.** `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` and `SMTP_FROM` were saved from *Admin → Server Config* into the database, which won over the environment after the first start. Once the environment names a mail server (`SMTP_HOST`), each of the six is now the environment's; one it leaves out takes its default, never a saved value. `getConfig()` (`db/db.js`) asks the new `utils/mailSettings.js` (pure) first, so the mailer and the Alertmanager file follow without a change. The environment is read at each call.
