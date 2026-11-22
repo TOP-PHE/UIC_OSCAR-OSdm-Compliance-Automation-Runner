@@ -31,7 +31,7 @@ global.validationLogger = (line) => { mockLogs.push(line); };
 
 beforeEach(() => { envStore = {}; mockLogs = []; });
 
-const leg = (category) => new TripLegDefinition(
+const leg = (category) => new global.TripLegDefinition(
   'urn:uic:stn:5457076', '2026-10-24T00:01:00+02:00', 'urn:uic:stn:5433295', '2026-10-24T02:49:00+02:00',
   category.ref, category.name, category.shortName, '579', 'urn:uic:rics:1154',
 );

@@ -31,7 +31,6 @@ app.use(express.json());
 app.use('/v1/company/providers', require('../../src/api/routes/company-providers'));
 app.use('/v1/company',           require('../../src/api/routes/company-run-shares'));
 app.use('/v1/runs',              require('../../src/api/routes/runs'));
-// eslint-disable-next-line no-unused-vars
 app.use((err, req, res, _next) => res.status(500).json({ status: 500, detail: err.message }));
 
 const tag = uuidv4().slice(0, 8);

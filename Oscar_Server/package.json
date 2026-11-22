@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "lint": "eslint src/ public/ && node scripts/lint-inline-scripts.js",
+    "lint": "eslint src/ public/ tests/ scripts/ && npm run lint:library && node scripts/lint-inline-scripts.js",
+    "lint:library": "cd .. && node Oscar_Server/node_modules/eslint/bin/eslint.js -c Oscar_Server/eslint.library.config.js Bruno_Collection/library-bruno --max-warnings 0",
     "lint:fix": "eslint src/ public/ --fix",
     "lint:html": "node scripts/lint-inline-scripts.js",
     "test": "jest",

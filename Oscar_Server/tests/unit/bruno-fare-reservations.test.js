@@ -230,16 +230,14 @@ describe('the Bruno glue', () => {
   const env = {};
   const recorded = [];
   const logged = [];
-  let next = null;
   const realTest = test;
   beforeEach(() => {
     for (const k of Object.keys(env)) delete env[k];
     recorded.length = 0;
     logged.length = 0;
-    next = null;
     global.bru = {
       getEnvVar: (k) => env[k], setEnvVar: (k, v) => { env[k] = v; },
-      runner: { setNextRequest: (n) => { next = n; }, stopExecution: () => {} },
+      runner: { setNextRequest: () => {}, stopExecution: () => {} },
     };
     global.test = (name, fn) => { try { fn(); recorded.push(`${name}: ok`); } catch (e) { recorded.push(`${name}: ${e.message}`); } };
     global.validationLogger = (line) => logged.push(line);

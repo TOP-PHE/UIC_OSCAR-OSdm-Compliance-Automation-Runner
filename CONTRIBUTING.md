@@ -74,7 +74,12 @@ npm test -- tests/unit/foo.test.js  # one file
 
 - **Language**: JavaScript (Node 22+). Files use CommonJS `require`.
 - **Style**: enforced by ESLint (`npm run lint`). LF line endings (see
-  `.gitattributes`).
+  `.gitattributes`). `npm run lint` reads the server and the pages with the
+  server's rules, and the tests, the scripts and the Bruno collection's
+  library with rules that name bugs only (`Oscar_Server/eslint.bug-rules.js`).
+  A library module that needs another one requires it: the list of names
+  shared through the global object (`eslint.library.config.js`) may only get
+  shorter.
 - **Comments**: prose-style, explain *why* (the code shows *what*).
   Architecture decisions worth preserving go into the file's top comment.
 - **Tests**: unit tests under `tests/unit/`, integration under
