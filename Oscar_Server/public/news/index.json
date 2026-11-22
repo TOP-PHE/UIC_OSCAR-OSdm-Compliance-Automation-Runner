@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-22-waiting-runs-ceiling",
+    "date": "November 22, 2026",
+    "tag": "Operations",
+    "title": "A limit on the runs one account has waiting",
+    "summary": "A launch is refused when the person or the Company API account would have more than 5,000 runs queued or running. Nothing changes for a normal campaign.",
+    "content": "OSCAR now limits the runs one person, or one Company API account, has queued or running at the same time, all companies and providers together. The limit is 5,000 by default; an administrator can change it on Server Config.\n\nA campaign is a few hundred scenarios on each of a few providers, so you should never meet it. It is there for an automation that asks for tests in a loop: its runs would fill the queue and the storage that every company shares.\n\nIf a launch is refused for this reason, the message says how many runs are waiting, how many were asked and the limit, and nothing was queued. Wait for the runs to finish, or cancel them on the Dashboard, then launch again. If it comes from your automation, check that it does not ask the same tests again and again."
+  },
+  {
     "id": "2026-11-22-api-account-key-revoked",
     "date": "November 22, 2026",
     "tag": "Improvement",

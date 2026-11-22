@@ -249,7 +249,7 @@ module.exports = {
           } } } },
           400: { description: 'Company config invalid (no datafile, missing creds, etc.)' },
           403: { description: 'Administrators and certifiers do not start runs: only the company\'s Test Managers and testers do' },
-          429: { description: 'Rate limit exceeded' },
+          429: { description: 'Rate limit exceeded; or the person would have more runs queued or running, all companies together, than MAX_WAITING_RUNS_PER_ACCOUNT allows (#1369): { waiting, wanted, limit }, nothing queued' },
         },
       },
     },

@@ -618,6 +618,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.568] — 2026-11-22
+
+A ceiling on the runs an account has waiting (#1369). Not released on its own: listed in `compatibility.json` (2026.607) without moving `current_release`.
+
+### Added
+- **One person or one Company API account has at most `MAX_WAITING_RUNS_PER_ACCOUNT` runs queued or running**, all companies and providers together (Server Config, *Max Waiting Runs per Account*: 5,000 by default, 100 to 100,000). Each launch route limited how often it is called, and none looked at what was already waiting: a pipeline asking again and again could queue tens of thousands of runs, and the queue, the `runs` table and the stored results are shared by every company.
+- **A launch that would go over is refused before anything is queued**: `429` with `{ waiting, wanted, limit }` and a sentence saying to wait for the runs or cancel them. Both routes go through `waitingRoomRefusal()` (`helpers/runLaunch.js`): `POST /v1/runs` once its scenarios are known, `POST /v1/api/test-requests` on the runs of every provider of the request together, before the request is recorded, so its `Idempotency-Key` is not used up.
+- The count reads the partial index of the runs waiting (`INDEXED BY idx_runs_active`), never an account's whole history.
+
+### Documentation
+- *Server Admin Guide* (the Server Config tab), *Test Automation API Guide* (the `429` of a test request), OpenAPI (both launch routes).
+
+### Tests
+- `waiting-runs-ceiling.test.js` (new): the default and a stored value; under, at and over the ceiling on both routes; finished runs not counted, running ones counted; the count across companies; another account not counted; no run, no test request and no used key after a refusal; the count's plan.
+
+---
+
 ## [server-1.11.567] — 2026-11-22
 
 API accounts: an assertion's lifetime counted from the server's clock; a revoked key ends its tokens (#1367). Not released on its own: listed in `compatibility.json` (2026.606) without moving `current_release`.
