@@ -180,8 +180,9 @@ or accept the risk.
 ## 5. Create the first platform admin
 
 The `/v1/auth/bootstrap/platform-user` endpoint is gated by the
-`PLATFORM_BOOTSTRAP_TOKEN` from your `.env`. It can only create the very
-first administrator.
+`PLATFORM_BOOTSTRAP_TOKEN` from your `.env`. It is there to create the very
+first administrator, and it answers for as long as the token is set: clear
+the token once that administrator exists (below).
 
 From the host (or anywhere with HTTPS access once nginx is up):
 
@@ -197,11 +198,21 @@ curl -X POST http://localhost:3001/v1/auth/bootstrap/platform-user \
 Expected response:
 
 ```json
-{ "id": "...", "email": "admin@example.org", "role": "platform_admin" }
+{ "user": { "id": "...", "email": "admin@example.org", "role": "administrator", "company_id": "..." } }
 ```
 
-After this, the bootstrap endpoint returns `409 Conflict` for any further
-attempt — the admin is created via the UI from now on.
+Then clear the token, so that the endpoint creates nobody else. Empty the
+line, then create the container again (a `restart` would keep the old
+value, see the note in section 3):
+
+```bash
+sudo sed -i 's/^PLATFORM_BOOTSTRAP_TOKEN=.*/PLATFORM_BOOTSTRAP_TOKEN=/' /opt/OSCAR/OSCAR_Deploy/.env
+cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose up -d oscar
+```
+
+From then on the endpoint answers `503` ("PLATFORM_BOOTSTRAP_TOKEN is not
+configured on server"), and further administrators are invited from the
+Admin pages by an existing one.
 
 ---
 
@@ -290,6 +301,7 @@ you created in step 5, and start onboarding companies.
 | -------------------------- | ----------------------------------------------------------- |
 | Tail logs                  | `sudo docker compose logs -f oscar`                         |
 | Restart                    | `sudo docker compose restart oscar`                         |
+| Apply a change of `.env`   | `sudo docker compose up -d oscar` (a `restart` keeps the container, and its old values: see the note in section 3) |
 | Upgrade to a new release   | `cd /opt/OSCAR && sudo git pull && cd OSCAR_Deploy && sudo docker compose up -d --build` |
 | Update collection only     | `cd /opt/OSCAR && sudo git pull` (no rebuild needed — collection is bind-mounted) |
 | Backup DB + artifacts      | `sudo docker compose stop oscar && sudo tar czf oscar-backup-$(date +%F).tar.gz data/ && sudo docker compose start oscar` |
