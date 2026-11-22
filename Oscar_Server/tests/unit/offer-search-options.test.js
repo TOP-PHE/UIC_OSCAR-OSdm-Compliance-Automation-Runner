@@ -256,7 +256,7 @@ describe('the Test Framework page', () => {
     expect(html).toContain('data-key="offerModes" data-val="INDIVIDUAL"');
     expect((html.match(/class="pill selected"/g) || []).length).toBe(1 + 8 + 3 + 5 + 13 + 2);
     expect(page).toContain('${offerSearchOptionsPanelHtml(fw)}');
-    expect(page).toContain("case 'fw-offer-search-option':");
+    expect(page).toContain("\n  'fw-offer-search-option': (el) => { fwToggleOfferSearchOption(el, el.dataset.key, el.dataset.val); saveFrameworkDebounced(); },\n");
   });
 });
 
@@ -484,7 +484,8 @@ describe('#780 part 3: the Test Framework page', () => {
     expect(page).toContain('${offerCombinationsHtml(fw)}');
     expect(page).toContain("if (action !== 'fw-offer-combinations') return false;");
     expect(page).toContain('|| changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el) || changeExchange(action, el) || changeTraceContext(action, el)) return;');
-    expect(page).toContain("case 'fw-offer-combinations-new-seed': {");
+    expect(page).toContain("\n  'fw-offer-combinations-new-seed': clickFwOfferCombinationsNewSeed,\n");
+    expect(page).toContain('\nfunction clickFwOfferCombinationsNewSeed() {\n');
   });
 });
 

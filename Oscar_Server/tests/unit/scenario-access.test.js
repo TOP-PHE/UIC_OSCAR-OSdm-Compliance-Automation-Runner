@@ -191,11 +191,25 @@ describe('scenarios.js wiring', () => {
     expect(topLevelFunction('renderScenarioDetail')).toContain('OscarScenarioAccess.isAllowedOnReadOnlyCard(');
   });
 
-  test.each(['click', 'change', 'input'])('the %s delegate refuses a locked control before dispatching', type => {
+  // Where each delegate hands the action over: the click's table of actions
+  // (#1396), the switch of the two others. The handlers tried before it count
+  // as dispatching too, so the refusal must come before the first of them.
+  test.each([
+    ['click', 'CLICK_ACTIONS[action]', 'if (clickFwList(action, el)) return;'],
+    ['change', 'switch (action)', null],
+    ['input', 'switch (action)', null],
+  ])('the %s delegate refuses a locked control before dispatching', (type, dispatch, firstHandler) => {
     const start = SCENARIOS_JS.indexOf(`document.body.addEventListener('${type}', function(e) {`);
     expect(start).toBeGreaterThan(-1);
-    const head = SCENARIOS_JS.slice(start, SCENARIOS_JS.indexOf('switch (action)', start));
+    const end = SCENARIOS_JS.indexOf(dispatch, start);
+    expect(end).toBeGreaterThan(start);
+    const head = SCENARIOS_JS.slice(start, end);
+    expect(head.split('addEventListener(')).toHaveLength(2);   // one delegate, not the next one's too
     expect(head).toContain('if (isLockedControl(el))');
+    if (firstHandler) {
+      expect(head).toContain(firstHandler);
+      expect(head.indexOf('if (isLockedControl(el))')).toBeLessThan(head.indexOf(firstHandler));
+    }
   });
 
   test('each scenario card carries the index isLockedControl looks up', () => {

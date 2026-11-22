@@ -256,6 +256,6 @@ describe('the Test Framework page', () => {
     expect((html.match(/class="pill selected"/g) || []).length).toBe(1);
     expect(html).toContain('data-action="fw-trip-parameter" data-val="VIAS"');
     expect(page).toContain('${tripSearchParametersHtml(fw)}');
-    expect(page).toContain("case 'fw-trip-parameter':");
+    expect(page).toContain("\n  'fw-trip-parameter': (el) => { fwToggleTripSearchParameter(el, el.dataset.val); saveFrameworkDebounced(); },\n");
   });
 });

@@ -643,6 +643,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.573] — 2026-11-22
+
+The click delegate of Test Config is a table of actions, behaviour unchanged (#1396; point M2 of the code quality review for #221, third function). Not released on its own: listed in `compatibility.json` (2026.613) without moving `current_release`. Collection unchanged.
+
+### Changed
+- **A click in Test Config is looked up in a table.** The click delegate of `public/js/scenarios.js` was one function of 499 lines of code and 93 paths: a `switch` of 95 `data-action` values with the code of each in its case, all in one scope. `npm run lint` allows 100 lines and 15 paths.
+  - `CLICK_ACTIONS` holds the 94 actions that do something: 75 are one line that calls (`'toggle-section': (el) => { toggleSection(el.dataset.section); }`), 19 name a function of their own, `click<Action>(el, e)`, written above the table and laid out as the page's other functions, so that a test can run one action alone.
+  - The delegate is 12 lines: the control of the click, the refusal of a locked control (#515), the four handlers that were written before the switch when it reached Sonar's limit of cases (`clickFwList`, `clickDistributionMode`, `clickFarePanel`, `clickScenarioSearch`, kept as they are), then the table. It asks `Object.hasOwn(CLICK_ACTIONS, action)`: every object also answers to names such as `constructor`, which are no action.
+  - The largest new function has 12 paths and 45 lines (`clickAddPax`); the delegate has 9 paths.
+  - The 95th case, `change-pax-category`, only left the switch (the change delegate handles it): it has no entry, its comment is kept.
+  - **A new click action is a line in the table.** The change and input delegates are still switches.
+- **The lint's record goes down.** `scenarios.js`: 29 functions over the path limit become 28, 14 over the line limit become 13. The totals in `lint-config.test.js` go from 105 and 20 to 104 and 19.
+
+### How it was checked
+- **The moved code was not typed again.** A script read the delegate's syntax tree and moved the code of each case as it is; a `break` that left the switch from inside the code became a `return` (14 of them, each a guard of the form `if (…) break;`, listed and read). It stops on what it cannot move safely: a case that falls through, a name shared between two cases, a use of a name of the delegate other than the element and the event. A second script, which reads the two files and nothing of the first, compared them: the 3,998 tokens of the cases' code are the same in the new functions, the 85 before the switch too, and every comment is there.
+- **What a click does, before and after.** The old and the new delegate were run as they are in their file, in a scope where every name they do not declare is a recorder: the page's 96 functions (the call and its arguments are written down), the page's elements (every read, write and call), `confirm`, `fetch`. What a recorder answers (an element found or not, a confirmation, the data file, the passengers, an answer of the server) is drawn by a seeded generator, the same for both. On 50,000 clicks (the 95 actions and 5 names that are no action, 500 draws each): the same 470,395 lines in the same order and the same data at the end.
+  - Those clicks run the 385 lines of code of the new functions, the table and the delegate, each of them often: a first draw reached one path in 2 clicks of 50,000, which checks nothing, and was tuned.
+  - **The comparison sees a fault.** 366 faults were put in the new code, one at a time (a condition negated, the answers of a `? :` swapped, `&&` and `||` exchanged, a comparison turned round, a statement removed, a number changed), each run on 20,000 clicks with two unchanged copies beside as a control: 366 seen (363 by a trace that differs, 3 by a loop that no longer ends), the two controls not. A first count had left 9 not seen, each a number changed that the draw could not tell from the right one (an index of one digit read in base 11, one entry removed from a list of one, a default age no drawn passenger used, a first id in a data file whose ids are all numbers): the draw was given those cases, and the count made again.
+- **The page in a browser.** A throwaway server with the simulator gamma reference (212 scenarios, 45 Test Data entries), Test Config opened as a Test Manager, 184 real clicks chosen by what the page shows at each step; after each, the page's HTML, the data file and the wizard's data are hashed, and every write the page asks for is answered without being made and kept (123 of them). The old and the new script give the same 184 results, 148 of them different from one another; two passes of the new script give the same; a fault put on purpose in the new script changes 13 of them. 68 of the 94 actions were reached by a real element; the others need a state that set-up does not have (a journey opened, a probe's answer, an empty company) and are held by the 50,000 clicks above.
+
+### Tests
+- Nine assertions in eight test files pinned the text `case '<action>':` of a click: they pin the table's line. `scenario-access.test.js` read "the head of the click delegate" up to the next `switch (action)`, which is now the change delegate's: it stops at the table, and also asks that the refusal of a locked control comes before the first handler.
+- `ui-scripts.test.js`: 13 tests run the page's own text, from `findAction()` to the end of the click delegate, with recorders for the rest: an action of the table gets the values of its element, after the refusal and the handlers tried first; a click inside a control is the control's; a function of its own gets the element, and the event when it uses it; `constructor`, `toString`, `__proto__` and the like do nothing; a locked control is refused first; a handler that takes the action ends the click; each entry is one line or the name of a function that is there, no action twice, and no action that the page never draws. 15 faults put in the page's script one at a time: the tests fail on each, and pass without.
+
+### Not done here
+- The change and input delegates of `scenarios.js`, and the other functions of M2 (`postCreateBookingResponse`, `mergeTesterSave`): one pull request each.
+- `refresh-sections` is an action that nothing in the page draws. It was a case of the switch and is an entry of the table: removing it would be a change of behaviour, and is not this pull request's.
+
 ## [server-1.11.572] — 2026-11-22
 
 `runSteps()` of the runner split by stage, behaviour unchanged (#1390; point M2 of the code quality review for #221, second function). Not released on its own: listed in `compatibility.json` (2026.612) without moving `current_release`. Collection unchanged.

@@ -8753,6 +8753,498 @@ function findAction(target) {
   return null;
 }
 
+// What a click on an element does, by the element's data-action (#1396).
+// One function per action that does more than call another; the others are
+// written in the table below, CLICK_ACTIONS. Each takes the element that
+// carries the action, and the event when it uses it.
+function clickToggleParamSection(el) {
+  const body  = el.nextElementSibling;
+  const arrow = el.querySelector('.ps-arrow');
+  if (body) body.classList.toggle('open');
+  if (arrow) arrow.classList.toggle('open');
+}
+
+function clickAddPax(el, e) {
+  e.stopPropagation();
+  const pIdx = Number.parseInt(el.dataset.pidx);
+  const scIdx = Number.parseInt(el.dataset.scenidx);
+  const typeSelect = document.getElementById(`add-pax-type-${esc(pIdx)}`);
+  const category = typeSelect ? typeSelect.value : 'ADULT';
+  const osdmType = WIZ_PAX_TO_OSDM_TYPE[category] || 'PERSON';
+  const isHuman = WIZ_HUMAN_PAX_TYPES.includes(category);
+  const paxList = state.passengersList[pIdx];
+  if (!paxList?.passengers) return;
+  const companySlug = (wizProfile.slug || wizProfile.company_name || 'company').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const fn = randomPick(WIZ_RANDOM_FIRST_NAMES);
+  const ln = randomPick(WIZ_RANDOM_LAST_NAMES);
+  const ageRange = WIZ_PAX_DEFAULT_AGES[category] || { min: 18, max: 99 };
+  // Newly-added passenger has no gender by default ("None"). The user
+  // explicitly picks one via the dropdown in the row — at which point
+  // set-pax sets the field. Omitting from the initial object means the
+  // data file JSON does not carry `gender: "X"` until the user asks for it.
+  const newPax = {
+    // 5-digit zero-padded — see comment at wizGenPassengers() for rationale.
+    reference: String(paxList.passengers.length + 1).padStart(5, '0'),
+    type: osdmType,
+    category: category,
+    firstName: fn,
+    lastName: ln,
+    dateOfBirth: isHuman ? genDateOfBirth(ageRange.min, ageRange.max) : '',
+    email: `${fn.toLowerCase()}.${ln.toLowerCase()}@${companySlug}.com`,
+    phoneNumber: genPhone(),
+    updateFirstName: randomPick(WIZ_RANDOM_FIRST_NAMES),
+    updateLastName: randomPick(WIZ_RANDOM_LAST_NAMES),
+    updateDateOfBirth: isHuman ? genDateOfBirth(ageRange.min, ageRange.max) : '',
+    updatePhoneNumber: genPhone(),
+    updateEmail: `updated@${companySlug}.com`
+  };
+  paxList.passengers.push(newPax);
+  markDirty();
+  // Re-render the detail for this scenario
+  const detail = document.getElementById(`detail-${esc(scIdx)}`);
+  if (detail?.innerHTML) {
+    renderScenarioDetail(detail, scIdx);
+    // Re-open the passengers section
+    detail.querySelectorAll('.param-section-body').forEach(b => b.classList.remove('open'));
+    detail.querySelectorAll('.ps-arrow').forEach(a => a.classList.remove('open'));
+    const sections = detail.querySelectorAll('.param-section-head');
+    sections.forEach(h => {
+      if (h.textContent.includes('Passengers')) {
+        h.nextElementSibling?.classList.add('open');
+        h.querySelector('.ps-arrow')?.classList.add('open');
+      }
+    });
+  }
+}
+
+function clickTogglePaxEdit(el, e) {
+  e.stopPropagation();
+  const tpIdx = Number.parseInt(el.dataset.pidx);
+  const tpPi  = Number.parseInt(el.dataset.pi);
+  const key   = tpIdx + ':' + tpPi;
+  const panel = cardElementById(el, 'pax-edit-' + tpIdx + '-' + tpPi);
+  const row   = panel?.previousElementSibling;
+  const nowOpen = !_paxEditOpen.has(key);
+  if (nowOpen) _paxEditOpen.add(key); else _paxEditOpen.delete(key);
+  if (panel) panel.style.display = nowOpen ? 'block' : 'none';
+  if (el)    el.textContent = (el.dataset.verb || 'Edit') + (nowOpen ? ' ▴' : ' ▾');
+  if (row)   row.style.borderBottom = nowOpen ? 'none' : '1px solid #f0f0f0';
+}
+
+function clickAddPaxReduction(el, e) {
+  e.stopPropagation();
+  const arIdx = Number.parseInt(el.dataset.pidx);
+  const arPi  = Number.parseInt(el.dataset.pi);
+  const arList = state.passengersList[arIdx];
+  const arPax  = arList?.passengers?.[arPi];
+  if (!arPax) return;
+  if (!Array.isArray(arPax.reductionCards)) arPax.reductionCards = [];
+  arPax.reductionCards.push('');
+  markDirty();
+  // Append the new row just before the "+ Add" button so indexes stay contiguous.
+  // The rows below are editable (readOnly false): isLockedControl has
+  // already refused this action on a read-only card.
+  const container = cardElementById(el, 'pax-reductions-' + arIdx + '-' + arPi);
+  if (container) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = buildReductionCardRow(arIdx, arPi, arPax.reductionCards.length - 1, '', false);
+    const newRow = tmp.firstElementChild;
+    const addBtn = container.querySelector('[data-action="add-pax-reduction"]');
+    if (addBtn) addBtn.before(newRow); else container.append(newRow);
+    // Focus the new input so the user can start typing immediately.
+    const input = newRow.querySelector('input[data-action="set-pax-reduction"]');
+    if (input) input.focus();
+  }
+}
+
+function clickRemovePaxReduction(el, e) {
+  e.stopPropagation();
+  const rrIdx = Number.parseInt(el.dataset.pidx);
+  const rrPi  = Number.parseInt(el.dataset.pi);
+  const rrCi  = Number.parseInt(el.dataset.cidx);
+  const rrList = state.passengersList[rrIdx];
+  const rrPax  = rrList?.passengers?.[rrPi];
+  if (!rrPax || !Array.isArray(rrPax.reductionCards)) return;
+  rrPax.reductionCards.splice(rrCi, 1);
+  markDirty();
+  // Rebuild the card list for this passenger to keep data-cidx values
+  // contiguous with the underlying array indices.
+  const container = cardElementById(el, 'pax-reductions-' + rrIdx + '-' + rrPi);
+  if (container) {
+    container.innerHTML = rrPax.reductionCards.map((code, ci) =>
+      buildReductionCardRow(rrIdx, rrPi, ci, code, false)
+    ).join('') + `<button class="btn btn-sm btn-secondary" data-action="add-pax-reduction" data-pidx="${rrIdx}" data-pi="${rrPi}" style="font-size:11px;margin-top:6px">➕ Add reduction card</button>`;
+  }
+}
+
+function clickAddPaxLoyalty(el, e) {
+  e.stopPropagation();
+  const alIdx = Number.parseInt(el.dataset.pidx);
+  const alPi  = Number.parseInt(el.dataset.pi);
+  const alList = state.passengersList[alIdx];
+  const alPax  = alList?.passengers?.[alPi];
+  if (!alPax) return;
+  if (!Array.isArray(alPax.loyaltyCards)) alPax.loyaltyCards = [];
+  alPax.loyaltyCards.push({ carrierCode: '', cardReference: '' });
+  markDirty();
+  const container = cardElementById(el, 'pax-loyalties-' + alIdx + '-' + alPi);
+  if (container) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = buildLoyaltyCardRow(alIdx, alPi, alPax.loyaltyCards.length - 1, {}, false);
+    const newRow = tmp.firstElementChild;
+    const addBtn = container.querySelector('[data-action="add-pax-loyalty"]');
+    if (addBtn) addBtn.before(newRow); else container.append(newRow);
+    const input = newRow.querySelector('input[data-field="carrierCode"]');
+    if (input) input.focus();
+  }
+}
+
+function clickRemovePaxLoyalty(el, e) {
+  e.stopPropagation();
+  const rlIdx = Number.parseInt(el.dataset.pidx);
+  const rlPi  = Number.parseInt(el.dataset.pi);
+  const rlCi  = Number.parseInt(el.dataset.cidx);
+  const rlList = state.passengersList[rlIdx];
+  const rlPax  = rlList?.passengers?.[rlPi];
+  if (!rlPax || !Array.isArray(rlPax.loyaltyCards)) return;
+  rlPax.loyaltyCards.splice(rlCi, 1);
+  markDirty();
+  const container = cardElementById(el, 'pax-loyalties-' + rlIdx + '-' + rlPi);
+  if (container) {
+    container.innerHTML = rlPax.loyaltyCards.map((card, ci) =>
+      buildLoyaltyCardRow(rlIdx, rlPi, ci, card, false)
+    ).join('') + `<button class="btn btn-sm btn-secondary" data-action="add-pax-loyalty" data-pidx="${rlIdx}" data-pi="${rlPi}" style="font-size:11px;margin-top:6px">➕ Add loyalty card</button>`;
+  }
+}
+
+function clickRemovePax(el, e) {
+  e.stopPropagation();
+  const rpIdx = Number.parseInt(el.dataset.pidx);
+  const rpPi = Number.parseInt(el.dataset.pi);
+  const rpList = state.passengersList[rpIdx];
+  if (!rpList?.passengers || rpList.passengers.length <= 1) return;
+  if (!confirm(`Remove passenger ${rpPi + 1}?`)) return;
+  rpList.passengers.splice(rpPi, 1);
+  // When a passenger is removed, drop its stale Edit-open entry so the
+  // remaining passengers don't inherit an expanded state at their index.
+  _paxEditOpen.delete(rpIdx + ':' + rpPi);
+  // Re-number references — 5-digit zero-padded; see comment at wizGenPassengers().
+  rpList.passengers.forEach((p, i) => p.reference = String(i + 1).padStart(5, '0'));
+  markDirty();
+  // Find which scenario detail is open and re-render
+  document.querySelectorAll('.scenario-detail').forEach(det => {
+    if (det.innerHTML && det.id.startsWith('detail-')) {
+      const sIdx = Number.parseInt(det.id.replace('detail-', ''));
+      const sc = state.scenarios[sIdx];
+      if (sc && sc.passengersListId === rpList.id) {
+        renderScenarioDetail(det, sIdx);
+        det.querySelectorAll('.param-section-body').forEach(b => b.classList.remove('open'));
+        det.querySelectorAll('.ps-arrow').forEach(a => a.classList.remove('open'));
+        det.querySelectorAll('.param-section-head').forEach(h => {
+          if (h.textContent.includes('Passengers')) {
+            h.nextElementSibling?.classList.add('open');
+            h.querySelector('.ps-arrow')?.classList.add('open');
+          }
+        });
+      }
+    }
+  });
+}
+
+function clickToggleShared(el, e) {
+  e.stopPropagation();
+  const sIdx = Number.parseInt(el.dataset.idx);
+  const sc = state.scenarios[sIdx];
+  if (sc) {
+    sc.shared = !sc.shared;
+    if (sc.shared && !sc.created_by) sc.created_by = user.email || '';
+    if (sc.shared && !sc.version) sc.version = '1.0';
+    markDirty();
+    renderAll();
+  }
+}
+
+function clickToggleSalesAction(el, e) {
+  e.stopPropagation();
+  const tsaIdx = Number.parseInt(el.dataset.idx);
+  const key = el.dataset.key;
+  const sc = state.scenarios[tsaIdx];
+  if (!sc || !key) return;
+  if (!sc.salesFlowActions || typeof sc.salesFlowActions !== 'object') {
+    sc.salesFlowActions = defaultSalesFlowActions();
+  }
+  // Explicit flip: true ↔ false. Anything else (undefined, null) is
+  // treated as false for the toggle purpose and becomes true.
+  sc.salesFlowActions[key] = sc.salesFlowActions[key] !== true;
+  el.classList.toggle('selected', sc.salesFlowActions[key]);
+  markDirty();
+}
+
+function clickTogglePlaceProbe(el, e) {
+  e.stopPropagation();
+  const ppIdx = Number.parseInt(el.dataset.idx);
+  const ppKey = el.dataset.key;
+  const ppSc = state.scenarios[ppIdx];
+  if (!ppSc || !ppKey) return;
+  if (!ppSc.placeSelectionProbes || typeof ppSc.placeSelectionProbes !== 'object') {
+    ppSc.placeSelectionProbes = {};
+  }
+  ppSc.placeSelectionProbes[ppKey] = ppSc.placeSelectionProbes[ppKey] !== true;
+  markDirty();
+  // Re-render so the sub-group + top NHF badges follow the toggle (the
+  // re-render preserves open/closed sub-sections by header text).
+  reRenderScenarioDetail(ppIdx);
+}
+
+function clickSetAccommodationSelection(el, e) {
+  // #373: single-select accommodation family (Seat/Couchette/Berth);
+  // '' (— any —) clears the field → current default behaviour.
+  e.stopPropagation();
+  const accIdx = Number.parseInt(el.dataset.idx);
+  const accSc = state.scenarios[accIdx];
+  if (!accSc) return;
+  accSc.accommodationSelection = el.dataset.val || null;
+  const accGrp = el.parentElement;
+  if (accGrp) accGrp.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === el));
+  markDirty();
+}
+
+function clickSetAccommodationGender(el, e) {
+  // #211: single-select gender-segregation preference (MEN/LADIES/MIXED)
+  // for night-train COUCHETTE/BERTH compartments; '' (— any —) clears it.
+  e.stopPropagation();
+  const genIdx = Number.parseInt(el.dataset.idx);
+  const genSc = state.scenarios[genIdx];
+  if (!genSc) return;
+  genSc.accommodationGenderPreference = el.dataset.val || null;
+  const genGrp = el.parentElement;
+  if (genGrp) genGrp.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === el));
+  markDirty();
+}
+
+function clickToggleBookMandatoryReservations(el, e) {
+  // #239: single boolean toggle — book via optionalReservationSelections.
+  e.stopPropagation();
+  const mrIdx = Number.parseInt(el.dataset.idx);
+  const mrSc = state.scenarios[mrIdx];
+  if (!mrSc) return;
+  mrSc.bookMandatoryReservations = mrSc.bookMandatoryReservations !== true;
+  el.classList.toggle('selected', mrSc.bookMandatoryReservations === true);
+  el.title = mrSc.bookMandatoryReservations ? 'Enabled — click to disable' : 'Disabled (default) — click to enable';
+  markDirty();
+}
+
+function clickSetPlaceMode(el, e) {
+  // Single-select seat-selection mode (issue #107). Constrained at render
+  // time to the framework's supported modes.
+  e.stopPropagation();
+  const spmIdx = Number.parseInt(el.dataset.idx);
+  const spmSc = state.scenarios[spmIdx];
+  if (!spmSc) return;
+  spmSc.placeSelectionMode = el.dataset.val;
+  const grp = el.parentElement;
+  if (grp) grp.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === el));
+  markDirty();
+}
+
+function clickDuplicateScenario(el, e) {
+  e.stopPropagation();
+  const dupIdx = Number.parseInt(el.dataset.idx);
+  const original = state.scenarios[dupIdx];
+  if (!original) return;
+
+  const copy = structuredClone(original);
+  // Unique scenario code — keep appending _COPY / _COPY_COPY until we
+  // find one not already used. Prevents silent duplicate collisions
+  // that would then break scenariosToRun indexing.
+  let newCode = original.code + '_COPY';
+  while (state.scenarios.some(s => s.code === newCode)) newCode += '_COPY';
+  copy.code = newCode;
+  copy.shared = false;
+  copy.created_by = user.email || '';
+  copy.version = '1.0';
+
+  // Allocate a fresh numeric id for each referenced list and deep-clone
+  // the source list record. Without this the copy would point at the
+  // same trip / passengers / purchaser / fulfillment records as the
+  // original, so editing one would silently mutate the other — a
+  // classic aliasing bug in the earlier duplicate implementation.
+  const maxId = (arr) => arr?.length
+    ? Math.max(...arr.map(x => x && typeof x.id === 'number' ? x.id : 0))
+    : 0;
+  let nextId = Math.max(
+    maxId(state.tripRequirements),
+    maxId(state.passengersList),
+    maxId(state.purchaserList),
+    maxId(state.requestedFulfillmentOptionsList)
+  ) + 1;
+
+  function cloneListEntry(arrName, sourceId) {
+    const arr = state[arrName] = state[arrName] || [];
+    const src = arr.find(x => x && x.id === sourceId);
+    if (!src) return null;
+    const clone = structuredClone(src);
+    clone.id = nextId++;
+    arr.push(clone);
+    return clone.id;
+  }
+
+  const newTripId  = cloneListEntry('tripRequirements',  original.tripRequirementId);
+  const newPaxId   = cloneListEntry('passengersList',    original.passengersListId);
+  const newPurchId = cloneListEntry('purchaserList',     original.purchaserListId);
+  const newFulfId  = cloneListEntry('requestedFulfillmentOptionsList', original.requestedFulfillmentOptionsListId);
+  if (newTripId  != null) copy.tripRequirementId                 = newTripId;
+  if (newPaxId   != null) copy.passengersListId                  = newPaxId;
+  if (newPurchId != null) copy.purchaserListId                   = newPurchId;
+  if (newFulfId  != null) copy.requestedFulfillmentOptionsListId = newFulfId;
+
+  state.scenarios.push(copy);
+  markDirty();
+  renderAll();
+}
+
+function clickFwOfferCombinationsNewSeed() {
+  const input = document.getElementById('fw-offer-combinations-seed');
+  const seed = fwNewOfferCombinationSeed();
+  if (input) input.value = seed;
+  saveFrameworkDebounced();
+}
+
+function clickWizReprobeOffers(el) {
+  // #369: manual refresh of the per-route offer-availability findings.
+  el.disabled = true; const _oldTxt = el.textContent; el.textContent = 'Re-probing…';
+  (async () => {
+    try {
+      const r = await fetch('/v1/company/test-resources/reprobe-offers', { method: 'POST' });
+      const b = await r.json().catch(() => ({}));
+      if (!r.ok) { oscarToast(`Re-probe failed: ${b.detail || b.title || ('HTTP ' + r.status)}`, 'error'); return; }
+      const warn = (b.routes || []).reduce((n2, x) => n2 + ((x.findings || []).length), 0);
+      oscarToast(`Re-probed ${ (b.routes || []).length } route(s), updated ${b.updated} train set(s) — ${warn} finding(s).`, warn ? 'warn' : 'success');
+      await refreshAllSections();
+    } catch (error_) {
+      oscarToast('Re-probe network error: ' + error_.message, 'error');
+    } finally { el.disabled = false; el.textContent = _oldTxt; }
+  })().catch(reportActionError);
+}
+
+function clickTrainRemoveService(el) {
+  const _tb = el.closest('tbody');
+  const _m = _tb && /^tf-(\d+)-services$/.exec(_tb.id || '');
+  if (_m) trainRemoveService(Number.parseInt(_m[1], 10), el);
+}
+
+// Each action of a click and what it does: one line that calls, or the name
+// of a function above. A new action is a line here. An action that is not
+// here does nothing.
+const CLICK_ACTIONS = {
+  // ── Static / section actions ──────────────────────────────────────────────
+  'download-json': () => { downloadJson().catch(reportActionError); },
+  'download-edits': () => { downloadUnsavedEdits(); },
+  'download-scenarios': () => { downloadScenarios().catch(reportActionError); },
+  'download-configuration': () => { downloadConfiguration().catch(reportActionError); },
+  'config-import-run': () => { runConfigurationImport().catch(reportActionError); },
+  'close-config-panel': () => { closeConfigPanels(); },
+  'restore-previous': () => { restorePreviousDatafile().catch(reportActionError); },
+  'save-datafile': () => { saveDatafile().catch(reportActionError); },
+  'toggle-section': (el) => { toggleSection(el.dataset.section); },
+  'toggle-param-section': clickToggleParamSection,
+  'delete-framework': (el, e) => { e.stopPropagation(); deleteFramework().catch(reportActionError); },
+  'delete-all-test-data': (el, e) => { e.stopPropagation(); deleteAllTestData().catch(reportActionError); },
+  'delete-all-scenarios': (el, e) => { e.stopPropagation(); deleteAllScenarios().catch(reportActionError); },
+  'create-framework': () => { wizData.framework = emptyFramework(); renderWizardStep1InSection(); toggleSection('framework'); },
+  'save-framework': () => { saveFrameworkFromSection().catch(reportActionError); },
+  'add-train-section': () => { renderWizardStep2InSection(); toggleSection('data'); },
+  'open-scenario-creator': () => { openScenarioCreator(); },
+  'select-all': (el) => { selectAll(el.dataset.checked === 'true'); },
+  'delete-datafile': () => { deleteDatafile().catch(reportActionError); },
+  // ── Scenario list actions ─────────────────────────────────────────────────
+  'toggle-detail': (el) => { toggleDetail(Number.parseInt(el.dataset.idx)); },
+  'delete-scenario': (el, e) => { e.stopPropagation(); deleteScenario(Number.parseInt(el.dataset.idx)); },
+  'add-pax': clickAddPax,
+  // 'change-pax-category' does nothing here. Handled in change delegation below.
+  'toggle-pax-edit': clickTogglePaxEdit,
+  'add-pax-reduction': clickAddPaxReduction,
+  'remove-pax-reduction': clickRemovePaxReduction,
+  'add-pax-loyalty': clickAddPaxLoyalty,
+  'remove-pax-loyalty': clickRemovePaxLoyalty,
+  'remove-pax': clickRemovePax,
+  'toggle-shared': clickToggleShared,
+  'toggle-sales-action': clickToggleSalesAction,
+  'toggle-place-probe': clickTogglePlaceProbe,
+  'set-accommodation-selection': clickSetAccommodationSelection,
+  'set-accommodation-gender': clickSetAccommodationGender,
+  'toggle-book-mandatory-reservations': clickToggleBookMandatoryReservations,
+  'set-place-mode': clickSetPlaceMode,
+  'duplicate-scenario': clickDuplicateScenario,
+  // ── Framework wizard (Step 1) ─────────────────────────────────────────────
+  // All fw-* actions that mutate wizData.framework trigger saveFrameworkDebounced()
+  // so the state is persisted without the user needing to click "💾 Save Framework".
+  // The fw-toggle action (expand/collapse header) is the only exception — it's
+  // purely visual and never touches the model.
+  'fw-toggle': (el) => { fwToggle(el); },
+  'fw-toggle-irops': (el) => { fwToggleIrops(el.dataset.type, el.dataset.code, el); saveFrameworkDebounced(); },
+  'fw-toggle-aftersales': (el) => { fwToggleAfterSales(el.dataset.val); saveFrameworkDebounced(); },
+  'fw-partial-scope': (el) => { fwTogglePartialScope(el, el.dataset.val); saveFrameworkDebounced(); },
+  'fw-pill': (el) => { fwTogglePill(el, el.dataset.mode, el.dataset.group, el.dataset.val); saveFrameworkDebounced(); },
+  'fw-offer-pill': (el) => { fwToggleOfferPill(el, el.dataset.group, el.dataset.val); saveFrameworkDebounced(); },
+  'fw-pax-type': (el) => { fwTogglePaxType(el, el.dataset.val); saveFrameworkDebounced(); },
+  'fw-ancillary': (el) => { fwToggleSimplePill(el, 'ancillaries', el.dataset.val); saveFrameworkDebounced(); },
+  'fw-offer-request-form': (el) => { fwToggleOfferRequestForm(el, el.dataset.val); saveFrameworkDebounced(); },
+  'fw-offer-search-option': (el) => { fwToggleOfferSearchOption(el, el.dataset.key, el.dataset.val); saveFrameworkDebounced(); },
+  'fw-trip-parameter': (el) => { fwToggleTripSearchParameter(el, el.dataset.val); saveFrameworkDebounced(); },
+  'fw-offer-combinations-new-seed': clickFwOfferCombinationsNewSeed,
+  'fw-place-selection-flow': (el) => { fwTogglePlaceSelectionFlow(el, el.dataset.val); saveFrameworkDebounced(); },
+  'fw-return-model': (el) => { fwToggleSimplePill(el, 'returnModels', el.dataset.val); refreshReturnVersionNote(); saveFrameworkDebounced(); },
+  'fw-remove-ancillary': (el) => { fwRemoveAncillary(el.dataset.val); },
+  'fw-add-ancillary': () => { fwAddCustomAncillary(); },
+  // ── Pill toggle (simple self-toggle) ──────────────────────────────────────
+  'pill-toggle': (el) => { el.classList.toggle('selected'); },
+  // ── Train resource actions (Step 2) ───────────────────────────────────────
+  'toggle-train-detail': (el) => { toggleTrainDetail(Number.parseInt(el.dataset.tidx)); },
+  'wiz-delete-resource': (el, e) => { e.stopPropagation(); wizDeleteResource(el.dataset.id).catch(reportActionError); },
+  'wiz-add-train': () => { wizAddTrain(); },
+  'wiz-duplicate-train': (el, e) => { e.stopPropagation(); wizDuplicateTrain(Number.parseInt(el.dataset.tidx)); },
+  'wiz-save-train': (el) => { wizSaveTrain(Number.parseInt(el.dataset.tidx)).catch(reportActionError); },
+  'wiz-save-all-trains': () => { wizSaveAllTrains().catch(reportActionError); },
+  'wiz-discover-timetable': () => { openTimetableDiscovery(); },
+  'wiz-download-places': (el) => { downloadPlaces(el).catch(reportActionError); },
+  'wiz-fill-calendars': (el) => { fillMissingCalendars(el).catch(reportActionError); },
+  'wiz-reprobe-offers': clickWizReprobeOffers,
+  'tt-discover-run': () => { runTimetableDiscovery().catch(reportActionError); },
+  'tt-discover-close': () => { closeTimetableDiscovery(); },
+  'train-add-service': (el) => { trainAddService(Number.parseInt(el.dataset.tidx)); },
+  'train-remove-service': clickTrainRemoveService,
+  'train-paste-service': (el) => { trainPasteServices(Number.parseInt(el.dataset.tidx)); },
+  // ── Journey actions (Step 2, #137) ────────────────────────────────────────
+  'toggle-journey-detail': (el) => { toggleJourneyDetail(Number.parseInt(el.dataset.jidx)); },
+  'wiz-add-journey': () => { wizAddJourney(); },
+  'wiz-find-journeys': () => { openJourneyFinder(); },
+  'jf-run': () => { runJourneyFinder(); },
+  'jf-close': () => { closeJourneyFinder(); },
+  'jf-probe': (el) => { journeyFinderProbe(Number.parseInt(el.dataset.idx, 10)).catch(reportActionError); },
+  'probe-keep-trip': (el, e) => { e.stopPropagation(); keepProbedTrip(el.dataset.key, Number.parseInt(el.dataset.idx, 10)).catch(reportActionError); },
+  'probe-replace-journey': (el, e) => { e.stopPropagation(); replaceProbedJourney(el.dataset.key).catch(reportActionError); },
+  'jf-create': (el) => { journeyFinderCreate(Number.parseInt(el.dataset.idx, 10)); },
+  'wiz-duplicate-journey': (el, e) => { e.stopPropagation(); wizDuplicateJourney(Number.parseInt(el.dataset.jidx)); },
+  'wiz-delete-journey': (el, e) => { e.stopPropagation(); wizDeleteJourney(el.dataset.id).catch(reportActionError); },
+  'wiz-probe-journey': (el, e) => { e.stopPropagation(); wizProbeJourney(Number.parseInt(el.dataset.jidx, 10), el.dataset.id).catch(reportActionError); },
+  'wiz-save-journey': (el) => { wizSaveJourney(Number.parseInt(el.dataset.jidx)).catch(reportActionError); },
+  'journey-add-leg': (el) => { journeyAddLeg(Number.parseInt(el.dataset.jidx)); },
+  'journey-remove-leg': (el) => { journeyRemoveLeg(Number.parseInt(el.dataset.jidx), Number.parseInt(el.dataset.li)); },
+  'journey-move-leg': (el) => { journeyMoveLeg(Number.parseInt(el.dataset.jidx), Number.parseInt(el.dataset.li), Number.parseInt(el.dataset.dir)); },
+  // ── Scenario creation (Step 3) ────────────────────────────────────────────
+  'wiz-scen-type': (el) => { wizSetScenType(el.dataset.val); },
+  'wiz-sub-type': (el) => { wizSetSubType(el.dataset.val); },
+  'wiz-action': (el) => { wizSetAction(el.dataset.val); },
+  'wiz-trip-type': (el) => { wizSetTripType(el.dataset.val); },
+  'wiz-pax': (el) => { wizAdjustPax(el.dataset.type, Number.parseInt(el.dataset.delta)); },
+  'wiz-scen-array': (el) => { wizToggleScenArray(el.dataset.field, el.dataset.val, el); },
+  'wiz-generate': () => { wizGenerateScenario().catch(reportActionError); },
+  'goto-section2': (el, e) => { e.preventDefault(); renderWizardStep2InSection(); toggleSection('data'); },
+  'refresh-sections': (el, e) => { e.preventDefault(); refreshAllSections().catch(reportActionError); },
+  'create-another': (el, e) => { e.preventDefault(); wizInitScenario(); reRenderStep3InSection(); },
+};
+
 document.body.addEventListener('click', function(e) {
   const el = findAction(e.target);
   if (!el) return;
@@ -8761,560 +9253,16 @@ document.body.addEventListener('click', function(e) {
   // (preventDefault also undoes a checkbox tick before its change event).
   if (isLockedControl(el)) { e.preventDefault(); return; }
   const action = el.dataset.action;
-  if (clickFwList(action, el)) return;   // #887, before the switch (Sonar S1479)
-  if (clickDistributionMode(action, el)) return;   // #936, likewise
-  if (clickFarePanel(action, el)) return;   // #937, likewise
-  if (clickScenarioSearch(action)) return;   // #1314, likewise
-
-  switch (action) {
-    // ── Static / section actions ──────────────────────────────────────────────
-    case 'download-json':
-      downloadJson().catch(reportActionError); break;
-    case 'download-edits':
-      downloadUnsavedEdits(); break;
-    case 'download-scenarios':
-      downloadScenarios().catch(reportActionError); break;
-    case 'download-configuration':
-      downloadConfiguration().catch(reportActionError); break;
-    case 'config-import-run':
-      runConfigurationImport().catch(reportActionError); break;
-    case 'close-config-panel':
-      closeConfigPanels(); break;
-    case 'restore-previous':
-      restorePreviousDatafile().catch(reportActionError); break;
-    case 'save-datafile':
-      saveDatafile().catch(reportActionError); break;
-    case 'toggle-section':
-      toggleSection(el.dataset.section); break;
-    case 'toggle-param-section': {
-      const body  = el.nextElementSibling;
-      const arrow = el.querySelector('.ps-arrow');
-      if (body) body.classList.toggle('open');
-      if (arrow) arrow.classList.toggle('open');
-      break;
-    }
-    case 'delete-framework':
-      e.stopPropagation(); deleteFramework().catch(reportActionError); break;
-    case 'delete-all-test-data':
-      e.stopPropagation(); deleteAllTestData().catch(reportActionError); break;
-    case 'delete-all-scenarios':
-      e.stopPropagation(); deleteAllScenarios().catch(reportActionError); break;
-    case 'create-framework':
-      wizData.framework = emptyFramework(); renderWizardStep1InSection(); toggleSection('framework'); break;
-    case 'save-framework':
-      saveFrameworkFromSection().catch(reportActionError); break;
-    case 'add-train-section':
-      renderWizardStep2InSection(); toggleSection('data'); break;
-    case 'open-scenario-creator':
-      openScenarioCreator(); break;
-    case 'select-all':
-      selectAll(el.dataset.checked === 'true'); break;
-    case 'delete-datafile':
-      deleteDatafile().catch(reportActionError); break;
-
-    // ── Scenario list actions ─────────────────────────────────────────────────
-    case 'toggle-detail':
-      toggleDetail(Number.parseInt(el.dataset.idx)); break;
-    case 'delete-scenario':
-      e.stopPropagation(); deleteScenario(Number.parseInt(el.dataset.idx)); break;
-    case 'add-pax': {
-      e.stopPropagation();
-      const pIdx = Number.parseInt(el.dataset.pidx);
-      const scIdx = Number.parseInt(el.dataset.scenidx);
-      const typeSelect = document.getElementById(`add-pax-type-${esc(pIdx)}`);
-      const category = typeSelect ? typeSelect.value : 'ADULT';
-      const osdmType = WIZ_PAX_TO_OSDM_TYPE[category] || 'PERSON';
-      const isHuman = WIZ_HUMAN_PAX_TYPES.includes(category);
-      const paxList = state.passengersList[pIdx];
-      if (!paxList?.passengers) break;
-      const companySlug = (wizProfile.slug || wizProfile.company_name || 'company').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const fn = randomPick(WIZ_RANDOM_FIRST_NAMES);
-      const ln = randomPick(WIZ_RANDOM_LAST_NAMES);
-      const ageRange = WIZ_PAX_DEFAULT_AGES[category] || { min: 18, max: 99 };
-      // Newly-added passenger has no gender by default ("None"). The user
-      // explicitly picks one via the dropdown in the row — at which point
-      // set-pax sets the field. Omitting from the initial object means the
-      // data file JSON does not carry `gender: "X"` until the user asks for it.
-      const newPax = {
-        // 5-digit zero-padded — see comment at wizGenPassengers() for rationale.
-        reference: String(paxList.passengers.length + 1).padStart(5, '0'),
-        type: osdmType,
-        category: category,
-        firstName: fn,
-        lastName: ln,
-        dateOfBirth: isHuman ? genDateOfBirth(ageRange.min, ageRange.max) : '',
-        email: `${fn.toLowerCase()}.${ln.toLowerCase()}@${companySlug}.com`,
-        phoneNumber: genPhone(),
-        updateFirstName: randomPick(WIZ_RANDOM_FIRST_NAMES),
-        updateLastName: randomPick(WIZ_RANDOM_LAST_NAMES),
-        updateDateOfBirth: isHuman ? genDateOfBirth(ageRange.min, ageRange.max) : '',
-        updatePhoneNumber: genPhone(),
-        updateEmail: `updated@${companySlug}.com`
-      };
-      paxList.passengers.push(newPax);
-      markDirty();
-      // Re-render the detail for this scenario
-      const detail = document.getElementById(`detail-${esc(scIdx)}`);
-      if (detail?.innerHTML) {
-        renderScenarioDetail(detail, scIdx);
-        // Re-open the passengers section
-        detail.querySelectorAll('.param-section-body').forEach(b => b.classList.remove('open'));
-        detail.querySelectorAll('.ps-arrow').forEach(a => a.classList.remove('open'));
-        const sections = detail.querySelectorAll('.param-section-head');
-        sections.forEach(h => {
-          if (h.textContent.includes('Passengers')) {
-            h.nextElementSibling?.classList.add('open');
-            h.querySelector('.ps-arrow')?.classList.add('open');
-          }
-        });
-      }
-      break;
-    }
-    case 'change-pax-category': {
-      // Handled in change delegation below
-      break;
-    }
-    case 'toggle-pax-edit': {
-      e.stopPropagation();
-      const tpIdx = Number.parseInt(el.dataset.pidx);
-      const tpPi  = Number.parseInt(el.dataset.pi);
-      const key   = tpIdx + ':' + tpPi;
-      const panel = cardElementById(el, 'pax-edit-' + tpIdx + '-' + tpPi);
-      const row   = panel?.previousElementSibling;
-      const nowOpen = !_paxEditOpen.has(key);
-      if (nowOpen) _paxEditOpen.add(key); else _paxEditOpen.delete(key);
-      if (panel) panel.style.display = nowOpen ? 'block' : 'none';
-      if (el)    el.textContent = (el.dataset.verb || 'Edit') + (nowOpen ? ' ▴' : ' ▾');
-      if (row)   row.style.borderBottom = nowOpen ? 'none' : '1px solid #f0f0f0';
-      break;
-    }
-    case 'add-pax-reduction': {
-      e.stopPropagation();
-      const arIdx = Number.parseInt(el.dataset.pidx);
-      const arPi  = Number.parseInt(el.dataset.pi);
-      const arList = state.passengersList[arIdx];
-      const arPax  = arList?.passengers?.[arPi];
-      if (!arPax) break;
-      if (!Array.isArray(arPax.reductionCards)) arPax.reductionCards = [];
-      arPax.reductionCards.push('');
-      markDirty();
-      // Append the new row just before the "+ Add" button so indexes stay contiguous.
-      // The rows below are editable (readOnly false): isLockedControl has
-      // already refused this action on a read-only card.
-      const container = cardElementById(el, 'pax-reductions-' + arIdx + '-' + arPi);
-      if (container) {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = buildReductionCardRow(arIdx, arPi, arPax.reductionCards.length - 1, '', false);
-        const newRow = tmp.firstElementChild;
-        const addBtn = container.querySelector('[data-action="add-pax-reduction"]');
-        if (addBtn) addBtn.before(newRow); else container.append(newRow);
-        // Focus the new input so the user can start typing immediately.
-        const input = newRow.querySelector('input[data-action="set-pax-reduction"]');
-        if (input) input.focus();
-      }
-      break;
-    }
-    case 'remove-pax-reduction': {
-      e.stopPropagation();
-      const rrIdx = Number.parseInt(el.dataset.pidx);
-      const rrPi  = Number.parseInt(el.dataset.pi);
-      const rrCi  = Number.parseInt(el.dataset.cidx);
-      const rrList = state.passengersList[rrIdx];
-      const rrPax  = rrList?.passengers?.[rrPi];
-      if (!rrPax || !Array.isArray(rrPax.reductionCards)) break;
-      rrPax.reductionCards.splice(rrCi, 1);
-      markDirty();
-      // Rebuild the card list for this passenger to keep data-cidx values
-      // contiguous with the underlying array indices.
-      const container = cardElementById(el, 'pax-reductions-' + rrIdx + '-' + rrPi);
-      if (container) {
-        container.innerHTML = rrPax.reductionCards.map((code, ci) =>
-          buildReductionCardRow(rrIdx, rrPi, ci, code, false)
-        ).join('') + `<button class="btn btn-sm btn-secondary" data-action="add-pax-reduction" data-pidx="${rrIdx}" data-pi="${rrPi}" style="font-size:11px;margin-top:6px">➕ Add reduction card</button>`;
-      }
-      break;
-    }
-    case 'add-pax-loyalty': {
-      e.stopPropagation();
-      const alIdx = Number.parseInt(el.dataset.pidx);
-      const alPi  = Number.parseInt(el.dataset.pi);
-      const alList = state.passengersList[alIdx];
-      const alPax  = alList?.passengers?.[alPi];
-      if (!alPax) break;
-      if (!Array.isArray(alPax.loyaltyCards)) alPax.loyaltyCards = [];
-      alPax.loyaltyCards.push({ carrierCode: '', cardReference: '' });
-      markDirty();
-      const container = cardElementById(el, 'pax-loyalties-' + alIdx + '-' + alPi);
-      if (container) {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = buildLoyaltyCardRow(alIdx, alPi, alPax.loyaltyCards.length - 1, {}, false);
-        const newRow = tmp.firstElementChild;
-        const addBtn = container.querySelector('[data-action="add-pax-loyalty"]');
-        if (addBtn) addBtn.before(newRow); else container.append(newRow);
-        const input = newRow.querySelector('input[data-field="carrierCode"]');
-        if (input) input.focus();
-      }
-      break;
-    }
-    case 'remove-pax-loyalty': {
-      e.stopPropagation();
-      const rlIdx = Number.parseInt(el.dataset.pidx);
-      const rlPi  = Number.parseInt(el.dataset.pi);
-      const rlCi  = Number.parseInt(el.dataset.cidx);
-      const rlList = state.passengersList[rlIdx];
-      const rlPax  = rlList?.passengers?.[rlPi];
-      if (!rlPax || !Array.isArray(rlPax.loyaltyCards)) break;
-      rlPax.loyaltyCards.splice(rlCi, 1);
-      markDirty();
-      const container = cardElementById(el, 'pax-loyalties-' + rlIdx + '-' + rlPi);
-      if (container) {
-        container.innerHTML = rlPax.loyaltyCards.map((card, ci) =>
-          buildLoyaltyCardRow(rlIdx, rlPi, ci, card, false)
-        ).join('') + `<button class="btn btn-sm btn-secondary" data-action="add-pax-loyalty" data-pidx="${rlIdx}" data-pi="${rlPi}" style="font-size:11px;margin-top:6px">➕ Add loyalty card</button>`;
-      }
-      break;
-    }
-    case 'remove-pax': {
-      e.stopPropagation();
-      const rpIdx = Number.parseInt(el.dataset.pidx);
-      const rpPi = Number.parseInt(el.dataset.pi);
-      const rpList = state.passengersList[rpIdx];
-      if (!rpList?.passengers || rpList.passengers.length <= 1) break;
-      if (!confirm(`Remove passenger ${rpPi + 1}?`)) break;
-      rpList.passengers.splice(rpPi, 1);
-      // When a passenger is removed, drop its stale Edit-open entry so the
-      // remaining passengers don't inherit an expanded state at their index.
-      _paxEditOpen.delete(rpIdx + ':' + rpPi);
-      // Re-number references — 5-digit zero-padded; see comment at wizGenPassengers().
-      rpList.passengers.forEach((p, i) => p.reference = String(i + 1).padStart(5, '0'));
-      markDirty();
-      // Find which scenario detail is open and re-render
-      document.querySelectorAll('.scenario-detail').forEach(det => {
-        if (det.innerHTML && det.id.startsWith('detail-')) {
-          const sIdx = Number.parseInt(det.id.replace('detail-', ''));
-          const sc = state.scenarios[sIdx];
-          if (sc && sc.passengersListId === rpList.id) {
-            renderScenarioDetail(det, sIdx);
-            det.querySelectorAll('.param-section-body').forEach(b => b.classList.remove('open'));
-            det.querySelectorAll('.ps-arrow').forEach(a => a.classList.remove('open'));
-            det.querySelectorAll('.param-section-head').forEach(h => {
-              if (h.textContent.includes('Passengers')) {
-                h.nextElementSibling?.classList.add('open');
-                h.querySelector('.ps-arrow')?.classList.add('open');
-              }
-            });
-          }
-        }
-      });
-      break;
-    }
-    case 'toggle-shared': {
-      e.stopPropagation();
-      const sIdx = Number.parseInt(el.dataset.idx);
-      const sc = state.scenarios[sIdx];
-      if (sc) {
-        sc.shared = !sc.shared;
-        if (sc.shared && !sc.created_by) sc.created_by = user.email || '';
-        if (sc.shared && !sc.version) sc.version = '1.0';
-        markDirty();
-        renderAll();
-      }
-      break;
-    }
-    case 'toggle-sales-action': {
-      e.stopPropagation();
-      const tsaIdx = Number.parseInt(el.dataset.idx);
-      const key = el.dataset.key;
-      const sc = state.scenarios[tsaIdx];
-      if (!sc || !key) break;
-      if (!sc.salesFlowActions || typeof sc.salesFlowActions !== 'object') {
-        sc.salesFlowActions = defaultSalesFlowActions();
-      }
-      // Explicit flip: true ↔ false. Anything else (undefined, null) is
-      // treated as false for the toggle purpose and becomes true.
-      sc.salesFlowActions[key] = sc.salesFlowActions[key] !== true;
-      el.classList.toggle('selected', sc.salesFlowActions[key]);
-      markDirty();
-      break;
-    }
-    case 'toggle-place-probe': {
-      e.stopPropagation();
-      const ppIdx = Number.parseInt(el.dataset.idx);
-      const ppKey = el.dataset.key;
-      const ppSc = state.scenarios[ppIdx];
-      if (!ppSc || !ppKey) break;
-      if (!ppSc.placeSelectionProbes || typeof ppSc.placeSelectionProbes !== 'object') {
-        ppSc.placeSelectionProbes = {};
-      }
-      ppSc.placeSelectionProbes[ppKey] = ppSc.placeSelectionProbes[ppKey] !== true;
-      markDirty();
-      // Re-render so the sub-group + top NHF badges follow the toggle (the
-      // re-render preserves open/closed sub-sections by header text).
-      reRenderScenarioDetail(ppIdx);
-      break;
-    }
-    case 'set-accommodation-selection': {
-      // #373: single-select accommodation family (Seat/Couchette/Berth);
-      // '' (— any —) clears the field → current default behaviour.
-      e.stopPropagation();
-      const accIdx = Number.parseInt(el.dataset.idx);
-      const accSc = state.scenarios[accIdx];
-      if (!accSc) break;
-      accSc.accommodationSelection = el.dataset.val || null;
-      const accGrp = el.parentElement;
-      if (accGrp) accGrp.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === el));
-      markDirty();
-      break;
-    }
-    case 'set-accommodation-gender': {
-      // #211: single-select gender-segregation preference (MEN/LADIES/MIXED)
-      // for night-train COUCHETTE/BERTH compartments; '' (— any —) clears it.
-      e.stopPropagation();
-      const genIdx = Number.parseInt(el.dataset.idx);
-      const genSc = state.scenarios[genIdx];
-      if (!genSc) break;
-      genSc.accommodationGenderPreference = el.dataset.val || null;
-      const genGrp = el.parentElement;
-      if (genGrp) genGrp.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === el));
-      markDirty();
-      break;
-    }
-    case 'toggle-book-mandatory-reservations': {
-      // #239: single boolean toggle — book via optionalReservationSelections.
-      e.stopPropagation();
-      const mrIdx = Number.parseInt(el.dataset.idx);
-      const mrSc = state.scenarios[mrIdx];
-      if (!mrSc) break;
-      mrSc.bookMandatoryReservations = mrSc.bookMandatoryReservations !== true;
-      el.classList.toggle('selected', mrSc.bookMandatoryReservations === true);
-      el.title = mrSc.bookMandatoryReservations ? 'Enabled — click to disable' : 'Disabled (default) — click to enable';
-      markDirty();
-      break;
-    }
-    case 'set-place-mode': {
-      // Single-select seat-selection mode (issue #107). Constrained at render
-      // time to the framework's supported modes.
-      e.stopPropagation();
-      const spmIdx = Number.parseInt(el.dataset.idx);
-      const spmSc = state.scenarios[spmIdx];
-      if (!spmSc) break;
-      spmSc.placeSelectionMode = el.dataset.val;
-      const grp = el.parentElement;
-      if (grp) grp.querySelectorAll('.pill').forEach(p => p.classList.toggle('selected', p === el));
-      markDirty();
-      break;
-    }
-    case 'duplicate-scenario': {
-      e.stopPropagation();
-      const dupIdx = Number.parseInt(el.dataset.idx);
-      const original = state.scenarios[dupIdx];
-      if (!original) break;
-
-      const copy = structuredClone(original);
-      // Unique scenario code — keep appending _COPY / _COPY_COPY until we
-      // find one not already used. Prevents silent duplicate collisions
-      // that would then break scenariosToRun indexing.
-      let newCode = original.code + '_COPY';
-      while (state.scenarios.some(s => s.code === newCode)) newCode += '_COPY';
-      copy.code = newCode;
-      copy.shared = false;
-      copy.created_by = user.email || '';
-      copy.version = '1.0';
-
-      // Allocate a fresh numeric id for each referenced list and deep-clone
-      // the source list record. Without this the copy would point at the
-      // same trip / passengers / purchaser / fulfillment records as the
-      // original, so editing one would silently mutate the other — a
-      // classic aliasing bug in the earlier duplicate implementation.
-      const maxId = (arr) => arr?.length
-        ? Math.max(...arr.map(x => x && typeof x.id === 'number' ? x.id : 0))
-        : 0;
-      let nextId = Math.max(
-        maxId(state.tripRequirements),
-        maxId(state.passengersList),
-        maxId(state.purchaserList),
-        maxId(state.requestedFulfillmentOptionsList)
-      ) + 1;
-
-      function cloneListEntry(arrName, sourceId) {
-        const arr = state[arrName] = state[arrName] || [];
-        const src = arr.find(x => x && x.id === sourceId);
-        if (!src) return null;
-        const clone = structuredClone(src);
-        clone.id = nextId++;
-        arr.push(clone);
-        return clone.id;
-      }
-
-      const newTripId  = cloneListEntry('tripRequirements',  original.tripRequirementId);
-      const newPaxId   = cloneListEntry('passengersList',    original.passengersListId);
-      const newPurchId = cloneListEntry('purchaserList',     original.purchaserListId);
-      const newFulfId  = cloneListEntry('requestedFulfillmentOptionsList', original.requestedFulfillmentOptionsListId);
-      if (newTripId  != null) copy.tripRequirementId                 = newTripId;
-      if (newPaxId   != null) copy.passengersListId                  = newPaxId;
-      if (newPurchId != null) copy.purchaserListId                   = newPurchId;
-      if (newFulfId  != null) copy.requestedFulfillmentOptionsListId = newFulfId;
-
-      state.scenarios.push(copy);
-      markDirty();
-      renderAll();
-      break;
-    }
-
-    // ── Framework wizard (Step 1) ─────────────────────────────────────────────
-    // All fw-* actions that mutate wizData.framework trigger saveFrameworkDebounced()
-    // so the state is persisted without the user needing to click "💾 Save Framework".
-    // The fw-toggle action (expand/collapse header) is the only exception — it's
-    // purely visual and never touches the model.
-    case 'fw-toggle':
-      fwToggle(el); break;
-    case 'fw-toggle-irops':
-      fwToggleIrops(el.dataset.type, el.dataset.code, el); saveFrameworkDebounced(); break;
-    case 'fw-toggle-aftersales':
-      fwToggleAfterSales(el.dataset.val); saveFrameworkDebounced(); break;
-    case 'fw-partial-scope':
-      fwTogglePartialScope(el, el.dataset.val); saveFrameworkDebounced(); break;
-    case 'fw-pill':
-      fwTogglePill(el, el.dataset.mode, el.dataset.group, el.dataset.val); saveFrameworkDebounced(); break;
-    case 'fw-offer-pill':
-      fwToggleOfferPill(el, el.dataset.group, el.dataset.val); saveFrameworkDebounced(); break;
-    case 'fw-pax-type':
-      fwTogglePaxType(el, el.dataset.val); saveFrameworkDebounced(); break;
-    case 'fw-ancillary':
-      fwToggleSimplePill(el, 'ancillaries', el.dataset.val); saveFrameworkDebounced(); break;
-    case 'fw-offer-request-form':
-      fwToggleOfferRequestForm(el, el.dataset.val); saveFrameworkDebounced(); break;
-    case 'fw-offer-search-option':
-      fwToggleOfferSearchOption(el, el.dataset.key, el.dataset.val); saveFrameworkDebounced(); break;
-    case 'fw-trip-parameter':
-      fwToggleTripSearchParameter(el, el.dataset.val); saveFrameworkDebounced(); break;
-    case 'fw-offer-combinations-new-seed': {
-      const input = document.getElementById('fw-offer-combinations-seed');
-      const seed = fwNewOfferCombinationSeed();
-      if (input) input.value = seed;
-      saveFrameworkDebounced();
-      break;
-    }
-    case 'fw-place-selection-flow':
-      fwTogglePlaceSelectionFlow(el, el.dataset.val); saveFrameworkDebounced(); break;
-    case 'fw-return-model':
-      fwToggleSimplePill(el, 'returnModels', el.dataset.val); refreshReturnVersionNote(); saveFrameworkDebounced(); break;
-    case 'fw-remove-ancillary':
-      fwRemoveAncillary(el.dataset.val); break;
-    case 'fw-add-ancillary':
-      fwAddCustomAncillary(); break;
-
-    // ── Pill toggle (simple self-toggle) ──────────────────────────────────────
-    case 'pill-toggle':
-      el.classList.toggle('selected'); break;
-
-    // ── Train resource actions (Step 2) ───────────────────────────────────────
-    case 'toggle-train-detail':
-      toggleTrainDetail(Number.parseInt(el.dataset.tidx)); break;
-    case 'wiz-delete-resource':
-      e.stopPropagation(); wizDeleteResource(el.dataset.id).catch(reportActionError); break;
-    case 'wiz-add-train':
-      wizAddTrain(); break;
-    case 'wiz-duplicate-train':
-      e.stopPropagation(); wizDuplicateTrain(Number.parseInt(el.dataset.tidx)); break;
-    case 'wiz-save-train':
-      wizSaveTrain(Number.parseInt(el.dataset.tidx)).catch(reportActionError); break;
-    case 'wiz-save-all-trains':
-      wizSaveAllTrains().catch(reportActionError); break;
-    case 'wiz-discover-timetable':
-      openTimetableDiscovery(); break;
-    case 'wiz-download-places':
-      downloadPlaces(el).catch(reportActionError); break;
-    case 'wiz-fill-calendars':
-      fillMissingCalendars(el).catch(reportActionError); break;
-    case 'wiz-reprobe-offers': {
-      // #369: manual refresh of the per-route offer-availability findings.
-      el.disabled = true; const _oldTxt = el.textContent; el.textContent = 'Re-probing…';
-      (async () => {
-        try {
-          const r = await fetch('/v1/company/test-resources/reprobe-offers', { method: 'POST' });
-          const b = await r.json().catch(() => ({}));
-          if (!r.ok) { oscarToast(`Re-probe failed: ${b.detail || b.title || ('HTTP ' + r.status)}`, 'error'); return; }
-          const warn = (b.routes || []).reduce((n2, x) => n2 + ((x.findings || []).length), 0);
-          oscarToast(`Re-probed ${ (b.routes || []).length } route(s), updated ${b.updated} train set(s) — ${warn} finding(s).`, warn ? 'warn' : 'success');
-          await refreshAllSections();
-        } catch (error_) {
-          oscarToast('Re-probe network error: ' + error_.message, 'error');
-        } finally { el.disabled = false; el.textContent = _oldTxt; }
-      })().catch(reportActionError);
-      break;
-    }
-    case 'tt-discover-run':
-      runTimetableDiscovery().catch(reportActionError); break;
-    case 'tt-discover-close':
-      closeTimetableDiscovery(); break;
-    case 'train-add-service':
-      trainAddService(Number.parseInt(el.dataset.tidx)); break;
-    case 'train-remove-service': {
-      const _tb = el.closest('tbody');
-      const _m = _tb && /^tf-(\d+)-services$/.exec(_tb.id || '');
-      if (_m) trainRemoveService(Number.parseInt(_m[1], 10), el);
-      break;
-    }
-    case 'train-paste-service':
-      trainPasteServices(Number.parseInt(el.dataset.tidx)); break;
-
-    // ── Journey actions (Step 2, #137) ────────────────────────────────────────
-    case 'toggle-journey-detail':
-      toggleJourneyDetail(Number.parseInt(el.dataset.jidx)); break;
-    case 'wiz-add-journey':
-      wizAddJourney(); break;
-    case 'wiz-find-journeys':
-      openJourneyFinder(); break;
-    case 'jf-run':
-      runJourneyFinder(); break;
-    case 'jf-close':
-      closeJourneyFinder(); break;
-    case 'jf-probe':
-      journeyFinderProbe(Number.parseInt(el.dataset.idx, 10)).catch(reportActionError); break;
-    case 'probe-keep-trip':
-      e.stopPropagation(); keepProbedTrip(el.dataset.key, Number.parseInt(el.dataset.idx, 10)).catch(reportActionError); break;
-    case 'probe-replace-journey':
-      e.stopPropagation(); replaceProbedJourney(el.dataset.key).catch(reportActionError); break;
-    case 'jf-create':
-      journeyFinderCreate(Number.parseInt(el.dataset.idx, 10)); break;
-    case 'wiz-duplicate-journey':
-      e.stopPropagation(); wizDuplicateJourney(Number.parseInt(el.dataset.jidx)); break;
-    case 'wiz-delete-journey':
-      e.stopPropagation(); wizDeleteJourney(el.dataset.id).catch(reportActionError); break;
-    case 'wiz-probe-journey':
-      e.stopPropagation(); wizProbeJourney(Number.parseInt(el.dataset.jidx, 10), el.dataset.id).catch(reportActionError); break;
-    case 'wiz-save-journey':
-      wizSaveJourney(Number.parseInt(el.dataset.jidx)).catch(reportActionError); break;
-    case 'journey-add-leg':
-      journeyAddLeg(Number.parseInt(el.dataset.jidx)); break;
-    case 'journey-remove-leg':
-      journeyRemoveLeg(Number.parseInt(el.dataset.jidx), Number.parseInt(el.dataset.li)); break;
-    case 'journey-move-leg':
-      journeyMoveLeg(Number.parseInt(el.dataset.jidx), Number.parseInt(el.dataset.li), Number.parseInt(el.dataset.dir)); break;
-
-    // ── Scenario creation (Step 3) ────────────────────────────────────────────
-    case 'wiz-scen-type':
-      wizSetScenType(el.dataset.val); break;
-    case 'wiz-sub-type':
-      wizSetSubType(el.dataset.val); break;
-    case 'wiz-action':
-      wizSetAction(el.dataset.val); break;
-    case 'wiz-trip-type':
-      wizSetTripType(el.dataset.val); break;
-    case 'wiz-pax':
-      wizAdjustPax(el.dataset.type, Number.parseInt(el.dataset.delta)); break;
-    case 'wiz-scen-array':
-      wizToggleScenArray(el.dataset.field, el.dataset.val, el); break;
-    case 'wiz-generate':
-      wizGenerateScenario().catch(reportActionError); break;
-    case 'goto-section2':
-      e.preventDefault(); renderWizardStep2InSection(); toggleSection('data'); break;
-    case 'refresh-sections':
-      e.preventDefault(); refreshAllSections().catch(reportActionError); break;
-    case 'create-another':
-      e.preventDefault(); wizInitScenario(); reRenderStep3InSection(); break;
-  }
+  // Some groups of actions have a handler of their own, tried first: each
+  // says whether the action was one of its own.
+  if (clickFwList(action, el)) return;   // #887
+  if (clickDistributionMode(action, el)) return;   // #936
+  if (clickFarePanel(action, el)) return;   // #937
+  if (clickScenarioSearch(action)) return;   // #1314
+  // Only what the table itself holds: every object also answers to names
+  // such as `constructor`, which are no action.
+  const act = Object.hasOwn(CLICK_ACTIONS, action) ? CLICK_ACTIONS[action] : null;
+  if (act) act(el, e);
 });
 
 // ── Change event delegation (selects and checkboxes) ─────────────────────────

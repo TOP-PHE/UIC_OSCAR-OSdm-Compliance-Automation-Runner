@@ -486,7 +486,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     other entries), so each stays under Sonar's complexity limit of 15.
     The catalogue's `missingFor()` names the mode first. Editor: 🧭
     Distribution after the OSDM version (`FW_DISTRIBUTION_MODES`, pinned to
-    the server's list; `clickDistributionMode()` before the click switch;
+    the server's list; `clickDistributionMode()` before the click's table;
     the last mode cannot be unticked). The simulator references take both
     modes from the profile (`fares`) until the checklist asks (#938).
     **Fare declarations** (#937, part B, 1.11.388 / OTST_V2.0.218): `fares`
@@ -2397,7 +2397,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   comments out; the function's own first and last lines count), in the `src`,
   `public` and library blocks, not the tests. What was over them is ESLint's
   own baseline (bulk suppressions, ESLint 9.24+): `eslint-suppressions.json`
-  (found by itself in the folder ESLint starts in: 105 + 20 since #1390) and
+  (found by itself in the folder ESLint starts in: 104 + 19 since #1396) and
   `eslint-library-suppressions.json` (`--suppressions-location`, 79 + 21
   since #1388),
   paths with forward slashes from that folder. **One more function over a
@@ -2461,6 +2461,37 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   record that holds the machine's `PATH` differs between `npx jest` and
   `node jest.js` (record the machine's variables by name only).
   `runner.test.js` gained 34 tests for what the faults showed no test held.
+- **A click in Test Config is looked up in a table** (#1396, 1.11.573; M2,
+  third function). `CLICK_ACTIONS` in `scenarios.js` replaces the click
+  delegate's switch of 95 actions: an entry is one line that calls
+  (`'x': (el) => { … },`) or the name of a top-level `click<Action>(el, e)`
+  function, laid out as the others (`}` at column 0), so `loadFunction()` runs
+  one action alone. **A new click action is a line in the table**; the four
+  handlers tried first (`clickFwList` …) were written when the switch was at
+  Sonar's limit of cases and stay as they are. The delegate asks
+  `Object.hasOwn(CLICK_ACTIONS, action)`, **never `CLICK_ACTIONS[action]`
+  alone**: every object answers to `constructor` and `__proto__`. The change
+  and input delegates are still switches. Tests that pinned `case 'x':` of a
+  click pin the table's line; `ui-scripts.test.js` runs the real delegate
+  (its text inside `with (scope)`, every name it does not declare a
+  recorder). `refresh-sections` is in the table and drawn nowhere, as before.
+  **How a split of a page function was proved** (scratch files, kept in the
+  sessions' shared notes folder, not in the repository):
+  - `build-delegate.js` moves each case's code from the syntax tree (a
+    `break` that left the switch becomes `return`) and stops on what it
+    cannot move safely: a case that falls through, a name shared between two
+    cases; `tokens-delegate.js` then compares the tokens from the two files
+    alone, without the builder's manifest;
+  - `trace-delegate.js` runs the old and the new text of the delegate as
+    they are, in a scope where the page's functions and elements are
+    recorders and every answer (an element found or not, a confirmation, the
+    data) is drawn by a seeded generator: the same action and seed get the
+    same answers, so two versions that do the same leave the same lines.
+    The inspector's precise coverage says which new lines no click ran: **a
+    line reached in 2 cases of 50,000 was not checked**, so the draw was
+    tuned until every line ran often;
+  - one fault at a time, each in a process of its own (a fault can loop for
+    ever), with two unchanged copies as a control.
 - **CI required checks:** Lint/audit/test, CodeQL, Trivy (image scan), Docker
   build, Gitleaks, SonarCloud scan, Bruno-collection validation, PR labeler,
   **`SonarQube Quality Gate check`** (added to required list 2026-07-02 via
@@ -2982,7 +3013,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   gives the card holder the first declared card (code + issuer, an object
   entry) in a list of its own (`passengersWithCard()`), not copiable without
   one. The page's list is drawn by `fwReductionCardsHtml()`, its click handled
-  before the click switch (`clickReductionCard()`), like the change chain.
+  before the click's table (`clickReductionCard()`), like the change chain.
   Named products and groups are PRs 2-3 of #887.
   **A card's rate is checked when declared** (#889, 1.11.363 / OTST_V2.0.198):
   `percent` on a framework card (`percentOf()`: "25", "25 %", "12,5"; A3.7's

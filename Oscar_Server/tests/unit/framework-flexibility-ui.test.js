@@ -42,7 +42,7 @@ describe('Test Framework: flexibilities the provider sells (#691)', () => {
   });
 
   test('a click toggles the flexibility in the framework and saves it', () => {
-    expect(source).toMatch(/case 'fw-offer-pill':\s*\n\s*fwToggleOfferPill\(el, el\.dataset\.group, el\.dataset\.val\); saveFrameworkDebounced\(\); break;/);
+    expect(source).toContain("\n  'fw-offer-pill': (el) => { fwToggleOfferPill(el, el.dataset.group, el.dataset.val); saveFrameworkDebounced(); },\n");
     const wizData = { framework: { offerCriteria: { flexibilities: ['FULL_FLEXIBLE', 'SEMI_FLEXIBLE', 'NON_FLEXIBLE'] } } };
     const toggle = loadFunction('fwToggleOfferPill', { wizData });
     const full = fakePill();
