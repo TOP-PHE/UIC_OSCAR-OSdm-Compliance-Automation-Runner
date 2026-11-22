@@ -2387,8 +2387,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   passes `-Dsonar.projectVersion` from `Oscar_Server/package.json` (digits and
   dots only): kept by hand in `sonar-project.properties`, it stayed at
   1.11.178 from July to November 2026 and the gate counted all that time as
-  new code. **SonarCloud's gate has a 35 % coverage floor, not the 83 % the
-  properties file documents**; its conditions are read without a token from
+  new code. **SonarCloud's gate had a 35 % coverage floor until 2026-11-22, when the
+  maintainer set it to the 83 % the properties file documents; a changed gate
+  shows in `project_status` only after the next analysis**; its conditions are read without a token from
   `api/qualitygates/project_status` (*OSCAR - GitHub and CI set-up*, § 7, 10).
 - **A new function is held to two limits by `npm run lint`** (#1385):
   `Oscar_Server/eslint.size-rules.js`, `complexity` 15 (variant `modified`: a
