@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A new function is held to two limits** (#1385). Tooling and tests, no version: no function changes, and nothing the server runs.
+  - **Seen:** 50 new functions over SonarCloud's complexity limit since the clean-up of October (#523). Nothing stopped one: the gate counts ratings, and reports after the push.
+  - **Now:** `npm run lint` refuses a function of more than 15 paths (ESLint's `complexity`, a `switch` counting once) or more than 100 lines of code, in the server, the pages' scripts and the Bruno library (`Oscar_Server/eslint.size-rules.js`). Not in the tests.
+  - **What was there stays:** 189 functions over the first limit and 45 over the second, recorded file by file with ESLint's own baseline (`eslint-suppressions.json`, `eslint-library-suppressions.json`). One more in a file fails the lint; one less fails it too, until `npm run lint:baseline` lowers the record. The totals are held by `lint-config.test.js`, which also runs the limits and the baseline on a folder of a moment: at a limit, one over, recorded, one more, one less.
+
 - **Text answers are compressed at the proxy** (#1379). Deployment files, CI and guides, no version.
   - **Seen:** production sent `scenarios.js` as 555,602 bytes with no `Content-Encoding`, and every JSON answer the same way. OSCAR compresses nothing itself, on purpose (its one thread serves every page and every run); the nginx example set nothing, so an installation got its distribution's `gzip on;` alone, which compresses `text/html` and nothing else.
   - **nginx:** `OSCAR_Deploy/nginx/oscar.conf.example` has `gzip_types` for JSON, JavaScript, CSS, plain text, CSV, XML and SVG (level 5, from 1 KB). Measured: `scenarios.js` 555,602 → 149,347 bytes; the simulator's data file 1,902,824 → 110,966.

@@ -35,7 +35,8 @@ describe('npm run lint', () => {
 
   test('reads the library from the repository root, with its own configuration and no warning allowed', () => {
     expect(scripts['lint:library']).toBe(
-      'cd .. && node Oscar_Server/node_modules/eslint/bin/eslint.js -c Oscar_Server/eslint.library.config.js Bruno_Collection/library-bruno --max-warnings 0');
+      'cd .. && node Oscar_Server/node_modules/eslint/bin/eslint.js -c Oscar_Server/eslint.library.config.js Bruno_Collection/library-bruno --max-warnings 0'
+      + ' --suppressions-location Oscar_Server/eslint-library-suppressions.json');
   });
 
   test('CI runs it', () => {
@@ -71,8 +72,132 @@ describe('the rules for code not held to the server\'s style', () => {
   test('the library is read with them', () => {
     const [block] = require('../../eslint.library.config');
     expect(block.files).toEqual(['Bruno_Collection/library-bruno/**/*.js']);
-    expect(block.rules).toBe(rules);
+    expect(block.rules).toEqual({ ...rules, ...require('../../eslint.size-rules') });
     for (const name of ['bru', 'req', 'res', 'test', 'expect']) expect(block.languageOptions.globals).toHaveProperty(name);
+  });
+});
+
+describe('the limits a new function is held to', () => {
+  const sizeRules = require('../../eslint.size-rules');
+  const ESLINT = path.join(SERVER, 'node_modules', 'eslint', 'bin', 'eslint.js');
+  const recorded = name => JSON.parse(read(SERVER, name));
+  const totalOf = (record, rule) => Object.values(record).reduce((sum, rules) => sum + (rules[rule]?.count || 0), 0);
+
+  test('15 paths through a function, 100 lines of code', () => {
+    expect(sizeRules).toEqual({
+      complexity: ['error', { max: 15, variant: 'modified' }],
+      'max-lines-per-function': ['error', { max: 100, skipBlankLines: true, skipComments: true }],
+    });
+  });
+
+  test('in the server, the pages\' scripts and the library; not in the tests', () => {
+    const blocks = require('../../eslint.config');
+    const blockOf = glob => blocks.find(b => (b.files || []).includes(glob));
+    for (const glob of ['src/**/*.js', 'public/**/*.js']) {
+      expect(blockOf(glob).rules.complexity).toBe(sizeRules.complexity);
+      expect(blockOf(glob).rules['max-lines-per-function']).toBe(sizeRules['max-lines-per-function']);
+    }
+    const [library] = require('../../eslint.library.config');
+    expect(library.rules.complexity).toBe(sizeRules.complexity);
+    expect(library.rules['max-lines-per-function']).toBe(sizeRules['max-lines-per-function']);
+    expect(blockOf('tests/**/*.js').rules).not.toHaveProperty('complexity');
+    expect(blockOf('tests/**/*.js').rules).not.toHaveProperty('max-lines-per-function');
+  });
+
+  // What was over the limits when they were set. **These numbers only go
+  // down**: lower them with the record (`npm run lint:baseline`) when a
+  // function is brought under a limit. Raising one says, in this diff, that a
+  // function over a limit was let in on purpose.
+  test.each([
+    ['eslint-suppressions.json', 107, 22],
+    ['eslint-library-suppressions.json', 82, 23],
+  ])('%s records no more than what was there', (name, complexity, lines) => {
+    const record = recorded(name);
+    expect(totalOf(record, 'complexity')).toBeLessThanOrEqual(complexity);
+    expect(totalOf(record, 'max-lines-per-function')).toBeLessThanOrEqual(lines);
+  });
+
+  test('the records hold the two limits only: no other rule is ever set aside', () => {
+    for (const name of ['eslint-suppressions.json', 'eslint-library-suppressions.json']) {
+      for (const [file, rules] of Object.entries(recorded(name))) {
+        expect([file, Object.keys(rules).filter(rule => !(rule in sizeRules))]).toEqual([file, []]);
+        // Written with forward slashes, from the folder ESLint is started in.
+        expect(file).not.toContain('\\');
+        const from = name === 'eslint-suppressions.json' ? SERVER : REPO;
+        expect([file, fs.existsSync(path.join(from, file))]).toEqual([file, true]);
+      }
+    }
+  });
+
+  test('the scripts: the library has a record of its own, and one command lowers both', () => {
+    const scripts = JSON.parse(read(SERVER, 'package.json')).scripts;
+    expect(scripts['lint:library']).toContain('--suppressions-location Oscar_Server/eslint-library-suppressions.json');
+    expect(scripts['lint:baseline']).toBe(
+      'eslint src/ public/ tests/ scripts/ --prune-suppressions && cd .. && ' + scripts['lint:library'].replace('cd .. && ', '') + ' --prune-suppressions');
+    // No script sets a rule aside: a record is raised by hand, where it shows.
+    for (const script of Object.values(scripts)) expect(script).not.toMatch(/--suppress-(all|rule)/);
+  });
+
+  // The baseline is ESLint's own. What OSCAR relies on is run here on a folder
+  // of a moment, with the real limits: an upgrade of ESLint that changed any
+  // of it would fail this test, not pass a function over a limit unseen.
+  describe('as ESLint applies them', () => {
+    let folder;
+    const lint = (...args) => spawnSync(process.execPath, [ESLINT, 'code', ...args], { cwd: folder, encoding: 'utf8' });
+    const ifs = (name, count) => `function ${name}(x) {\n  let n = 0;\n${Array.from({ length: count }, (_, i) => `  if (x === ${i}) n += 1;`).join('\n')}\n  return n;\n}\n`;
+    const write = (name, text) => fs.writeFileSync(path.join(folder, 'code', name), `'use strict';\n${text}`);
+    const record = () => JSON.parse(fs.readFileSync(path.join(folder, 'eslint-suppressions.json'), 'utf8'));
+
+    beforeAll(() => {
+      folder = fs.mkdtempSync(path.join(os.tmpdir(), 'oscar-limits-'));
+      fs.mkdirSync(path.join(folder, 'code'));
+      fs.writeFileSync(path.join(folder, 'eslint.config.js'), [
+        "'use strict';",
+        `const rules = require(${JSON.stringify(path.join(SERVER, 'eslint.size-rules.js'))});`,
+        "module.exports = [{ files: ['code/**/*.js'], languageOptions: { ecmaVersion: 2023, sourceType: 'commonjs' }, rules }];",
+      ].join('\n'));
+    });
+    afterAll(() => fs.rmSync(folder, { recursive: true, force: true }));
+
+    test('at a limit passes, one over fails, and a recorded one passes until another joins it or it leaves', () => {
+      // 14 conditions make 15 paths; 97 statements make 100 lines with the three around them.
+      write('paths.js', `${ifs('atTheLimit', 14)}module.exports = { atTheLimit };\n`);
+      write('lines.js', `function long() {\n${Array.from({ length: 97 }, (_, i) => `  const v${i} = ${i};`).join('\n')}\n  return v0 + v96;\n}\nmodule.exports = { long };\n`);
+      expect(lint().status).toBe(0);
+
+      write('paths.js', `${ifs('over', 15)}module.exports = { over };\n`);
+      let run = lint();
+      expect(run.status).toBe(1);
+      expect(run.stdout).toContain("Function 'over' has a complexity of 16. Maximum allowed is 15");
+
+      write('lines.js', `function long() {\n${Array.from({ length: 98 }, (_, i) => `  const v${i} = ${i};`).join('\n')}\n  return v0 + v97;\n}\nmodule.exports = { long };\n`);
+      run = lint();
+      expect(run.stdout).toContain("Function 'long' has too many lines (101). Maximum allowed is 100");
+
+      // Recorded, as the two files of OSCAR's were made.
+      expect(lint('--suppress-rule', 'complexity', '--suppress-rule', 'max-lines-per-function').status).toBe(0);
+      expect(record()).toEqual({
+        'code/lines.js': { 'max-lines-per-function': { count: 1 } },
+        'code/paths.js': { complexity: { count: 1 } },
+      });
+      expect(lint().status).toBe(0);
+
+      // One more over the limit in a file that has its record: refused.
+      write('paths.js', `${ifs('over', 15)}${ifs('another', 15)}module.exports = { over, another };\n`);
+      run = lint();
+      expect(run.status).toBe(1);
+      expect(run.stdout).toContain("Function 'another' has a complexity of 16");
+
+      // One brought under the limit: refused too, until the record is lowered.
+      write('paths.js', `${ifs('over', 15)}module.exports = { over };\n`);
+      write('lines.js', 'function short() { return 1; }\nmodule.exports = { short };\n');
+      run = lint();
+      expect(run.status).toBe(2);
+      expect(run.stdout + run.stderr).toContain('--prune-suppressions');
+      expect(lint('--prune-suppressions').status).toBe(0);
+      expect(record()).toEqual({ 'code/paths.js': { complexity: { count: 1 } } });
+      expect(lint().status).toBe(0);
+    }, 120000);
   });
 });
 

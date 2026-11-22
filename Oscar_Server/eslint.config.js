@@ -7,6 +7,9 @@
  */
 
 const BUG_RULES = require('./eslint.bug-rules');
+// The limits a new function is held to (eslint.size-rules.js): the server and
+// the pages' scripts; not the tests, whose `describe` blocks are long by nature.
+const SIZE_RULES = require('./eslint.size-rules');
 
 const readonly = names => Object.fromEntries(names.map(name => [name, 'readonly']));
 
@@ -69,6 +72,7 @@ module.exports = [
       'semi': ['warn', 'always'],
       'quotes': ['warn', 'single', { avoidEscape: true, allowTemplateLiterals: true }],
       'indent': ['off'],   // existing code uses mixed alignment; not enforcing
+      ...SIZE_RULES,
     },
   },
   {
@@ -107,6 +111,7 @@ module.exports = [
       // here. The real-bug rules above are the point (they catch an undefined
       // reference — e.g. a fixed XSS sink that lost its esc() call).
       'no-unused-vars': 'off',
+      ...SIZE_RULES,
     },
   },
   {

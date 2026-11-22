@@ -14,10 +14,13 @@
  * Bug rules only (eslint.bug-rules.js), no style: the library was written
  * over two years in several hands, and the point is what breaks a run (a name
  * that does not exist, a variable nothing reads, a branch that cannot be
- * reached), not its layout.
+ * reached), not its layout. And the two limits a new function is held to
+ * (eslint.size-rules.js), with the library's own record of what was over them:
+ * eslint-library-suppressions.json.
  */
 
 const BUG_RULES = require('./eslint.bug-rules');
+const SIZE_RULES = require('./eslint.size-rules');
 
 const readonly = names => Object.fromEntries(names.map(name => [name, 'readonly']));
 
@@ -61,7 +64,7 @@ module.exports = [
       sourceType: 'commonjs',
       globals: { ...SANDBOX, ...readonly(SHARED_THROUGH_GLOBAL), module: 'writable', exports: 'writable' },
     },
-    rules: BUG_RULES,
+    rules: { ...BUG_RULES, ...SIZE_RULES },
   },
 ];
 
