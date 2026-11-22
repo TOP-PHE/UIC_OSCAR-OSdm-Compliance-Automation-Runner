@@ -613,6 +613,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.570] — 2026-11-22
+
+The code-scanning alerts left on `main`, read one by one (#1377). Not released on its own: listed in `compatibility.json` (2026.609) without moving `current_release`.
+
+### Changed
+- **Three read routes name a rate limit in their own chain**: `GET /health` (300 a minute per address), `GET /v1/auth/me` (600, before the session is read) and `GET /v1/runs/:id/artifacts/:aid` (300, the ceiling of the other file downloads). All far above real use: a readiness and a liveness probe make 6 calls a minute, a page asks `/me` once as it loads and `/health` once while its version line is cached.
+- **`GET /health` keeps its two disk checks for 10 seconds** (`utils/healthChecks.js`). At every call it wrote and removed a file in the data folder and asked the file system for its free space, on the server's one thread. A probe every 15 or 30 seconds still reads the disk each time; a burst of calls reads it once.
+- **A failed health check answers a code** (`EACCES`, `ENOSPC`, `ERR_SQLITE_ERROR`…; `error` when the error has none), and the artifact route's `500` a fixed sentence. Both answered the error's own words, which can hold a path of the machine; the words go to the server's log.
+- **The fingerprint kept beside a tester's access token is a keyed digest** (`utils/credentialFingerprint.js`: HMAC-SHA-256 under a key derived from `ENCRYPTION_KEY`, which is not in the database). OSCAR keeps it to know whether the credentials are still those that obtained the token (#208); it was a plain SHA-256 of the same values. A new fingerprint starts with `v2:` and one kept by an earlier version never equals it, so **each tester's token is asked again once after the update**; the run's log then says "the token was kept by an earlier version of the server", not "credentials changed".
+- **The trip editor's `setTripFieldByPath()` refuses `__proto__`, `constructor` and `prototype`** as a path segment. The paths come from the page's own fields; the helper no longer relies on that.
+
+### Fixed
+- **`worker/access-token.js` held a NUL character**, stored months ago by an editing tool in place of the escape that was typed. The code worked, but git read the file as binary: every change to the module that resolves a tester's token showed as "Binary files differ" in a review. The character is now made with `String.fromCharCode(0)`, in the new module, and `credential-fingerprint.test.js` refuses a NUL in any source file of the server, the pages, the tests, the collection library, the simulator and the MCP server.
+- Names nothing read: an import in `services/credentialTest.js`, a caught error in `worker/auth-profiles.js` (ESLint's one warning on `src/`), and five names in four test files, one of them a helper no test called.
+
+### Tests
+- `health-checks.test.js` and `credential-fingerprint.test.js` (new), three tests of `/health` in `server.test.js`, three of the token cache in `access-token.test.js`, one of the trip editor in `ui-scripts.test.js`. 20 mutations of the changed code, each caught by a test.
+
+### Not changed, on purpose
+- The alerts in `Bruno_Collection/` (two exports of `refunds.js`, two notes): a collection release of their own, with the simulator replay.
+- Those that describe a choice made and written in the code: the sign-out has no limit, since it must always go through (a test now holds the comment and the route together); limits set once for a whole router; a placeholder in the collection's settings; one reading kept as it is in the Report Builder (#527). They are closed in GitHub with their reason.
+
+### Documentation
+- *installation-guide* (what a failed check answers) and the OpenAPI description of `/health`.
+- No news entry: nothing changes for testers or Test Managers.
+
 ## [server-1.11.569] — 2026-11-22
 
 The 5 MB JSON limit only where a data file is saved; `ALLOW_PRIVATE_TARGETS` said when it is on (#1371). Not released on its own: listed in `compatibility.json` (2026.608) without moving `current_release`.

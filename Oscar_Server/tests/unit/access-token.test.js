@@ -133,6 +133,39 @@ describe('resolveAccessToken — oauth2 cache', () => {
     }), log);
   });
 
+  // The fingerprint is a keyed digest that names its form (#1377). One kept by
+  // an earlier server is another kind of value: the token is asked again once,
+  // and the run's log says why instead of "credentials changed".
+  describe('a fingerprint kept by an earlier version of the server', () => {
+    const future = () => new Date(Date.now() + 3600 * 1000).toISOString();
+    const said = () => log.info.mock.calls.map(([line]) => line).join('\n');
+
+    test('the token is asked again, and the log does not say the credentials changed', async () => {
+      fetchToken.mockResolvedValue({ token: 'freshtok', expiresIn: 3600 });
+      const tok = await resolveAccessToken(
+        { ...base, cached_token_enc: 'enc:cachedtok', cached_token_expires_at: future(),
+          cached_token_cred_fp: 'ab'.repeat(32) }, log);
+      expect(tok).toBe('freshtok');
+      expect(said()).toContain('kept by an earlier version of the server');
+      expect(said()).not.toContain('credentials changed');
+    });
+
+    test('a fingerprint of this version that differs still says the credentials changed', async () => {
+      fetchToken.mockResolvedValue({ token: 'freshtok', expiresIn: 3600 });
+      const tok = await resolveAccessToken(
+        { ...base, cached_token_enc: 'enc:cachedtok', cached_token_expires_at: future(),
+          cached_token_cred_fp: `v2:${'0'.repeat(64)}` }, log);
+      expect(tok).toBe('freshtok');
+      expect(said()).toContain('credentials changed since the cached token was issued');
+      expect(said()).not.toContain('earlier version');
+    });
+
+    test('what is kept after the new token is a fingerprint of this version', async () => {
+      const fp = await captureCredFp();
+      expect(fp).toMatch(/^v2:[0-9a-f]{64}$/);
+    });
+  });
+
   test('refetches when the cache is expired/within margin and persists when expires_in is given', async () => {
     fetchToken.mockResolvedValue({ token: 'freshtok', expiresIn: 3600 });
     const past = new Date(Date.now() - 1000).toISOString();

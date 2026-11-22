@@ -1234,6 +1234,30 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`server_info.private_targets_allowed`), with the bootstrap token's and the
   mail settings' notes: **a setting that turns a protection off is shown
   while it is on.**
+- **A read route names its rate limit in its own chain; `/health` keeps its
+  disk checks; the credential fingerprint is keyed** (#1377, 1.11.570). CodeQL
+  reads a limit only where the route names it (`router.get(path, limiter, …)`),
+  not one set with `router.use()` or in `server.js` for a whole router:
+  `GET /health` (`healthLimiter`, 300 a minute), `GET /v1/auth/me`
+  (`sessionReadLimiter`, 600, before `requireAuth`), `GET
+  /v1/runs/:id/artifacts/:aid` (`artifactReadLimiter`, 300). `/logout` stays
+  without one on purpose (`health-checks.test.js` holds the comment and the
+  route together). `utils/healthChecks.js` `diskChecks()` keeps the data
+  folder's write test and the free space for `KEEP_MS` (10 s, under the
+  shortest probe period). **An answer anyone can read carries an error's code
+  (`errorCode()`), never `err.message`**: the words can hold a path, and go to
+  the log. `utils/credentialFingerprint.js`:
+  `tester_credentials.cached_token_cred_fp` is `v2:` + HMAC-SHA-256 under a key
+  derived from `ENCRYPTION_KEY`; a fingerprint of an earlier version never
+  matches, so the token is asked again once (`isCurrentForm()` chooses the log
+  line). **`access-token.js` held a raw NUL**: an editing tool had stored the
+  typed escape as the character, git read the file as binary and showed no
+  diff. Make such a character with `String.fromCharCode()`;
+  `credential-fingerprint.test.js` refuses a NUL in any source file. **In Git
+  Bash an argument that starts with `//` loses a slash** (MSYS path
+  conversion): `export MSYS_NO_PATHCONV=1` before passing a comment line as an
+  anchor. **On a pull request CodeQL reports on the changed lines only**
+  ("Persisted N diff range(s)"); the whole reading is `main`'s next analysis.
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;
