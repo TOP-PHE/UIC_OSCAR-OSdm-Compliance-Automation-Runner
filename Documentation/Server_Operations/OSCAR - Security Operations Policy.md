@@ -178,14 +178,24 @@ expired" toast (v1.9.1 wired this up) and are bounced to login.
 
 ### 3.4 SMTP credentials
 
-Brevo SMTP key. Held in OSCAR's Server Config tab (DB) since v1.7. Also
-held in `OSCAR_Deploy/alertmanager/alertmanager.yml` for Alertmanager —
-since v1.9.0 this file is generated from the DB on save, so there's one
-canonical source.
+Brevo SMTP key. Since server 1.11.565 it is held in the server's
+environment (`SMTP_PASS` in `/opt/OSCAR/OSCAR_Deploy/.env`; the Secret on
+Kubernetes), with the rest of the mail server's settings: *Server Config*
+shows them and changes none. Also held in
+`OSCAR_Deploy/alertmanager/alertmanager.yml` for Alertmanager — a file
+OSCAR writes from the same settings when "Apply alerting config" is clicked.
+
+An OSCAR whose mail server was saved from the page by an earlier version
+keeps using those saved settings (in the database) until `.env` names a mail
+server; the page says which of the two it reads. Move them to `.env` at the
+next rotation at the latest.
 
 Rotate when Brevo rotates (their dashboard notifies) or on suspected
-leak. Procedure: Brevo → SMTP & API → generate new key → paste into
-OSCAR Server Config → Save → click "Apply alerting config".
+leak. Procedure: Brevo → SMTP & API → generate new key → write it as
+`SMTP_PASS` in `.env` (with `SMTP_HOST` and the other `SMTP_*` values if
+they are not there yet) → `cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose
+up -d oscar`, when no run is in progress → *Server Config* → "Send test
+email" → "Apply alerting config".
 
 ---
 
@@ -334,7 +344,8 @@ If any of the four long-lived secrets is suspected leaked:
 - `JWT_SECRET` → SEV-2, immediate rotation via admin UI button
 - `PLATFORM_BOOTSTRAP_TOKEN` → not really a leak risk (single-use); just
   clear it
-- SMTP key → SEV-2, rotate in Brevo + paste new key in Server Config
+- SMTP key → SEV-2, rotate in Brevo + write the new key in the server's
+  environment (§ 3.4)
 
 ---
 

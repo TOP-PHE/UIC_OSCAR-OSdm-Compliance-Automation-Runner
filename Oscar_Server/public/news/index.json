@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-22-mail-server-settings",
+    "date": "November 22, 2026",
+    "tag": "Operations",
+    "title": "For administrators: the mail server is set on the server, and Server Config shows it",
+    "summary": "The mail server's settings are now read from the server's environment. Server Config shows them, says where they come from and sends a test e-mail; it no longer changes them.",
+    "content": "This concerns administrators of an OSCAR installation. Testers and Test Managers have nothing to do.\n\nThe mail server is part of the installation, as the encryption key is. Its settings (host, port, login, password, sender) are now read from the server's environment: the .env file on a Docker host, the settings and the Secret on Kubernetes. On Admin, Server Config, the SMTP section shows the settings in use and says where they come from. The fields can no longer be typed in, and the test e-mail is still there.\n\nNothing stops at the upgrade. If your mail server was set from the page, those saved settings keep working, and the page says they were saved by an earlier version. To change them, write them in the server's environment and create the server again; from then on the environment's values are the ones read.\n\nOne thing to check after the upgrade: if the .env file still holds the mail server of your first installation, it is now the one read. The page then says which saved settings it replaces. Send a test e-mail from Server Config to make sure e-mails still leave.\n\nThe Server Admin Guide (section 7, SMTP) and the Self-Hosted Quick Start (step 7) say how to set and change the mail server."
+  },
+  {
     "id": "2026-11-21-api-account-setup-points",
     "date": "November 21, 2026",
     "tag": "Improvement",

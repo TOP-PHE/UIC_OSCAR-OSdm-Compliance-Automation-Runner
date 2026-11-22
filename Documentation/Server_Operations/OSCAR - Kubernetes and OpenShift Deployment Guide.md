@@ -179,10 +179,15 @@ change one, add it to the overlay's `configMapGenerator` literals
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_FROM` | none | to send registration, approval and password-reset e-mails |
 | `ALLOW_PRIVATE_TARGETS` | not set | section 7 |
 
-`MAX_CONCURRENT_RUNS` and the `SMTP_*` settings are read once, at the first
-start, into Admin → *Server Config*; from then on that page's value counts, and
-a change in `settings.env` does nothing. A database moved from a VPS (section
-6a) brings the VPS's values.
+`MAX_CONCURRENT_RUNS` is read once, at the first start, into Admin → *Server
+Config*; from then on that page's value counts, and a change in `settings.env`
+does nothing. A database moved from a VPS (section 6a) brings the VPS's value.
+
+The mail server is the other way round (server 1.11.565): once the settings
+name one (`SMTP_HOST`), the `SMTP_*` values of the settings and `SMTP_PASS` of
+the Secret are read at each start, and *Server Config* shows them without
+changing them. While they name none, an OSCAR whose database came from a VPS
+keeps the mail server saved there.
 
 The volume asks for 20 GiB (`base/data-volume.yaml`): reports grow with the
 number of runs. The runs' working folders are an `emptyDir` of 4 GiB, emptied

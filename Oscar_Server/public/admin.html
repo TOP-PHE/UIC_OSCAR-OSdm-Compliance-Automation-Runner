@@ -1397,7 +1397,38 @@ function smtpAlertingNote(mode) {
   const how = mode === 'kubernetes'
     ? 'once given to Alertmanager with the commands of the Alerting section below'
     : 'after you click "Apply" in the Alerting section below';
-  return '💡 <strong>One SMTP for everything.</strong> These credentials are used by OSCAR for password-reset / email-verification emails AND by Alertmanager for admin alerts (' + how + '). One source of truth — no separate VPS file edits.';
+  return '💡 <strong>One mail server for everything.</strong> It sends OSCAR\'s own e-mails (invitations, password resets) and Alertmanager\'s alerts to administrators (' + how + ').';
+}
+
+// The id of a Server Config field. A setting the page only shows (#1363: the
+// mail server's) gets another id than the fields saveConfig() collects.
+function configFieldId(key, cfg) {
+  return (cfg && cfg.read_only ? 'cfg-shown-' : 'cfg-') + key;
+}
+
+// Where the mail settings come from and how they are changed (#1363). They
+// are the server's environment's: the page shows them and saves none.
+// `source` is server_info.mail_source; `replaced` server_info.mail_replaced,
+// the names of the settings saved earlier that the environment's differ from.
+function mailSettingsNote(source, replaced) {
+  const change = 'in the server\'s environment (the <code>.env</code> file on a Docker host; the settings and the Secret on Kubernetes), then create the server again (<code>docker compose up -d oscar</code>; on Kubernetes, apply and restart it)';
+  if (source === 'environment') {
+    const names = (Array.isArray(replaced) ? replaced : []).filter(name => /^[A-Z_]{1,30}$/.test(name));
+    const html = '📌 <strong>Set in the server\'s environment.</strong> These settings are shown here, not changed here. To change them, edit them ' + change + '. Then send a test e-mail below.';
+    if (names.length === 0) return { warn: false, html: html };
+    return { warn: true, html: html + ' <strong>Check them:</strong> the settings saved from this page earlier are no longer read, and held another value for ' + names.join(', ') + '. If the environment still holds an older mail server, e-mails fail until it is corrected there.' };
+  }
+  if (source === 'stored') {
+    return { warn: true, html: '⚠️ <strong>Saved from this page by an earlier version.</strong> These settings are still in use and can no longer be changed here. To change them, set <code>SMTP_HOST</code> and the other <code>SMTP_*</code> values ' + change + '. From then on the environment\'s values are the ones used, and the ones kept here are no longer read.' };
+  }
+  return { warn: true, html: '⚠️ <strong>No mail server is set.</strong> OSCAR sends no e-mail: no invitation, no password reset, no alert. Set <code>SMTP_HOST</code>, <code>SMTP_USER</code>, <code>SMTP_PASS</code> and <code>SMTP_FROM</code> ' + change + '.' };
+}
+
+// The server's hints on the sender address (server_info.mail_warnings), as text.
+function mailWarningsHtml(warnings) {
+  if (!Array.isArray(warnings) || warnings.length === 0) return '';
+  return '<div style="font-size:12px;color:#7c5800;margin-bottom:14px;padding:10px 14px;background:#fff8e1;border-left:3px solid #f9a825;border-radius:4px">' +
+    warnings.map(w => '<div>' + esc(w) + '</div>').join('') + '</div>';
 }
 
 // The Alerting section's opening line and its end: the Apply button, or on
@@ -1423,7 +1454,7 @@ function alertingParts(mode, commands) {
 // What a successful save says about Alertmanager.
 function savedConfigMessage(mode) {
   const next = mode === 'kubernetes'
-    ? 'For SMTP or Alerting changes, run the commands of the Alerting section on the machine.'
+    ? 'For Alerting changes, run the commands of the Alerting section on the machine.'
     : 'For Alerting changes, click "Apply alerting config" below.';
   return 'Configuration saved — changes take effect immediately. (' + next + ')';
 }
@@ -1459,23 +1490,27 @@ async function loadConfig() {
     const isEnum = cfg.type === 'enum';
     const isSensitive = cfg.sensitive;
     const rangeHint = isNum && cfg.min != null ? `(${cfg.min} – ${cfg.max})` : '';
+    const fieldId = configFieldId(key, cfg);
 
     let control;
-    if (isEnum) {
+    if (cfg.read_only) {
+      // Shown, never sent back (#1363). A sensitive value arrives masked.
+      control = `<input id="${fieldId}" type="text" readonly value="${esc(cfg.value || '')}" style="font-size:14px;font-weight:600;background:#f5f7f8;color:#546e7a" placeholder="not set">`;
+    } else if (isEnum) {
       const opts = (cfg.options || []).map(o =>
         `<option value="${esc(o)}"${o === cfg.value ? ' selected' : ''}>${esc(o)}</option>`
       ).join('');
-      control = `<select id="cfg-${key}" style="font-size:14px;font-weight:600;padding:9px 10px;border:1px solid #cfd8dc;border-radius:6px;width:100%">${opts}</select>`;
+      control = `<select id="${fieldId}" style="font-size:14px;font-weight:600;padding:9px 10px;border:1px solid #cfd8dc;border-radius:6px;width:100%">${opts}</select>`;
     } else {
       const inputType = configInputType(isSensitive, isNum);
       const attrs = isNum ? `min="${cfg.min}" max="${cfg.max}"` : '';
-      control = `<input id="cfg-${key}" type="${inputType}" ${attrs} value="${esc(cfg.value || '')}" style="font-size:14px;font-weight:600" placeholder="${esc(configPlaceholder(cfg))}">`;
+      control = `<input id="${fieldId}" type="${inputType}" ${attrs} value="${esc(cfg.value || '')}" style="font-size:14px;font-weight:600" placeholder="${esc(configPlaceholder(cfg))}">`;
     }
 
     return `
     <div class="row" style="margin-bottom:12px;align-items:start">
       <div class="field" style="max-width:320px">
-        <label for="cfg-${key}">${esc(CONFIG_LABELS[key] || key)}</label>
+        <label for="${fieldId}">${esc(CONFIG_LABELS[key] || key)}</label>
         ${control}
       </div>
       <div style="flex:1;font-size:12px;color:#78909c;padding-top:22px">
@@ -1491,8 +1526,12 @@ async function loadConfig() {
     html += loggingKeys.map(configRow).join('');
   }
   html += '<div style="font-size:13px;font-weight:700;color:#0090D4;text-transform:uppercase;letter-spacing:.4px;margin:20px 0 10px;padding-top:14px;border-top:1px solid #eceff1">SMTP / Email Settings</div>';
+  const mailNote = mailSettingsNote(si.mail_source, si.mail_replaced);
+  html += '<div style="font-size:12px;color:' + (mailNote.warn ? '#7c5800' : '#546e7a') + ';margin-bottom:10px;padding:10px 14px;background:' + (mailNote.warn ? '#fff8e1' : '#f5fcff') + ';border-left:3px solid ' + (mailNote.warn ? '#f9a825' : '#0090D4') + ';border-radius:4px">' +
+    mailNote.html + '</div>';
   html += '<div style="font-size:12px;color:#78909c;margin-bottom:14px;padding:10px 14px;background:#f5fcff;border-left:3px solid #0090D4;border-radius:4px">' +
     smtpAlertingNote(_alertingMode) + '</div>';
+  html += mailWarningsHtml(si.mail_warnings);
   html += smtpKeys.map(configRow).join('');
   if (alertingKeys.length) {
     const alerting = alertingParts(_alertingMode, si.alerting_commands);
@@ -1548,7 +1587,7 @@ The new config is live. Trigger a synthetic alert to verify end-to-end:
   Reload body:       ${data.reloadBody || 'n/a'}
 
 Common causes:
-  • SMTP_HOST or ALERT_RECIPIENTS empty — fill them in above and re-save first
+  • SMTP_HOST (set in the server's environment) or ALERT_RECIPIENTS (above) empty
   • alertmanager-config volume not mounted into the OSCAR container (operator action — see Admin Guide § 14)
   • Alertmanager container not running or unreachable on http://alertmanager:9093`;
     }
@@ -1565,6 +1604,8 @@ async function saveConfig() {
   if (!_configCache) return;
   const payload = {};
   for (const key of Object.keys(_configCache)) {
+    // A setting the page only shows is not sent back (#1363).
+    if (_configCache[key] && _configCache[key].read_only) continue;
     const el = document.getElementById('cfg-' + key);
     if (el) payload[key] = el.value;
   }

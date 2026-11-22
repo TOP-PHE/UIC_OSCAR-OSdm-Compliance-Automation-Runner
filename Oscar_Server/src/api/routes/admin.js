@@ -43,6 +43,7 @@ const { withDatafileLock } = require('../../utils/datafileLock');
 const path = require('node:path');
 const AccessRequests = require('../../utils/accessRequests');
 const alertmanagerConfig = require('../../utils/alertmanagerConfig');
+const mailSettings = require('../../utils/mailSettings');
 const { deploymentKind } = require('../../utils/deployment');
 const log = require('../../utils/logger').child({ module: 'admin' });
 
@@ -860,16 +861,44 @@ const CONFIG_SCHEMA = {
   ALERT_REPEAT_WARNING:   { description: 'How often to re-page warning alerts until acknowledged (e.g. 4h, 12h)', type: 'string', group: 'alerting' },
 };
 
-router.get('/config', (req, res) => {
+// A sensitive value is never answered whole: its first four characters, then ****.
+function shownValue(schema, value) {
+  if (!schema.sensitive || !value) return value;
+  return value.length > 4 ? value.slice(0, 4) + '****' : '****';
+}
+
+/**
+ * Server Config as the page reads it, after a read and after a save alike:
+ * each setting's value (a sensitive one masked) and its schema. The mail
+ * server's settings are marked read_only (#1363): the page shows them and
+ * sends none back.
+ */
+function configView() {
   const config = {};
   for (const [key, schema] of Object.entries(CONFIG_SCHEMA)) {
-    let value = getConfig(key, '');
-    // Mask sensitive values (show first 4 chars + ****)
-    if (schema.sensitive && value) {
-      value = value.length > 4 ? value.slice(0, 4) + '****' : '****';
-    }
-    config[key] = { value, ...schema };
+    config[key] = { value: shownValue(schema, getConfig(key, '')), ...schema };
+    if (mailSettings.isMailKey(key)) config[key].read_only = true;
   }
+  return config;
+}
+
+// Where the mail settings in use come from, and what looks wrong in them,
+// for the page's note (#1363).
+function mailInfo() {
+  const stored = Object.fromEntries(
+    all("SELECT key, value FROM server_config WHERE key LIKE 'SMTP!_%' ESCAPE '!'").map(r => [r.key, r.value]));
+  return {
+    source: mailSettings.sourceOf(stored.SMTP_HOST),
+    // The settings saved earlier that the environment replaces with another
+    // value: their names, for the page to say an old .env may be in use.
+    replaced: mailSettings.replacedByEnvironment(stored),
+    warnings: smtpFromWarnings(getConfig('SMTP_FROM', ''), { SMTP_USER: getConfig('SMTP_USER', '') }),
+  };
+}
+
+router.get('/config', (req, res) => {
+  const config = configView();
+  const mail = mailInfo();
 
   const serverInfo = {
     version:         '1.0.0',
@@ -882,16 +911,21 @@ router.get('/config', (req, res) => {
     // How Alertmanager gets these settings: on Kubernetes the page shows the
     // commands instead of the Apply button (#1175).
     alerting_mode:   alertmanagerConfig.alertingMode(),
+    // #1363: 'environment', 'stored' (saved from this page by an earlier
+    // version) or 'none', and the hints on the sender address.
+    mail_source:     mail.source,
+    mail_replaced:   mail.replaced,
+    mail_warnings:   mail.warnings,
   };
   if (serverInfo.alerting_mode === 'kubernetes') serverInfo.alerting_commands = alertmanagerConfig.KUBERNETES_COMMANDS;
 
   return res.json({ config, server_info: serverInfo });
 });
 
-// Soft-validation hints for SMTP — NOT errors that block the save (the operator
-// might genuinely want an unusual setup), but warnings surfaced in the response
-// body so the UI can highlight likely-mistakes inline. Closes the diagnostic
-// gap that produced the SMTP_USER-pasted-into-SMTP_FROM incident.
+// Hints on the sender address — never a refusal (the operator may want an
+// unusual set-up), shown by the page under the mail settings. They come from
+// the SMTP_USER-pasted-into-SMTP_FROM incident. Since #1363 they are given
+// with a read of the settings, which the page no longer saves.
 const INTERNAL_RELAY_DOMAINS = [
   'smtp-brevo.com', 'smtp.sendgrid.net', 'smtp-sendgrid.net',
   'smtp.mailgun.org', 'smtp.postmarkapp.com', 'smtp.mailtrap.io'
@@ -923,11 +957,59 @@ function backToDefault(key) {
   return run('DELETE FROM server_config WHERE key = ?', [key]).changes > 0;
 }
 
+/**
+ * What a save asks of one setting: { error }, { skip: true } (nothing asked),
+ * { reset: true } (its stored value goes) or { value } (to store).
+ */
+function checkedSetting(key, schema, rawValue) {
+  if (schema.type === 'number') {
+    if (isEmptyField(rawValue)) return { reset: true };
+    const value = Number(rawValue);
+    if (Number.isNaN(value)) return { error: `${key}: must be a number` };
+    if (schema.min != null && value < schema.min) return { error: `${key}: minimum is ${schema.min}` };
+    if (schema.max != null && value > schema.max) return { error: `${key}: maximum is ${schema.max}` };
+    return { value };
+  }
+  const value = String(rawValue || '');
+  if (schema.type === 'enum') {
+    return schema.options?.includes(value)
+      ? { value }
+      : { error: `${key}: must be one of ${(schema.options || []).join(', ')}` };
+  }
+  // A sensitive value sent back masked was not changed.
+  if (schema.sensitive && value.includes('****')) return { skip: true };
+  return { value };
+}
+
+function storeSetting(key, value, by) {
+  run(
+    `INSERT INTO server_config (key, value, updated_at, updated_by)
+     VALUES (?, ?, datetime('now'), ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
+    [key, String(value), by]
+  );
+  // The log level is applied at once.
+  if (key === 'LOG_LEVEL') {
+    try { require('../../utils/logger').setLevel(String(value)); } catch (_) { /* ignore */ }
+  }
+}
+
+// #1363: the mail server's settings are the server's environment's. A page
+// from before sends every field back, the mail settings among them: one sent
+// as it is shown asks for nothing, any other value is refused.
+const MAIL_NOT_HERE = "the mail server's settings are set in the server's environment and are not changed from this page.";
+
+function mailSettingAsShown(key, schema, rawValue) {
+  const sent = String(rawValue ?? '').trim();
+  const current = String(getConfig(key, '') ?? '');
+  return sent === current || sent === shownValue(schema, current);
+}
+
 router.patch('/config', (req, res) => {
   const body = req.body || {};
   const updated = [];
   const errors  = [];
-  const warnings = [];
+  const mailRefused = [];
 
   for (const [key, rawValue] of Object.entries(body)) {
     const schema = CONFIG_SCHEMA[key];
@@ -935,51 +1017,27 @@ router.patch('/config', (req, res) => {
       errors.push(`Unknown config key: ${key}`);
       continue;
     }
-
-    if (schema.type === 'number' && isEmptyField(rawValue)) {
-      if (backToDefault(key)) updated.push({ key, value: 'default' });
+    // Nothing of a mail setting is written or removed here, whatever is sent.
+    if (mailSettings.isMailKey(key)) {
+      if (!mailSettingAsShown(key, schema, rawValue)) mailRefused.push(key);
       continue;
     }
 
-    let value;
-    if (schema.type === 'number') {
-      value = Number(rawValue);
-      if (Number.isNaN(value)) {
-        errors.push(`${key}: must be a number`);
-        continue;
-      }
-      if (schema.min != null && value < schema.min) { errors.push(`${key}: minimum is ${schema.min}`); continue; }
-      if (schema.max != null && value > schema.max) { errors.push(`${key}: maximum is ${schema.max}`); continue; }
-    } else if (schema.type === 'enum') {
-      value = String(rawValue || '');
-      if (!schema.options?.includes(value)) {
-        errors.push(`${key}: must be one of ${(schema.options || []).join(', ')}`);
-        continue;
-      }
-    } else {
-      // String type — skip masked values (unchanged sensitive fields)
-      value = String(rawValue || '');
-      if (schema.sensitive && value.includes('****')) continue; // skip — user didn't change it
+    const asked = checkedSetting(key, schema, rawValue);
+    if (asked.error) { errors.push(asked.error); continue; }
+    if (asked.skip) continue;
+    if (asked.reset) {
+      // #1338: an empty number field is no value; its stored one goes.
+      if (backToDefault(key)) updated.push({ key, value: 'default' });
+      continue;
     }
+    storeSetting(key, asked.value, req.user.email);
+    updated.push({ key, value: schema.sensitive ? '****' : String(asked.value) });
+  }
 
-    run(
-      `INSERT INTO server_config (key, value, updated_at, updated_by)
-       VALUES (?, ?, datetime('now'), ?)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`,
-      [key, String(value), req.user.email]
-    );
-
-    // Apply runtime side-effects for keys that need immediate action
-    if (key === 'LOG_LEVEL') {
-      try { require('../../utils/logger').setLevel(String(value)); } catch (_) { /* ignore */ }
-    }
-    // Soft warnings for the SMTP_FROM gotcha — surfaced to the UI so admins
-    // see them inline next to the field, but do not block the save.
-    if (key === 'SMTP_FROM') {
-      smtpFromWarnings(value, body).forEach(msg => warnings.push({ key, message: msg }));
-    }
-
-    updated.push({ key, value: schema.sensitive ? '****' : String(value) });
+  if (mailRefused.length > 0) {
+    errors.push(`${mailRefused.join(', ')}: ${MAIL_NOT_HERE}`);
+    auditLog(req.user.id, null, req.user.email, `config_mail_change_refused:${mailRefused.join(',')}`);
   }
 
   if (errors.length > 0 && updated.length === 0) {
@@ -989,13 +1047,10 @@ router.patch('/config', (req, res) => {
   const changes = updated.map(u => `${u.key}=${u.value}`).join(',');
   auditLog(req.user.id, null, req.user.email, `config_updated:${changes}`);
 
-  // Return the full config after update
-  const config = {};
-  for (const [key, schema] of Object.entries(CONFIG_SCHEMA)) {
-    config[key] = { value: getConfig(key, ''), ...schema };
-  }
-
-  return res.json({ updated, errors, warnings, config });
+  // The configuration after the save, as a read gives it (sensitive values
+  // masked). `warnings` stays in the answer for the page; the hints on the
+  // sender address are now given with the read (server_info.mail_warnings).
+  return res.json({ updated, errors, warnings: [], config: configView() });
 });
 
 // ── POST /v1/admin/alertmanager/apply (v1.9.0) ───────────────────────────────
@@ -1073,7 +1128,7 @@ router.post('/test-email',
     auditLog(req.user.id, null, req.user.email, `test_email:not_configured:${to}`);
     return res.status(409).json({
       status: 409, title: 'SMTP Not Configured',
-      detail: 'SMTP_HOST, SMTP_USER and SMTP_PASS must all be set on the Server Config tab before sending a test email.'
+      detail: "SMTP_HOST, SMTP_USER and SMTP_PASS must all be set in the server's environment before sending a test email."
     });
   }
 

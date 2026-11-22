@@ -1,8 +1,19 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.603",
+  "current_release": "2026.604",
   "releases": [
+    {
+      "release": "2026.604",
+      "date": "2026-11-22",
+      "server": "1.11.565",
+      "collection": "OTST_V2.0.268",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.565 (#1363): the mail server's settings (SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS, SMTP_FROM) are read from the server's environment once it names a mail server; Admin, Server Config shows them, says where they come from and no longer changes them. Settings saved from the page by an earlier version keep working until then. A save of Server Config answers the same view as a read (sensitive values masked). After the upgrade, check with a test e-mail that an .env holding an older mail server is not the one now read: the page and the server's start line name the saved settings it replaces. Collection unchanged."
+      ]
+    },
     {
       "release": "2026.603",
       "date": "2026-11-21",

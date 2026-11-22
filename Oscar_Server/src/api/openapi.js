@@ -376,10 +376,11 @@ module.exports = {
     },
     '/v1/admin/config': {
       get: { tags: ['Admin'], summary: 'Get server config + server info', security: [{ bearerAuth: [] }],
-        description: 'server_info.alerting_mode says how Alertmanager gets the alerting settings: file (a shared volume, the Apply button) or kubernetes (a Secret the administrator makes; server_info.alerting_commands gives the commands, #1175).',
+        description: 'server_info.alerting_mode says how Alertmanager gets the alerting settings: file (a shared volume, the Apply button) or kubernetes (a Secret the administrator makes; server_info.alerting_commands gives the commands, #1175). The mail server\'s settings (SMTP_*) carry read_only: true (#1363): they are the server\'s environment\'s. server_info.mail_source says where the ones in use come from: environment, stored (saved from Server Config by an earlier version, still used while the environment names no mail server) or none; server_info.mail_replaced names the settings saved earlier that the environment replaces with another value (names only); server_info.mail_warnings holds hints on the sender address. A sensitive value is answered masked.',
         responses: { 200: { description: 'Current config and server info' } } },
       patch: { tags: ['Admin'], summary: 'Update one or more config values (takes effect immediately)', security: [{ bearerAuth: [] }],
-        responses: { 200: { description: 'Updated config' }, 400: { description: 'Validation failed' } } },
+        description: 'Body: { KEY: value, … }. A mail setting (SMTP_*) is never written here (#1363): sent as it is shown it asks for nothing, any other value is refused and named in errors. The answer\'s config is the one a read gives, sensitive values masked.',
+        responses: { 200: { description: '{ updated, errors, warnings, config }' }, 400: { description: 'Nothing saved: every value sent was refused' } } },
     },
     '/v1/admin/rotate-jwt-secret': {
       post: { tags: ['Admin'], summary: 'Rotate the JWT secret — invalidates ALL existing sessions', security: [{ bearerAuth: [] }],

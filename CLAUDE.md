@@ -1148,6 +1148,29 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   cascade, so every table that cascade reaches needs an index on its key
   (`run_assertions.suite_id` had none: the deletion held the server for
   minutes, a 504). `user-deletion.test.js` fails on a new unindexed one.
+- **The mail server's settings are the server's environment's; no page
+  writes them** (#1363, 1.11.565, maintainer decision 2026-11-22: the mail
+  server is part of the deployment). `utils/mailSettings.js` (pure):
+  `MAIL_KEYS` are the six `SMTP_*`; once the environment names a mail server
+  (`SMTP_HOST`), `getConfig()` (`db.js`) answers each of them from the
+  environment, a missing one being its default, never the stored value. With
+  none in the environment, the values an earlier version saved from Server
+  Config are read as before (`stored`), so an upgrade stops no e-mail.
+  `PATCH /v1/admin/config` looks at a mail key before anything is stored or
+  removed: sent as it is shown (a page from before sends every field) it
+  asks for nothing, else it is refused and audited
+  (`config_mail_change_refused`). `GET` marks them `read_only` and gives
+  `server_info.mail_source` / `mail_replaced` / `mail_warnings`; the page
+  draws them with ids `cfg-shown-<KEY>`, which `saveConfig()` does not
+  collect. **A save answers `configView()`, the view a read gives**: never
+  build that answer from `getConfig()` directly (a sensitive value is
+  masked in one place, `shownValue()`). A first start copies no mail setting
+  of the environment into the database. **An `.env` may still hold the mail
+  server of a first installation**: `replacedByEnvironment()` names the saved
+  settings it replaces (start line, page), names only. A new setting that
+  decides where OSCAR sends something belongs to the environment the same
+  way; `mail-settings.test.js` lists the files of `src/` that write
+  `server_config`, and a new writer fails it.
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;
@@ -4322,8 +4345,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     backup's `data/`, `save` a cold copy): OSCAR's Deployment to 0, a pod
     made from that Deployment's own image, security context and claim (jq),
     the database checked. **The database's `server_config` wins over
-    `settings.env`** (`MAX_CONCURRENT_RUNS`, `SMTP_*` are read once, at the
-    first start), so a moved database keeps the VPS's values. The kind CI
+    `settings.env`** (`MAX_CONCURRENT_RUNS` is read once, at the first
+    start), so a moved database keeps the VPS's values; the mail server is
+    the exception since #1363 (the settings and the Secret win once they
+    name one, a moved database's saved one is used until then). The kind CI
     moves the first deployment's data into the second and reads it back.
   - **One machine with k3s** (guide *OSCAR - k3s on one VPS*): `k3s/`
     (k3s's `config.yaml`, a `HelmChartConfig` of its Traefik, both put in
