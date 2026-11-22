@@ -23,6 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Guides: an edited `.env` needs `docker compose up -d`, not `restart`; the session secret is not rotated through `.env`** (#1361). Documentation and one comment in a deployment example, no version.
+  - **Seen:** *Self-Hosted Quick Start* (step 6 and its troubleshooting table) said to clear `PLATFORM_BOOTSTRAP_TOKEN` in `.env`, then `docker compose restart oscar`. *Security Operations Policy* 3.3 rotated `JWT_SECRET` by writing a new value in `.env`, then the same restart.
+  - **Why it did nothing:**
+    - a container keeps the environment it was created with, and a `restart` keeps the container: the edited `.env` is not read. *installation-guide.md* said so already; these pages did not follow it. An operator who followed step 6 as written still had the token in the running server;
+    - the server makes its session secret at its first start and keeps it in the database: it does not read the `JWT_SECRET` line of `.env` at all.
+  - **Now:**
+    - Quick Start step 6: the line emptied with one command, the container created again with `docker compose up -d oscar`, the reason, and a call that shows the running server no longer holds a token (`503`);
+    - Security Operations Policy: 3.3 is the route `POST /v1/admin/rotate-jwt-secret` (at once, no restart), with how to call it, since no page has a button for it: the page named one that does not exist; the bootstrap token's row and its line under "suspected key leak" say how it is cleared;
+    - *installation-guide.md*: section 5 said the endpoint "can only create the very first administrator" and answers `409` afterwards. It answers for as long as the token is set, so the section now clears the token; its expected answer is the one the server gives. A row *Apply a change of `.env`* in the day-2 table;
+    - `OSCAR_Deploy/.env.example`: the comments on both lines.
+  - Both pages called the token "single-use": clearing it is what makes it so.
+  - Not regenerated: `OSCAR - Self-Hosted Quick Start.pdf` (May 2026), which was already older than the page.
+
 - **The CI job "k3s on one machine" failed since #1336** (#1340). CI, guide and a test, no version.
   - **Seen:** the job stopped at once at its inotify check, on #1336's PR and on `main` after it. The job is not a required check, so #1336 merged with it red.
   - **Why:** GitHub's runner image sets `fs.inotify.max_user_instances` in `/etc/sysctl.conf`, which `sysctl --system` reads after every file of `/etc/sysctl.d`. Its value wins over the guide's 8192.

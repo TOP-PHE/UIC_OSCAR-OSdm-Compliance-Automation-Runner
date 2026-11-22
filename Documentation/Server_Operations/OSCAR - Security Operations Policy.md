@@ -107,7 +107,7 @@ permissions `600` (root only).
 |---|---|---|---|
 | `ENCRYPTION_KEY` | At-rest encryption (creds + run_events + run_requests + scenarios + artifact files) | **NEVER ROTATE** under normal conditions | Without re-encryption pass, all encrypted data becomes unreadable |
 | `JWT_SECRET` | Web session tokens | On suspected leak; otherwise indefinite | All active web sessions invalidated; users must re-login |
-| `PLATFORM_BOOTSTRAP_TOKEN` | One-time admin creation via `POST /v1/auth/bootstrap/platform-user` | Once initial admin is created, this is cleared (set to empty) | The bootstrap endpoint returns 503 until set again |
+| `PLATFORM_BOOTSTRAP_TOKEN` | Creation of the first administrator via `POST /v1/auth/bootstrap/platform-user`. The route accepts the token for as long as it is set | Once the first administrator is created, it is cleared: the line emptied in `.env` **and the container created again** (`docker compose up -d oscar`; a `restart` keeps the old value) | The bootstrap endpoint returns 503 until set again |
 | Brevo SMTP key | Outbound emails (alerts, password reset, verification) | When Brevo rotates / on suspected leak | Email delivery stops until re-configured |
 
 ### 3.2 `ENCRYPTION_KEY` — the most critical secret
@@ -162,19 +162,24 @@ Cheaper to rotate. Effect: every user logged in must log in again.
 
 #### Rotation procedure
 
-```bash
-# Generate new
-NEW=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-echo "JWT_SECRET=$NEW"
+A signed-in administrator calls `POST /v1/admin/rotate-jwt-secret`. The
+server makes a new secret, stores it and uses it at once: no restart, no
+file to edit. The action is written to the audit log.
 
-# Update .env on the VPS (or use the admin UI's "Rotate JWT Secret" button —
-# which does the same thing through /v1/admin/rotate-jwt-secret)
-ssh ubuntu@oscar.uic.org "sudo sed -i \"s|^JWT_SECRET=.*|JWT_SECRET=$NEW|\" /opt/OSCAR/OSCAR_Deploy/.env"
-ssh ubuntu@oscar.uic.org "cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose restart oscar"
+No page has a button for it yet. From an Admin page of OSCAR, open the
+browser's console (F12 → Console) and run:
+
+```js
+fetch('/v1/admin/rotate-jwt-secret', { method: 'POST' }).then(r => r.json()).then(console.log)
 ```
 
-After restart, all existing JWTs are invalid. Users see "session
-expired" toast (v1.9.1 wired this up) and are bounced to login.
+It answers `{ rotated: true, … }`. From that moment all existing JWTs are
+invalid, the administrator's own included. Users see the "session expired"
+toast and are bounced to login.
+
+> **Not through `.env`.** The server makes its session secret at its first
+> start and keeps it in the database; it does not read the `JWT_SECRET`
+> line of `.env`. Writing a new value there and restarting rotates nothing.
 
 ### 3.4 SMTP credentials
 
@@ -341,9 +346,11 @@ worked example.
 If any of the four long-lived secrets is suspected leaked:
 
 - `ENCRYPTION_KEY` → SEV-1, rotate-and-re-encrypt window (§ 3.2)
-- `JWT_SECRET` → SEV-2, immediate rotation via admin UI button
-- `PLATFORM_BOOTSTRAP_TOKEN` → not really a leak risk (single-use); just
-  clear it
+- `JWT_SECRET` → SEV-2, immediate rotation (§ 3.3)
+- `PLATFORM_BOOTSTRAP_TOKEN` → no risk once it is cleared, since the server
+  then accepts none. If it was still set: clear it (§ 3.1: empty the line
+  and create the container again), then read the list of administrators and
+  certifiers for an account nobody knows
 - SMTP key → SEV-2, rotate in Brevo + write the new key in the server's
   environment (§ 3.4)
 

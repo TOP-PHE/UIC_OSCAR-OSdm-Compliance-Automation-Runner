@@ -145,8 +145,8 @@ ENCRYPTION_KEY=$(openssl rand -hex 32) && echo "ENCRYPTION_KEY=$ENCRYPTION_KEY"
 # 2. JWT signing secret for web sessions.
 JWT_SECRET=$(openssl rand -hex 32) && echo "JWT_SECRET=$JWT_SECRET"
 
-# 3. One-time bootstrap token used to create the very first admin account.
-#    Used exactly once, then can be unset.
+# 3. Bootstrap token used to create the very first admin account.
+#    Needed once. The server accepts it for as long as it is set: Step 6 clears it.
 PLATFORM_BOOTSTRAP_TOKEN=$(openssl rand -base64 36 | tr -d '=+/') && echo "PLATFORM_BOOTSTRAP_TOKEN=$PLATFORM_BOOTSTRAP_TOKEN"
 ```
 
@@ -154,11 +154,13 @@ Save all three values to a password manager (or just to a temp text file
 you'll delete after Step 6 below). You'll paste them into the next step.
 
 > **Why these matter:** lose `ENCRYPTION_KEY` and you lose access to every
-> stored OAuth credential (the encrypted columns become unreadable). Lose
-> `JWT_SECRET` and every active session is invalidated on the next restart
-> (annoying but recoverable — users just log in again). Lose
-> `PLATFORM_BOOTSTRAP_TOKEN` after you've created the first admin and it
-> doesn't matter — that token is single-use.
+> stored OAuth credential (the encrypted columns become unreadable).
+> `JWT_SECRET` matters less than it looks: the server makes its session
+> secret at its first start and keeps it in the database, so the `.env`
+> line is not what signs sessions. To end every session, see *Security
+> Operations Policy* 3.3 (users just log in again).
+> `PLATFORM_BOOTSTRAP_TOKEN` is needed once, to create the first admin. The
+> server accepts it for as long as it is set, so Step 6 clears it.
 
 ---
 
@@ -301,13 +303,39 @@ Expected response:
 Now sign in at `https://oscar.example.org` with the credentials you just
 created. You'll land on the admin welcome page with full access.
 
-After this, **clear the bootstrap token from `.env`** so it can't be reused:
+After this, **clear the bootstrap token** so it can't be reused. The server
+accepts the token for as long as it is set: emptying the line is not
+enough, the container must be created again.
 
 ```bash
-sudo nano /opt/OSCAR/OSCAR_Deploy/.env
-# blank out the PLATFORM_BOOTSTRAP_TOKEN line
-sudo docker compose restart oscar
+# 1. Empty the line in the file. Prints 0 once it is empty.
+sudo sed -i 's/^PLATFORM_BOOTSTRAP_TOKEN=.*/PLATFORM_BOOTSTRAP_TOKEN=/' /opt/OSCAR/OSCAR_Deploy/.env
+sudo grep -c '^PLATFORM_BOOTSTRAP_TOKEN=..*' /opt/OSCAR/OSCAR_Deploy/.env
 ```
+
+```bash
+# 2. Create the container again, so that it starts without the token.
+cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose up -d oscar
+```
+
+> **Why `up -d` and not `restart`:** a container keeps the environment it
+> was created with. `docker compose restart` keeps the container, so an
+> edited `.env` is not read; `docker compose up -d oscar` sees the change
+> and creates the container again. An image update by Watchtower does not
+> read `.env` either. If you start OSCAR with more than one compose file
+> (`-f docker-compose.yml -f docker-compose.metrics.yml`), name the same
+> files here.
+
+Then check that the running server no longer has it. The same call as
+above, with any token, must answer `503` ("PLATFORM_BOOTSTRAP_TOKEN is not
+configured on server"); a `401` means the server still holds a token:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -X POST https://oscar.example.org/v1/auth/bootstrap/platform-user -H 'Content-Type: application/json' -H 'X-Platform-Bootstrap-Token: none' -d '{"email":"check@example.org","password":"Check-1234567890"}'
+```
+
+Later administrators are invited from the **Admin** pages by an existing
+one; the token is not needed for them.
 
 ---
 
@@ -509,7 +537,7 @@ sudo docker compose up -d
 |---|---|---|
 | `docker pull` errors with `denied` / `unauthorized` | GHCR package is private | `docker logout ghcr.io && docker pull ghcr.io/top-phe/oscar-server:stable`. If still denied, the package owner needs to flip it to public. |
 | `https://oscar.example.org` returns 502 Bad Gateway | OSCAR container down or wrong port | `docker logs oscar --tail 50` — usually a missing required env var (ENCRYPTION_KEY, JWT_SECRET) caught at startup |
-| Bootstrap call returns 401 / 403 | Wrong / missing `PLATFORM_BOOTSTRAP_TOKEN` in `.env`, or you forgot to restart oscar after editing `.env` | `sudo docker compose restart oscar`, then re-curl |
+| Bootstrap call returns 401 / 403 | Wrong / missing `PLATFORM_BOOTSTRAP_TOKEN` in `.env`, or the container was not created again after `.env` was edited (a `restart` keeps the old values) | `cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose up -d oscar`, then re-curl |
 | Test email "succeeds" but never arrives | `SMTP_FROM` on an unverified domain — relay accepts but recipient spam-filters | Use a sender on a domain your relay has verified. Add SPF + DKIM DNS records. Check spam folder. |
 | Server runs but admin UI banner shows "untested combination" in red | `compatibility.json` doesn't list your image+collection combination | Either upgrade to a known-good combo, or accept the warning — runtime is unaffected |
 
