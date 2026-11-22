@@ -23,53 +23,55 @@ const KEY_A = { ENCRYPTION_KEY: 'a'.repeat(64) };
 const KEY_B = { ENCRYPTION_KEY: 'b'.repeat(64) };
 const VALUES = ['oauth2_basic', 'https://token.example/oauth', 'client', 'secret', 'scope', '', '', 'https://api.example'];
 const REPO = path.join(__dirname, '..', '..', '..');
+const print = (values, env = KEY_A) => F.credentialFingerprint(values, env);
 
 describe('the fingerprint of a set of credentials', () => {
-  test('the same values give the same fingerprint, any other value another', () => {
-    const base = F.credentialFingerprint(VALUES, KEY_A);
-    expect(F.credentialFingerprint([...VALUES], KEY_A)).toBe(base);
+  test('the same values give the same fingerprint, any other value another', async () => {
+    const base = await print(VALUES);
+    expect(await print([...VALUES])).toBe(base);
     for (let i = 0; i < VALUES.length; i++) {
       const changed = [...VALUES];
       changed[i] = `${changed[i]}x`;
-      expect(F.credentialFingerprint(changed, KEY_A)).not.toBe(base);
+      expect(await print(changed)).not.toBe(base);
     }
   });
 
-  test('where a value ends counts: two values are not their joined text', () => {
-    expect(F.credentialFingerprint(['ab', 'c'], KEY_A)).not.toBe(F.credentialFingerprint(['a', 'bc'], KEY_A));
-    expect(F.credentialFingerprint(['a', 'b'], KEY_A)).not.toBe(F.credentialFingerprint(['b', 'a'], KEY_A));
+  test('where a value ends counts: two values are not their joined text', async () => {
+    expect(await print(['ab', 'c'])).not.toBe(await print(['a', 'bc']));
+    expect(await print(['a', 'b'])).not.toBe(await print(['b', 'a']));
   });
 
-  test('a value that is missing counts as empty text', () => {
-    expect(F.credentialFingerprint(['a', null, undefined, 'b'], KEY_A)).toBe(F.credentialFingerprint(['a', '', '', 'b'], KEY_A));
+  test('a value that is missing counts as empty text', async () => {
+    expect(await print(['a', null, undefined, 'b'])).toBe(await print(['a', '', '', 'b']));
   });
 
-  test('it is keyed: another server key, another fingerprint', () => {
-    expect(F.credentialFingerprint(VALUES, KEY_A)).not.toBe(F.credentialFingerprint(VALUES, KEY_B));
+  test('it is keyed: another server key, another fingerprint', async () => {
+    expect(await print(VALUES, KEY_A)).not.toBe(await print(VALUES, KEY_B));
   });
 
-  test('it is not a digest anyone can compute from the values alone', () => {
-    const fingerprint = F.credentialFingerprint(VALUES, KEY_A);
+  test('it is not something anyone can compute from the values alone', async () => {
+    const fingerprint = await print(VALUES);
     const joined = VALUES.join(String.fromCharCode(0));
     for (const algorithm of ['sha256', 'sha512', 'sha1', 'md5']) {
       expect(fingerprint).not.toContain(crypto.createHash(algorithm).update(joined).digest('hex'));
     }
-    // Nor one keyed by the encryption key as it is: the key is derived.
-    const direct = crypto.createHmac('sha256', Buffer.from(KEY_A.ENCRYPTION_KEY, 'hex')).update(joined).digest('hex');
-    expect(fingerprint).not.toContain(direct);
+    // Nor with a salt that is empty, or the encryption key as it is: the key is derived.
+    for (const salt of ['', Buffer.from(KEY_A.ENCRYPTION_KEY, 'hex'), KEY_A.ENCRYPTION_KEY]) {
+      expect(fingerprint).not.toContain(crypto.scryptSync(joined, salt, 32, F.COST).toString('hex'));
+    }
   });
 
-  test('it names its form, and one kept by an earlier version does not', () => {
-    const fingerprint = F.credentialFingerprint(VALUES, KEY_A);
+  test('it names its form, and one kept by an earlier version does not', async () => {
+    const fingerprint = await print(VALUES);
     expect(fingerprint).toMatch(/^v2:[0-9a-f]{64}$/);
     expect(F.isCurrentForm(fingerprint)).toBe(true);
     const earlier = crypto.createHash('sha256').update('anything').digest('hex');
     for (const other of [earlier, '', null, undefined, 42, 'fp']) expect(F.isCurrentForm(other)).toBe(false);
   });
 
-  test('no fingerprint without a server key of the right form', () => {
+  test('no fingerprint without a server key of the right form', async () => {
     for (const env of [{}, { ENCRYPTION_KEY: '' }, { ENCRYPTION_KEY: 'abc' }, { ENCRYPTION_KEY: 'z'.repeat(64) }, { ENCRYPTION_KEY: 7 }]) {
-      expect(() => F.credentialFingerprint(VALUES, env)).toThrow(/ENCRYPTION_KEY/);
+      await expect(print(VALUES, env)).rejects.toThrow(/ENCRYPTION_KEY/);
     }
   });
 
@@ -79,13 +81,24 @@ describe('the fingerprint of a set of credentials', () => {
     expect(F.fingerprintKey(KEY_B).equals(first)).toBe(false);
     expect(F.fingerprintKey(KEY_A).equals(first)).toBe(true);
   });
+
+  // One is made each time a run asks for its token: the work stays small, and
+  // it is done on Node's thread pool, never on the server's thread.
+  test('its cost stays small, and it is not made on the server\'s thread', async () => {
+    expect(F.COST).toEqual({ N: 1024, r: 8, p: 1 });
+    const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'utils', 'credentialFingerprint.js'), 'utf8');
+    expect(source).not.toContain('scryptSync');
+    const started = process.hrtime.bigint();
+    await Promise.all(Array.from({ length: 50 }, (_, i) => print([...VALUES, String(i)])));
+    expect(Number(process.hrtime.bigint() - started) / 1e6).toBeLessThan(5000);
+  });
 });
 
 describe('the token module', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'worker', 'access-token.js'), 'utf8');
 
-  test('makes its fingerprint with the keyed digest, and with nothing else', () => {
-    expect(source).toContain('const credFp = credentialFingerprint([');
+  test('makes its fingerprint with this module, and with nothing else', () => {
+    expect(source).toContain('const credFp = await credentialFingerprint([');
     expect(source).not.toContain('createHash(');
     expect(source).not.toContain("require('node:crypto')");
   });

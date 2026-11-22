@@ -1247,8 +1247,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   shortest probe period). **An answer anyone can read carries an error's code
   (`errorCode()`), never `err.message`**: the words can hold a path, and go to
   the log. `utils/credentialFingerprint.js`:
-  `tester_credentials.cached_token_cred_fp` is `v2:` + HMAC-SHA-256 under a key
-  derived from `ENCRYPTION_KEY`; a fingerprint of an earlier version never
+  `tester_credentials.cached_token_cred_fp` is `v2:` + scrypt salted with a key
+  derived from `ENCRYPTION_KEY`, awaited (Node's thread pool, `COST` N 1024,
+  2 ms). An HMAC there is still `js/insufficient-password-hash` for CodeQL,
+  which reads a field named `oauth_*` as a password and any `createHash` /
+  `createHmac` as a fast hash. A fingerprint of an earlier version never
   matches, so the token is asked again once (`isCurrentForm()` chooses the log
   line). **`access-token.js` held a raw NUL**: an editing tool had stored the
   typed escape as the character, git read the file as binary and showed no

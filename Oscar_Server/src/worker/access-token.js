@@ -114,7 +114,7 @@ async function resolveAccessToken(userRow, log, opts) {
     // never exercise the new ones — the run would look like it passed/failed for
     // unrelated reasons. The fingerprint is a keyed digest whose key is not in
     // the database (utils/credentialFingerprint.js); the secret is never stored.
-    const credFp = credentialFingerprint([
+    const credFp = await credentialFingerprint([
       profile, tokenUrl, clientId, clientSecret,
       scope, extra,
       userRow.oauth_custom_template || '',
