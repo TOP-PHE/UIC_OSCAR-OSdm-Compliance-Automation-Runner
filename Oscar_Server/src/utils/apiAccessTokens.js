@@ -16,9 +16,12 @@
  * token never verifies as an access token, nor an access token as a session
  * (requireAuth verifies with JWT_SECRET itself, and sessionUser() refuses the
  * account's role anyway). Claims: iss "oscar", aud "oscar-api", sub the
- * account, scope, jti, iat, exp (15 minutes). The account is read again at
- * each call (apiCaller.js): suspended, deleted, or a token issued before its
- * suspension, and the token is refused.
+ * account, scope, jti, iat, exp (15 minutes), and `key`, the id of the
+ * account's key the assertion was signed with (#1367). The account is read
+ * again at each call (apiCaller.js): suspended, deleted, a token issued
+ * before its suspension, or a token whose key has been revoked since, and the
+ * token is refused. A token issued before #1367 names no key and lives out
+ * its quarter of an hour.
  */
 
 const crypto = require('node:crypto');
@@ -65,11 +68,17 @@ function oscarBase(req, env = process.env) {
 
 const TOKEN_PATH = '/v1/api/oauth/token';
 
-/** A new access token for `accountId` with `scopes`: { token, expiresIn }. */
-function issue(accountId, scopes, now = new Date()) {
+/**
+ * A new access token for `accountId` with `scopes`: { token, expiresIn }.
+ * `keyId` is the account's key that signed the assertion: the token names it,
+ * so that revoking that key ends this token and no other.
+ */
+function issue(accountId, scopes, now = new Date(), keyId = null) {
   const iat = Math.floor(now.getTime() / 1000);
+  const claims = { sub: accountId, scope: scopes.join(' '), jti: crypto.randomUUID(), iat, exp: iat + LIFETIME_S };
+  if (typeof keyId === 'string' && keyId !== '') claims.key = keyId;
   const token = jwt.sign(
-    { sub: accountId, scope: scopes.join(' '), jti: crypto.randomUUID(), iat, exp: iat + LIFETIME_S },
+    claims,
     signingKey(),
     { algorithm: 'HS256', audience: AUDIENCE, issuer: ISSUER, header: { typ: 'at+jwt', alg: 'HS256' } },
   );
@@ -85,7 +94,15 @@ function verify(token, now = new Date()) {
       clockTimestamp: Math.floor(now.getTime() / 1000),
     });
     if (typeof claims.sub !== 'string' || typeof claims.scope !== 'string') return null;
-    return { accountId: claims.sub, scopes: claims.scope.split(' ').filter(s => SCOPES.includes(s)), iat: claims.iat, jti: claims.jti };
+    // A `key` that is not a text is no token of ours: refused, not read as "no key".
+    if (claims.key !== undefined && (typeof claims.key !== 'string' || claims.key === '')) return null;
+    return {
+      accountId: claims.sub,
+      scopes: claims.scope.split(' ').filter(s => SCOPES.includes(s)),
+      iat: claims.iat,
+      jti: claims.jti,
+      keyId: claims.key ?? null,
+    };
   } catch {
     return null;
   }

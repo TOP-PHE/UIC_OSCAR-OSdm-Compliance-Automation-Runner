@@ -613,6 +613,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.567] — 2026-11-22
+
+API accounts: an assertion's lifetime counted from the server's clock; a revoked key ends its tokens (#1367). Not released on its own: listed in `compatibility.json` (2026.606) without moving `current_release`.
+
+### Changed
+- **An assertion's five minutes are counted from OSCAR's clock.** The rule was checked between `exp` and `iat`, two values the assertion carries: with no `iat`, or one written later than now, an assertion whose `exp` was far ahead was accepted until then. `lifetimeRefusal()` (`utils/clientAssertion.js`) now asks `exp` at most five minutes after the time of the check, plus the minute of tolerance for the client's clock; an `iat`, when there, a number, not later than that tolerance, and at most five minutes before `exp`. A refused assertion uses up no `jti`. The example client and the guide's examples sign for 60 seconds from now: nothing changes for them.
+- **Revoking a key ends the tokens obtained with it, at once, and no other.** A token lived its quarter of an hour after its key was revoked (the API document said so). A token now names the key its assertion was signed with (claim `key`, `Tokens.issue(…, keyId)`), and `accountOf()` (`middleware/apiCaller.js`) checks at each call that it is still an active key of that account. The account's second key and its tokens go on, so a key is changed without a stop, as before. A token issued before this change names no key and lives out its quarter of an hour; one naming a key of another account, or none that exists, is refused.
+
+### Documentation
+- *Test Automation API Guide* (sections 3 and 4), OpenAPI (the token endpoint, the key's revocation).
+
+### Tests
+- `api-sign-in.test.js` (new): the lifetime rule case by case, with a real key the assertions that were accepted (no `iat` and ten years; an `iat` a minute before an `exp` in ten years), the token's key claim.
+- `api-oauth-key-and-lifetime.test.js` (new, a file of its own: the token endpoint takes 30 requests a minute from an address): the same on the routes; a revoked key ends its tokens and leaves the other key's and an older token.
+
+---
+
 ## [server-1.11.566] — 2026-11-22
 
 The bootstrap route creates the first administrator only (#1365). Not released on its own: listed in `compatibility.json` (2026.605) without moving `current_release`.

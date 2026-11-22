@@ -14,8 +14,9 @@
  * The bearer token decides: an `oscar_…` key goes to requireApiKey(), as
  * before; anything else must be an access token (utils/apiAccessTokens.js).
  * The account is read again at each call: still of role api_client, active,
- * of its company, and the token issued after any suspension
- * (users.sessions_valid_after). Every refusal is the same 401. It then sets
+ * of its company, the token issued after any suspension
+ * (users.sessions_valid_after), and the key it was obtained with still an
+ * active key of the account (#1367). Every refusal is the same 401. It then sets
  *   req.apiAccount = { id, companyId, scopes }
  *   req.user       = { id, email, companyId, role: 'api_client' }
  *   req.scopes     = the token's scopes (for a key, the key's)
@@ -34,6 +35,11 @@ function bearerOf(req) {
   return header.startsWith('Bearer ') ? header.slice(7).trim() : null;
 }
 
+/** True while `keyId` is an active key of the account `accountId`. */
+function keyStillActive(keyId, accountId) {
+  return Boolean(get('SELECT 1 AS ok FROM api_account_key WHERE id = ? AND user_id = ? AND revoked_at IS NULL', [keyId, accountId]));
+}
+
 /** The account an access token stands for now, or null. Never throws. */
 function accountOf(token, now = new Date()) {
   try {
@@ -48,6 +54,10 @@ function accountOf(token, now = new Date()) {
     // numeric issue time too.
     const issuedAt = Number(claims.iat);
     if (validAfter && (!Number.isFinite(issuedAt) || issuedAt < validAfter)) return null;
+    // #1367: the key the token's assertion was signed with must still be one
+    // of the account's active keys. Revoking a key ends the tokens obtained
+    // with it at once, and no other. A token from before names no key.
+    if (claims.keyId && !keyStillActive(claims.keyId, row.id)) return null;
     return { row, scopes: claims.scopes };
   } catch {
     return null;

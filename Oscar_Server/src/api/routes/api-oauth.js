@@ -111,7 +111,7 @@ router.post('/token', tokenLimiter, (req, res) => {
   const scopes = Tokens.scopesOf(body.scope);
   if (scopes.error) return oauthError(res, 400, 'invalid_scope', `scope must be one or more of: ${Tokens.SCOPES.join(' ')}.`);
 
-  const issued = Tokens.issue(account.id, scopes.scopes, now);
+  const issued = Tokens.issue(account.id, scopes.scopes, now, checked.keyId);
   try { run("UPDATE api_account_key SET last_used_at = datetime('now') WHERE id = ?", [checked.keyId]); } catch { /* never block a token on the bookkeeping */ }
   auditLog(account.id, account.company_id, account.email, `api_token_issued:${scopes.scopes.join(',')}`);
   res.set('Cache-Control', 'no-store');

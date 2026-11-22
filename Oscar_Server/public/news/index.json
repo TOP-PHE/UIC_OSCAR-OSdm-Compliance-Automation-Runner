@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-22-api-account-key-revoked",
+    "date": "November 22, 2026",
+    "tag": "Improvement",
+    "title": "Company API accounts: revoking a key ends its tokens at once",
+    "summary": "A token obtained with a key is refused as soon as that key is revoked. The account's other key keeps working, so a key is changed without a stop.",
+    "content": "This concerns Test Managers whose automation calls OSCAR with a Company API account.\n\nUntil now, revoking a key stopped new tokens, and a token already obtained with it went on working until it expired, up to a quarter of an hour. From now on such a token is refused at once. The account's second key and the tokens obtained with it are not touched: add the new key, switch your automation to it, then revoke the old one, as before.\n\nIf a private key may have been copied, revoking its key on the API Accounts page is enough.\n\nThe signed request your automation sends to get a token is also held more strictly to its five minutes, counted from OSCAR's clock. The example client and the examples of the Test Automation API Guide sign for one minute from now, and are not affected. If your own client is refused after this release, check that its clock is right and that it signs for a few minutes at most."
+  },
+  {
     "id": "2026-11-22-first-administrator",
     "date": "November 22, 2026",
     "tag": "Operations",

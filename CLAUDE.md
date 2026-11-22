@@ -1186,6 +1186,22 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   as long as the token was set: **a guide that states what a route refuses
   needs a test of that refusal**. Tests that need an administrator insert the
   row; only `auth-routes.test.js` and the kind CI's `smoke.sh` call the route.
+- **An API account's assertion is timed on OSCAR's clock, and its token
+  names its key** (#1367, 1.11.567). `lifetimeRefusal()`
+  (`utils/clientAssertion.js`): `exp` at most `MAX_LIFETIME_S` +
+  `CLOCK_TOLERANCE_S` after the check, an `iat` not later than the
+  tolerance. **Never bound a lifetime by two values the caller writes**: `exp
+  − iat` alone let an assertion with no `iat` live for years, and
+  `jsonwebtoken` checks neither a future `iat` nor a maximum life unless
+  asked. A token carries `key`, the id of the account's key that signed the
+  assertion; `accountOf()` (`middleware/apiCaller.js`) refuses it once that
+  key is revoked, so revoking a key ends its tokens and leaves the other
+  key's. A token without `key` is one from before, good for its quarter of
+  an hour. In a test, `jwt.sign()` writes its own `iat` unless
+  `noTimestamp`, and with `noTimestamp` it removes one given: sign with
+  `noTimestamp: claims.iat === undefined`. The token endpoint takes 30
+  requests a minute from an address: a test file that asks many tokens is a
+  file of its own.
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;
