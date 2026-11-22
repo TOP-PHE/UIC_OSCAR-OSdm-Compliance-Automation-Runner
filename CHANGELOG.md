@@ -643,7 +643,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-1.11.571] — 2026-11-22
 
-Two heavy reads taken off the server's thread: a run's warning lines, the list of references (#1383). Not released on its own: listed in `compatibility.json` (2026.610) without moving `current_release`.
+Two heavy reads taken off the server's thread: a run's warning lines, the list of references (#1383).
+
+**Release 2026.610 (`current_release`)**, with everything merged since 2026.603: servers 1.11.565 to 1.11.571 (the sections below, each listed in `compatibility.json` without having been released on its own) and the changes without a version under *Unreleased* (workflow tokens, compression at the proxy, the lint's wider reading and its two limits, SonarCloud's version, the GitHub and CI set-up page). On a VPS: before the update, check that `.env` names no old `SMTP_HOST` (since 1.11.565 it becomes the mail server in use); after it, add the `gzip` lines of the nginx example to the installed nginx (*installation-guide*).
 
 ### Changed
 - **A run's warning lines are kept on their own, and read from there.** A run's log is some 1,500 lines, a few dozen of them warnings, and the log table's one index is by run: the coverage report, the AI analysis and a run's detail through the API each read every run's whole log to keep those few.
