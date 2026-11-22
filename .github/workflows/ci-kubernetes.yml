@@ -35,6 +35,8 @@ on:
       - 'OSCAR_Deploy/grafana/**'
       - 'OSCAR_Deploy/loki/**'
       - 'OSCAR_Deploy/prometheus/alerts/**'
+      # The VPS's proxy: its example file is run on a real nginx (job nginx).
+      - 'OSCAR_Deploy/nginx/**'
       - 'Oscar_Server/src/api/routes/auth.js'
       - '.github/workflows/ci-kubernetes.yml'
   push:
@@ -56,6 +58,8 @@ on:
       - 'OSCAR_Deploy/grafana/**'
       - 'OSCAR_Deploy/loki/**'
       - 'OSCAR_Deploy/prometheus/alerts/**'
+      # The VPS's proxy: its example file is run on a real nginx (job nginx).
+      - 'OSCAR_Deploy/nginx/**'
       - 'Oscar_Server/src/api/routes/auth.js'
       - '.github/workflows/ci-kubernetes.yml'
   schedule:
@@ -595,6 +599,12 @@ jobs:
           rm "$RUNNER_TEMP/big"
           echo "51 MB body: $code"
           test "$code" = 413
+          # Text answers are compressed for a client that takes gzip, as the
+          # VPS's nginx does (overlays/k3s/compression.yaml).
+          enc=$(curl -sk -o /dev/null -D - -H 'Accept-Encoding: gzip' --resolve "$host:443:$NODE_IP" "https://$host/js/scenarios.js" \
+            | tr -d '\r' | awk -F': ' 'tolower($1) == "content-encoding" { print $2 }')
+          echo "scenarios.js: content-encoding ${enc:-none}"
+          test "$enc" = gzip
           # The client's own address reaches OSCAR. The client is a network
           # namespace of its own (192.0.2.2, behind a veth pair): its traffic
           # comes into the machine as a visitor's does, not through the
@@ -667,3 +677,70 @@ jobs:
           sudo journalctl -u k3s --no-pager 2>&1 | tail -n 80 || true
           echo "=== simulator"
           tail -n 100 "$RUNNER_TEMP/simulator.log" || true
+
+  # The VPS's proxy. OSCAR_Deploy/nginx/oscar.conf.example is what an
+  # installation copies: it is run here on Ubuntu's own nginx, with that
+  # package's nginx.conf as it comes, in front of a stand-in for OSCAR.
+  # `nginx -t` alone says the file parses, not what it does.
+  nginx:
+    name: nginx example (the VPS's proxy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Ubuntu's nginx with the example as its only site
+        run: |
+          set -euo pipefail
+          if ! command -v nginx > /dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq nginx
+          fi
+          sudo rm -f /etc/nginx/sites-enabled/default
+          sudo cp OSCAR_Deploy/nginx/oscar.conf.example /etc/nginx/sites-available/oscar
+          sudo ln -sf /etc/nginx/sites-available/oscar /etc/nginx/sites-enabled/oscar
+          sudo nginx -t
+          sudo systemctl restart nginx
+
+      - name: A stand-in for OSCAR on 127.0.0.1:3001
+        run: |
+          set -euo pipefail
+          site="$RUNNER_TEMP/site"
+          mkdir -p "$site/js" "$site/metrics"
+          cp Oscar_Server/public/js/scenarios.js "$site/js/"
+          cp compatibility.json "$site/"
+          cp Oscar_Server/public/uic-logo.png "$site/"
+          echo "not for the outside" > "$site/metrics/index.html"
+          (cd "$site" && nohup python3 -m http.server 3001 --bind 127.0.0.1 > "$RUNNER_TEMP/site.log" 2>&1 &)
+          for i in $(seq 1 20); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3001/compatibility.json; then exit 0; fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/site.log"; exit 1
+
+      - name: Text is compressed, an image is not, /metrics is not served
+        run: |
+          set -euo pipefail
+          encoding() { curl -s -o /dev/null -D - -H 'Host: oscar.example.com' "$@" | tr -d '\r' | awk -F': ' 'tolower($1) == "content-encoding" { print $2 }'; }
+          for path in /js/scenarios.js /compatibility.json; do
+            enc=$(encoding -H 'Accept-Encoding: gzip' "http://127.0.0.1$path")
+            echo "$path: content-encoding ${enc:-none}"
+            test "$enc" = gzip
+          done
+          # An image is already compressed; a client that does not ask gets plain text.
+          enc=$(encoding -H 'Accept-Encoding: gzip' http://127.0.0.1/uic-logo.png)
+          echo "/uic-logo.png: content-encoding ${enc:-none}"
+          test -z "$enc"
+          enc=$(encoding http://127.0.0.1/js/scenarios.js)
+          echo "/js/scenarios.js without Accept-Encoding: content-encoding ${enc:-none}"
+          test -z "$enc"
+          # What goes over the wire, against what OSCAR sends.
+          sent=$(curl -s -H 'Host: oscar.example.com' -H 'Accept-Encoding: gzip' http://127.0.0.1/js/scenarios.js | wc -c)
+          whole=$(wc -c < Oscar_Server/public/js/scenarios.js)
+          echo "scenarios.js: $sent bytes on the wire for $whole"
+          test "$sent" -lt $((whole / 2))
+          # /metrics stays closed, in any spelling.
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: oscar.example.com' http://127.0.0.1/METRICS/)
+          echo "/METRICS/: $code"
+          test "$code" = 404

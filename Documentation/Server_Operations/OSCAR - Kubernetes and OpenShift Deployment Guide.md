@@ -666,6 +666,7 @@ Details to know:
 | Everybody is locked out of signing in after a few failed attempts | every user is seen at the router's address: `TRUST_PROXY_HOPS` is too low |
 | A data file or checklist upload fails with 413 | the Ingress allows less than 50 MB: `proxy-body-size` |
 | Long requests end with 504 | the router's timeout: `proxy-read-timeout` / `haproxy.router.openshift.io/timeout` (660 s) |
+| Pages and data files travel uncompressed | OSCAR compresses nothing itself: the way in does. ingress-nginx: `use-gzip: "true"` and `gzip-types` in the controller's ConfigMap (the types of `OSCAR_Deploy/nginx/oscar.conf.example`). OpenShift: `spec.httpCompression.mimeTypes` of the IngressController. k3s's Traefik: `overlays/k3s/compression.yaml` already does. Neither of the first two is set by these files: both are settings of the whole controller, not of one Ingress or Route |
 | `/health` shows `compatibility_status: "untested_combination"` | the image was not built from one release: rebuild from a `release-…` tag |
 | Prometheus gets 404 on `/metrics` | its bearer token is not `METRICS_TOKEN` |
 | The pod stays in `CreateContainerConfigError` | the Secret `oscar-runner` is missing (section 4) |

@@ -4396,6 +4396,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   The script refuses before writing when the snapshot and archive would leave
   less than `OSCAR_BACKUP_MIN_FREE_MB` free; tar's exit 1 (a file changed
   while read) is accepted.
+- **Text answers are compressed by the proxy, never by OSCAR** (#1379). The
+  server's one thread serves every page and every run, so it has no
+  compression (`kubernetes-manifests.test.js` refuses the dependency). nginx:
+  `gzip_types` in `OSCAR_Deploy/nginx/oscar.conf.example`. **Ubuntu's
+  `nginx.conf` has `gzip on;` alone, which compresses `text/html` only**:
+  production sent the 556 KB of `scenarios.js` and every JSON answer as they
+  were until then. k3s: a Traefik `compress` Middleware
+  (`overlays/k3s/compression.yaml`, nginx's types plus `text/html`; the Ingress
+  names its middlewares in one annotation, comma-separated). ingress-nginx and
+  OpenShift compress per controller, not per Ingress or Route: the guide says
+  so, the files set nothing. The job `nginx` of `ci-kubernetes.yml` runs
+  Ubuntu's nginx with the example in front of a stand-in, and the k3s job asks
+  Traefik for a compressed answer: neither Docker nor nginx is on the
+  maintainer's PC. **An installed nginx is changed by hand**: the example is
+  copied once, at installation.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image**. **The VPS checkout follows the
   newest `release-*` tag on `main`, never `main`'s head** (2026-11-06):

@@ -18,6 +18,7 @@ resources:
   - ../../base
   - ingress.yaml
   - middleware.yaml
+  - compression.yaml
 
 components:
   - ../../components/pod-runs

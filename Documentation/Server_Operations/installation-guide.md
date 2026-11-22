@@ -239,6 +239,14 @@ server {
 
     client_max_body_size 50M;     # for datafile uploads
 
+    # Compression of text answers (see below)
+    gzip            on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_proxied    any;
+    gzip_vary       on;
+    gzip_types      application/json application/problem+json application/javascript text/javascript text/css text/plain text/csv application/xml image/svg+xml;
+
     location / {
         proxy_pass         http://127.0.0.1:3001;
         proxy_http_version 1.1;
@@ -260,6 +268,26 @@ sudo ln -s /etc/nginx/sites-available/oscar /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 sudo certbot --nginx -d oscar.example.org
 ```
+
+**Compression.** OSCAR compresses nothing itself, so that its one thread is
+kept for the pages and the runs: nginx does it. The `gzip_types` line is what
+matters: a distribution's `nginx.conf` usually has `gzip on;` alone, which
+compresses HTML and nothing else, and OSCAR's answers are mostly JSON and
+JavaScript. With it, the Test Config script goes from 556 KB to about 150 KB
+on the wire, and a data file of 1.9 MB to about 110 KB.
+
+To check, from any machine (the answer must name `gzip`):
+
+```bash
+HOST=oscar.example.org     # ← yours
+curl -s -o /dev/null -D - -H 'Accept-Encoding: gzip' "https://$HOST/js/scenarios.js" | grep -i '^content-encoding'
+```
+
+An installation made before this section existed has no `gzip_types` line:
+add the six `gzip` lines above after `client_max_body_size` in
+`/etc/nginx/sites-available/oscar` (in the `server` block that listens on
+443), then `sudo nginx -t && sudo systemctl reload nginx`. A reload cuts no
+connection and stops no run.
 
 ---
 
