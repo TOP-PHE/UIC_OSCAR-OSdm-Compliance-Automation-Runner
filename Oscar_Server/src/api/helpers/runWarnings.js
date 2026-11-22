@@ -35,6 +35,10 @@ const MAX_RUNS = 500;
 
 const marks = n => Array.from({ length: n }, () => '?').join(',');
 
+// A limit a statement can take: a whole number above zero. Anything else
+// (0, a negative, not a number) reads nothing.
+const readsSomething = limit => Number.isInteger(limit) && limit > 0;
+
 /** Of these runs, those whose warning lines are kept on their own. */
 function keptAmong(runIds) {
   if (runIds.length === 0) return new Set();
@@ -63,7 +67,7 @@ function merged(a, b, before, limit) {
 function warningRowsOf(runIds, limit) {
   const ids = [...new Set(runIds)];
   if (ids.length > MAX_RUNS) throw new Error(`warningRowsOf: ${ids.length} runs in one call, ${MAX_RUNS} at most`);
-  if (ids.length === 0 || !(limit > 0)) return [];
+  if (ids.length === 0 || !readsSomething(limit)) return [];
   const kept = keptAmong(ids);
   const own = ids.filter(id => kept.has(id));
   const other = ids.filter(id => !kept.has(id));
@@ -87,7 +91,7 @@ const earlierInBatch = (x, y) => text(x.queued_at) < text(y.queued_at)
  */
 function warningRowsOfBatch(companyId, batchId, statuses, limit) {
   const wanted = [...statuses];   // an array or a Set
-  if (!(limit > 0) || wanted.length === 0) return [];
+  if (!readsSomething(limit) || wanted.length === 0) return [];
   const runsOfBatch = `r.company_id = ? AND r.batch_id = ? AND r.status IN (${marks(wanted.length)})`;
   const params = [companyId, batchId, ...wanted, limit];
   const fromOwn = all(

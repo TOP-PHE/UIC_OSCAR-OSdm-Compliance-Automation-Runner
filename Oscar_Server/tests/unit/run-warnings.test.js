@@ -186,7 +186,15 @@ describe('a marked run is read from what was kept, any other from its log', () =
 
   test('nothing asked, nothing read; too many runs in one call is refused', () => {
     expect(W.warningRowsOf([], 10)).toEqual([]);
-    expect(W.warningRowsOf([randomUUID()], 0)).toEqual([]);
+    const runId = newRun();
+    queueRunLogLine(line(runId, 'warn', '[WARNING] there is one'));
+    flushRunLogs();
+    expect(W.warningRowsOf([runId], 1)).toHaveLength(1);
+    // A limit is a whole number above zero: anything else reads nothing.
+    for (const limit of [0, -1, Number.NaN, undefined, null, 1.5, '3']) {
+      expect(W.warningRowsOf([runId], limit)).toEqual([]);
+      expect(W.warningRowsOfBatch(companyId, 'no-such-batch', FINISHED, limit)).toEqual([]);
+    }
     expect(W.warningRowsOfBatch(companyId, 'no-such-batch', FINISHED, 10)).toEqual([]);
     expect(W.warningRowsOfBatch(companyId, 'no-such-batch', [], 10)).toEqual([]);
     expect(() => W.warningRowsOf(Array.from({ length: W.MAX_RUNS + 1 }, () => randomUUID()), 10)).toThrow(/at most/);
