@@ -162,6 +162,13 @@ Name the most precise release that points at that commit in the comment
 (`# v7.0.1`, not `# v7`), so Dependabot and a reader see the same version.
 A new action is added pinned the same way.
 
+## The repository's GitHub and CI set-up
+
+Branch protection, required checks, environments and their secrets, GitHub
+Apps, SonarCloud and the test environments are recorded in
+[OSCAR - GitHub and CI set-up](Documentation/Server_Operations/OSCAR%20-%20GitHub%20and%20CI%20set-up.md).
+A change to them in GitHub or SonarCloud is written there too.
+
 ## Questions
 
 Open a `question`-labelled issue or ping the maintainers in the discussion

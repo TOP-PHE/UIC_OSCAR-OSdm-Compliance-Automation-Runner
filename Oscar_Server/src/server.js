@@ -1010,9 +1010,20 @@ app.use('/v1/docs', swaggerUi.serve, swaggerUi.setup(openapiSpec, {
 // ── Health check ──────────────────────────────────────────────────────────────
 // Returns 200 OK if all subsystems are healthy, 503 if any check fails.
 // Useful for Docker/k8s liveness/readiness probes.
-app.get('/health', (req, res) => {
+// Its two disk checks are kept a few seconds (utils/healthChecks.js), and a
+// caller gets a failed check's code, never its words. The limit is far above
+// what probes, monitoring and the pages' version line ask.
+const { diskChecks, errorCode: healthErrorCode } = require('./utils/healthChecks');
+const healthLimiter = require('express-rate-limit')({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many health checks in a short window.' }
+});
+const warnHealth = (what, err) => log.warn({ err: err?.message }, what);
+app.get('/health', healthLimiter, (req, res) => {
   const queue_ = require('./worker/queue');
-  const fs2 = require('node:fs');
   const checks = {};
   let overallOk = true;
 
@@ -1021,38 +1032,19 @@ app.get('/health', (req, res) => {
     const row = dbGet('SELECT 1 AS ok');
     checks.database = { ok: !!row, status: 'ok' };
   } catch (err) {
-    checks.database = { ok: false, status: 'error', error: err.message };
+    warnHealth('health: the database did not answer', err);
+    checks.database = { ok: false, status: 'error', error: healthErrorCode(err) };
     overallOk = false;
   }
 
   // 2. Queue status
   checks.queue = { ok: true, depth: queue_.depth, running: queue_.running };
 
-  // 3. Data directory writable
-  try {
-    const testFile = path.join(__dirname, '../data/.health-check');
-    fs2.writeFileSync(testFile, 'ok');
-    fs2.unlinkSync(testFile);
-    checks.data_dir = { ok: true, status: 'writable' };
-  } catch (err) {
-    checks.data_dir = { ok: false, status: 'error', error: err.message };
-    overallOk = false;
-  }
-
-  // 4. Disk space (Linux only)
-  try {
-    const stats = fs2.statfsSync ? fs2.statfsSync(path.resolve(__dirname, '..')) : null;
-    if (stats) {
-      const freeMb = Math.floor((stats.bavail * stats.bsize) / (1024 * 1024));
-      checks.disk = { ok: freeMb > 100, free_mb: freeMb };
-      if (freeMb <= 100) overallOk = false;
-    } else {
-      checks.disk = { ok: true, status: 'not_checked' };
-    }
-  } catch {
-    // A failed disk check is reported, but it does not fail the health check.
-    checks.disk = { ok: true, status: 'check_failed_non_critical' };
-  }
+  // 3. Data directory writable, 4. free disk space (Linux only)
+  const disk = diskChecks({ warn: warnHealth });
+  checks.data_dir = disk.data_dir;
+  checks.disk = disk.disk;
+  if (!disk.ok) overallOk = false;
 
   // 5. Process info
   const memMb = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);

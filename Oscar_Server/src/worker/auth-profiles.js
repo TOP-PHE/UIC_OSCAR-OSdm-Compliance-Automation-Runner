@@ -166,7 +166,7 @@ async function _fetchAndRead({ method, url, headers, body }, label, log, control
   let json;
   try {
     json = JSON.parse(text);
-  } catch (err) {
+  } catch {
     // Not err.message: the parser quotes the answer, which may be a token.
     const msg = `${label} response was not JSON (${text.length} characters).`;
     log.error(`[runner] ${msg}`, { http_status: res.status });

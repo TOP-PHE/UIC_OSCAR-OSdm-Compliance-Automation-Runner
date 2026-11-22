@@ -1234,6 +1234,33 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`server_info.private_targets_allowed`), with the bootstrap token's and the
   mail settings' notes: **a setting that turns a protection off is shown
   while it is on.**
+- **A read route names its rate limit in its own chain; `/health` keeps its
+  disk checks; the credential fingerprint is keyed** (#1377, 1.11.570). CodeQL
+  reads a limit only where the route names it (`router.get(path, limiter, …)`),
+  not one set with `router.use()` or in `server.js` for a whole router:
+  `GET /health` (`healthLimiter`, 300 a minute), `GET /v1/auth/me`
+  (`sessionReadLimiter`, 600, before `requireAuth`), `GET
+  /v1/runs/:id/artifacts/:aid` (`artifactReadLimiter`, 300). `/logout` stays
+  without one on purpose (`health-checks.test.js` holds the comment and the
+  route together). `utils/healthChecks.js` `diskChecks()` keeps the data
+  folder's write test and the free space for `KEEP_MS` (10 s, under the
+  shortest probe period). **An answer anyone can read carries an error's code
+  (`errorCode()`), never `err.message`**: the words can hold a path, and go to
+  the log. `utils/credentialFingerprint.js`:
+  `tester_credentials.cached_token_cred_fp` is `v2:` + scrypt salted with a key
+  derived from `ENCRYPTION_KEY`, awaited (Node's thread pool, `COST` N 1024,
+  2 ms). An HMAC there is still `js/insufficient-password-hash` for CodeQL,
+  which reads a field named `oauth_*` as a password and any `createHash` /
+  `createHmac` as a fast hash. A fingerprint of an earlier version never
+  matches, so the token is asked again once (`isCurrentForm()` chooses the log
+  line). **`access-token.js` held a raw NUL**: an editing tool had stored the
+  typed escape as the character, git read the file as binary and showed no
+  diff. Make such a character with `String.fromCodePoint()`;
+  `credential-fingerprint.test.js` refuses a NUL in any source file. **In Git
+  Bash an argument that starts with `//` loses a slash** (MSYS path
+  conversion): `export MSYS_NO_PATHCONV=1` before passing a comment line as an
+  anchor. **On a pull request CodeQL reports on the changed lines only**
+  ("Persisted N diff range(s)"); the whole reading is `main`'s next analysis.
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;
@@ -4846,6 +4873,7 @@ node ../Oscar_Server/node_modules/eslint/bin/eslint.js . --max-warnings 0
 | `Bruno_Collection/data_base/simulator_datafile.json` | the simulator's data file, two sale scenarios per OSDM version (#614), the one copy for OSCAR and for a standalone run (#593); `OSDM_Simulator/tests/datafile.test.js` keeps it valid and answerable |
 | `Bruno_Collection/README.md` | running the collection standalone (Bruno desktop and `bru run`), against the simulator's `gamma` (#593) |
 | `Documentation/Server_Operations/OSCAR - OSDM Simulator.md` | installing the simulator on its own host and pointing a company at it |
+| `Documentation/Server_Operations/OSCAR - GitHub and CI set-up.md` | the record of the GitHub settings (protection of `main`, required checks, environments and secret names, apps, workflows), SonarCloud and the test environments; GitHub keeps no history of its settings, so a change there is written here |
 | `OSCAR_Deploy/kubernetes/` | OSCAR as one pod on Kubernetes or OpenShift: bundle image, Kustomize base and overlays, CI deployment on kind (#1059); guide in `Documentation/Server_Operations/OSCAR - Kubernetes and OpenShift Deployment Guide.md` |
 | `OSCAR_Deploy/kubernetes/measure/` + `Documentation/Server_Operations/OSCAR - Kubernetes run campaigns.md` | the read-only scripts that read a campaign (runs a minute, time per step, failures, one run), run in OSCAR's pod with the script on stdin, and every k3s campaign of November 2026 with what it found (#1340). **Add a campaign's line to that table when a setting is measured**, and compare settings back to back: two identical campaigns differed by a third on the shared VPS. Architecture as built: section 14.12 of the Solution Architecture |
 | `Documentation/User_Guides/OSCAR_Checklist_TEMPLATE_Vxx.yy.docx` | questions to a provider before its first run (Part A every provider, chapter P product-based, chapter F fare-based since V01.06 / #938, Part B one sheet per service, Part C journeys with changes; found by `checklistFile()`) and an annex giving where each answer goes in OSCAR (#746). Since v2 (#795) every answer is a Word content control tagged with its answer name (`fw.…`, `api.…`, `data.…`, `info.…`), so a filled-in copy can be read back; it is generated from the sources kept in the private repository (`analysis/checklist-generator`), never edited by hand. Add the question and its annex row when a setting is added or moves. **Versioned since V1.03 (20/10/2026)**: `version.js` there holds the version and its history (title page, page header, a "Template versions" table after the Annex, custom property `OSCAR checklist template`); bump it with every change to a question, option, tag or the Annex, then `build-all.sh` rebuilds this file, the four simulator copies and the providers' copies with their answers |

@@ -1272,7 +1272,16 @@ router.get('/:id/artifacts', (req, res) => {
 });
 
 // ── GET /v1/runs/:id/artifacts/:aid ──────────────────────────────────────────
-router.get('/:id/artifacts/:aid', (req, res) => {
+// Each call reads a file and decrypts it: 300 a minute per address, the
+// ceiling of the other file downloads (fileDownloadLimiter in server.js).
+const artifactReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many file downloads in a short window. Slow down or wait a minute.' }
+});
+router.get('/:id/artifacts/:aid', artifactReadLimiter, (req, res) => {
   const runRow = readableRun(req);
   if (!runRow) return res.status(404).json({ status: 404, title: 'Run not found.' });
 
@@ -1294,7 +1303,9 @@ router.get('/:id/artifacts/:aid', (req, res) => {
   let plaintext;
   try { plaintext = decryptFromFile(safePath); }
   catch (err) {
-    return res.status(500).json({ status: 500, title: 'Decryption failed', detail: err.message });
+    // The reason goes to the server's log: it can hold a path of the machine.
+    require('../../utils/logger').warn({ err: err.message, run: req.params.id }, 'a stored report could not be read');
+    return res.status(500).json({ status: 500, title: 'Decryption failed', detail: 'The stored file could not be read.' });
   }
 
   if (runRow.sharedView) plaintext = Buffer.from(sharedTextOf(runRow)(plaintext.toString('utf8')), 'utf8');

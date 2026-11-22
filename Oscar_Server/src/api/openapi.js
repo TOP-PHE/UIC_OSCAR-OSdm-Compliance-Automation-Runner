@@ -131,9 +131,10 @@ module.exports = {
       get: {
         tags: ['Health'],
         summary: 'Health check',
-        description: 'Returns 200 if all subsystems healthy, 503 if degraded. Checks DB connectivity, queue, data dir, disk space.',
+        description: 'Returns 200 if all subsystems healthy, 503 if degraded. Checks DB connectivity, queue, data dir, disk space. The data folder and the free space are read at most every 10 seconds. A failed check carries an error code (EACCES, ENOSPC…); its reason is in the server log. 300 calls a minute per address.',
         responses: {
           200: { description: 'All systems OK' },
+          429: { description: 'More than 300 calls in a minute from this address' },
           503: { description: 'One or more checks failed' },
         },
       },
