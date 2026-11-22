@@ -1361,6 +1361,7 @@ const CONFIG_LABELS = {
   RUN_HARD_MAX_TIMEOUT_MS: 'Run Budget Ceiling (ms)',
   RUN_IDLE_TIMEOUT_MS: 'Silent Run Limit (ms)',
   RUN_FIRST_LINE_TIMEOUT_MS: 'Run Pod First Line Limit (ms)',
+  MAX_WAITING_RUNS_PER_ACCOUNT: 'Max Waiting Runs per Account',
   LOG_LEVEL:           'Log Level',
   SMTP_HOST:   'SMTP Host',
   SMTP_PORT:   'SMTP Port',
@@ -1398,6 +1399,27 @@ function smtpAlertingNote(mode) {
     ? 'once given to Alertmanager with the commands of the Alerting section below'
     : 'after you click "Apply" in the Alerting section below';
   return '💡 <strong>One mail server for everything.</strong> It sends OSCAR\'s own e-mails (invitations, password resets) and Alertmanager\'s alerts to administrators (' + how + ').';
+}
+
+// A bootstrap token left in the server's environment (#1365,
+// server_info.bootstrap_token_set). The administrator reading this exists, so
+// the token creates no account any more: the note says how to remove it.
+function bootstrapTokenNote(set) {
+  if (set !== true) return '';
+  return '<div class="kpi" style="grid-column:1/-1;text-align:left;font-size:12px;padding:10px 14px;color:#7c5800;background:#fff8e1;border-left:3px solid #f9a825">' +
+    '⚠️ <strong>The bootstrap token is still set in the server\'s environment.</strong> It was there to create the first administrator and creates no account any more. ' +
+    'Remove it: empty <code>PLATFORM_BOOTSTRAP_TOKEN</code> in the server\'s environment (the <code>.env</code> file on a Docker host; the Secret on Kubernetes), then create the server again (<code>docker compose up -d oscar</code>; on Kubernetes, restart it).' +
+    '</div>';
+}
+
+// ALLOW_PRIVATE_TARGETS is on (#1371, server_info.private_targets_allowed): the
+// policy that keeps OSCAR's outbound calls on public https addresses is off.
+function privateTargetsNote(set) {
+  if (set !== true) return '';
+  return '<div class="kpi" style="grid-column:1/-1;text-align:left;font-size:12px;padding:10px 14px;color:#7c5800;background:#fff8e1;border-left:3px solid #f9a825">' +
+    '⚠️ <strong>Private targets are allowed.</strong> <code>ALLOW_PRIVATE_TARGETS</code> is set in the server\'s environment: OSCAR\'s outbound calls (a provider\'s endpoint and token URL, an AI service, the simulator\'s administration) are not kept to public https addresses. ' +
+    'It is meant for a development PC or for providers on a private network. Otherwise remove it from the server\'s environment and create the server again.' +
+    '</div>';
 }
 
 // The id of a Server Config field. A setting the page only shows (#1363: the
@@ -1477,7 +1499,9 @@ async function loadConfig() {
     + `<div class="kpi" style="grid-column:1/-1;text-align:left;font-size:12px;padding:10px 14px">
          <div style="margin-bottom:4px"><strong style="color:#546e7a">Collection:</strong> <span class="mono">${esc(si.collection_path)}</span></div>
          <div><strong style="color:#546e7a">Bruno CLI:</strong> <span class="mono">${esc(si.bru_cmd)}</span></div>
-       </div>`;
+       </div>`
+    + bootstrapTokenNote(si.bootstrap_token_set)
+    + privateTargetsNote(si.private_targets_allowed);
 
   // Config form — group by category
   const smtpKeys     = Object.entries(data.config).filter(([_, cfg]) => cfg.group === 'smtp');

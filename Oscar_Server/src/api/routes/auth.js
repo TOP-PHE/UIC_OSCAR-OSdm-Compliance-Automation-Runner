@@ -29,6 +29,7 @@ const { sendVerificationEmail, sendPasswordResetEmail } = require('../../utils/m
 const AccessRequests = require('../../utils/accessRequests');
 const { isApiAccountRole } = require('../../utils/apiAccounts');
 const { resolveRole, ensurePlatformCompany } = require('../helpers/shared');
+const bootstrapToken = require('../../utils/bootstrapToken');
 const { loginAttempts } = require('../../utils/metrics');
 const { validate, v } = require('../middleware/validate');
 const log = require('../../utils/logger').child({ module: 'auth' });
@@ -79,7 +80,19 @@ const authLimiter = rateLimit({
 });
 router.use('/login', authLimiter);
 router.use('/register', authLimiter);
-router.use('/bootstrap', authLimiter);
+
+// The bootstrap route (#1365): a limit of its own, named in the route's own
+// chain. It was limited through router.use('/bootstrap', authLimiter), in the
+// bucket of the sign-in attempts; the code scanner does not read that as a
+// limit on the route, and a sign-in page left open no longer uses up the
+// attempts of whoever installs the server.
+const bootstrapLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: AUTH_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many attempts. Please try again later.' }
+});
 
 // Issue #449 — register/confirm now does more (account creation, a
 // test_manager lookup, an outbound email) than before, and CodeQL's
@@ -373,7 +386,7 @@ router.get('/register/check-token', registerConfirmLimiter, (req, res) => {
 });
 
 // ── POST /v1/auth/bootstrap/platform-user ────────────────────────────────────
-router.post('/bootstrap/platform-user',
+router.post('/bootstrap/platform-user', bootstrapLimiter,
   validate([
     v.body('email').isString().withMessage('email is required')
       .isEmail().withMessage('email must be a valid address')
@@ -399,6 +412,20 @@ router.post('/bootstrap/platform-user',
   const tokenValid = providedBuf.length === expectedBuf.length && crypto.timingSafeEqual(providedBuf, expectedBuf);
   if (!provided || !tokenValid) {
     return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid bootstrap token.' });
+  }
+
+  // #1365: the route is there for the first administrator. Once an active one
+  // exists it creates nobody, whatever is asked: every other account is made
+  // by invitation. Looked at after the token, so the answer says nothing to a
+  // caller without it; before the body's own checks, so nothing is created
+  // on any path.
+  if (bootstrapToken.administratorExists()) {
+    log.warn({ ip: req.ip }, 'Bootstrap route called with the token while an administrator exists: refused');
+    // In the audit log too: someone holds the token. Never the body sent.
+    try {
+      logAuthEvent({ eventType: 'bootstrap_refused:administrator_exists', ip: req.ip, userAgent: String(req.get('user-agent') || '').slice(0, 200) });
+    } catch { /* an audit line never changes the answer */ }
+    return res.status(409).json({ status: 409, title: 'Conflict', detail: bootstrapToken.ALREADY_AN_ADMINISTRATOR, administrator_exists: true });
   }
 
   const { email, password, role } = req.body || {};
@@ -484,7 +511,16 @@ router.post('/login',
 });
 
 // ── GET /v1/auth/me ───────────────────────────────────────────────────────────
-router.get('/me', requireAuth, (req, res) => {
+// Every page asks it as it loads. The limit is per address and far above
+// that; it is named in the route's own chain, before the session is read.
+const sessionReadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many requests in a short window. Please try again in a minute.' }
+});
+router.get('/me', sessionReadLimiter, requireAuth, (req, res) => {
   const user    = get('SELECT id, email, role, created_at FROM users    WHERE id = ?', [req.user.id]);
   const company = get('SELECT id, name, slug, auth_mode, api_base, datafile_updated_at FROM companies WHERE id = ?', [req.user.companyId]);
   if (!user) return res.status(404).json({ status: 404, title: 'Not Found' });

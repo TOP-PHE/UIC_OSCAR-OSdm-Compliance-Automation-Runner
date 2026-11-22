@@ -85,7 +85,10 @@ Make the pair in a folder that no repository and no shared or synchronised
 drive holds: whatever is there can be copied elsewhere. Keep `oscar-ci.key` where your CI keeps its secrets. Give OSCAR
 `oscar-ci.pub` only: OSCAR refuses a private key. An account holds two active
 keys at most, so you can change a key without a stop: add the new key, switch
-the automation to it, then revoke the old one.
+the automation to it, then revoke the old one. Revoking a key takes effect at
+once (server 1.11.567): no new token with it, and the tokens obtained with it
+are refused from that moment. The other key and its tokens go on working. If
+a private key may have been copied, revoke its key: nothing more is needed.
 
 ## 4. Getting a token
 
@@ -104,7 +107,7 @@ The assertion is signed ES256 (EC key) or PS256 (RSA key), with these claims:
 |---|---|
 | `iss`, `sub` | the account's client id |
 | `aud` | the token endpoint, as shown on the page |
-| `iat`, `exp` | now, and at most 5 minutes later (one minute is enough) |
+| `iat`, `exp` | now, and at most 5 minutes later (one minute is enough). The five minutes are counted from OSCAR's clock (server 1.11.567): an `exp` further ahead, or an `iat` later than now, is refused, with a minute of tolerance for your clock |
 | `jti` | a new random value each time: OSCAR accepts each once |
 
 The answer is `{ access_token, token_type: "Bearer", expires_in: 900, scope }`.
@@ -201,7 +204,7 @@ Every provider is checked **before anything is queued**:
 | `404` | a provider the account is not given, or an unknown suite |
 | `409` | a provider cannot run now: endpoint suspended, or the endpoint, the account's credentials or the data file missing. The answer names it (`provider`, `missing`) |
 | `422` | the `Idempotency-Key` was used for another request |
-| `429` | more than 30 requests in 10 minutes |
+| `429` | more than 30 requests in 10 minutes; or the account would have more runs queued or running than the server allows an account (5,000 by default, all providers together, server 1.11.568). The answer then gives `waiting`, `wanted` and `limit`, and nothing was queued: wait for the runs to finish, then ask again. A pipeline that meets this is usually asking in a loop |
 
 A scenario code a provider does not have is listed in that provider's
 `not_found`. It is not a refusal.

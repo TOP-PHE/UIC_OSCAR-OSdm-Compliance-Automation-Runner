@@ -180,9 +180,11 @@ or accept the risk.
 ## 5. Create the first platform admin
 
 The `/v1/auth/bootstrap/platform-user` endpoint is gated by the
-`PLATFORM_BOOTSTRAP_TOKEN` from your `.env`. It is there to create the very
-first administrator, and it answers for as long as the token is set: clear
-the token once that administrator exists (below).
+`PLATFORM_BOOTSTRAP_TOKEN` from your `.env`. It creates the very first
+administrator only: once an active administrator exists it answers `409
+Conflict` and creates nobody (server 1.11.566; before, it answered for as
+long as the token was set). Clear the token once that administrator exists
+(below).
 
 From the host (or anywhere with HTTPS access once nginx is up):
 
@@ -289,6 +291,12 @@ Expected:
 
 If `compatibility_status` is `"untested_combination"`, you're running a
 non-matrix combination — supported but not formally tested.
+
+A check that fails reads `"ok": false` with an `error` code (`EACCES`,
+`ENOSPC`…), and the answer is `503` with `"status": "degraded"`. The reason
+in full is in the server's log (`docker compose logs oscar`), not in the
+answer, which anyone can read. The data folder and the free space are read
+at most every 10 seconds.
 
 Open the UI at `https://oscar.example.org`, log in with the platform admin
 you created in step 5, and start onboarding companies.

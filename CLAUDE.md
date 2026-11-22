@@ -1171,6 +1171,96 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   decides where OSCAR sends something belongs to the environment the same
   way; `mail-settings.test.js` lists the files of `src/` that write
   `server_config`, and a new writer fails it.
+- **The bootstrap route creates the first administrator only** (#1365,
+  1.11.566). `POST /v1/auth/bootstrap/platform-user` is the one route that
+  makes an account with a password sent, on the word of
+  `PLATFORM_BOOTSTRAP_TOKEN`. Once an *active* administrator exists
+  (`utils/bootstrapToken.js` `administratorExists()`, the status
+  `sessionUser()` asks) it answers 409 and creates nobody, for a certifier
+  too; with none it works, which is the way back in for an installation
+  locked out. The order is fixed and tested: the token (401), then the
+  administrator rule, then the body. A refusal is audited
+  (`bootstrap_refused:administrator_exists`). A token still set is said at
+  each start and on Server Config (`server_info.bootstrap_token_set`). The
+  guides had promised this behaviour for months while the code answered for
+  as long as the token was set: **a guide that states what a route refuses
+  needs a test of that refusal**. Tests that need an administrator insert the
+  row; only `auth-routes.test.js` and the kind CI's `smoke.sh` call the route.
+- **An API account's assertion is timed on OSCAR's clock, and its token
+  names its key** (#1367, 1.11.567). `lifetimeRefusal()`
+  (`utils/clientAssertion.js`): `exp` at most `MAX_LIFETIME_S` +
+  `CLOCK_TOLERANCE_S` after the check, an `iat` not later than the
+  tolerance. **Never bound a lifetime by two values the caller writes**: `exp
+  − iat` alone let an assertion with no `iat` live for years, and
+  `jsonwebtoken` checks neither a future `iat` nor a maximum life unless
+  asked. A token carries `key`, the id of the account's key that signed the
+  assertion; `accountOf()` (`middleware/apiCaller.js`) refuses it once that
+  key is revoked, so revoking a key ends its tokens and leaves the other
+  key's. A token without `key` is one from before, good for its quarter of
+  an hour. In a test, `jwt.sign()` writes its own `iat` unless
+  `noTimestamp`, and with `noTimestamp` it removes one given: sign with
+  `noTimestamp: claims.iat === undefined`. The token endpoint takes 30
+  requests a minute from an address: a test file that asks many tokens is a
+  file of its own.
+- **An account has a ceiling of runs waiting** (#1369, 1.11.568).
+  `waitingRoomRefusal(userId, wanted)` (`helpers/runLaunch.js`): the runs of
+  one person or one Company API account that are QUEUED or RUNNING, all
+  companies together, plus those asked, must not pass
+  `MAX_WAITING_RUNS_PER_ACCOUNT` (Server Config, 5,000; the code's default
+  and the schema's are pinned by `waiting-runs-ceiling.test.js`). Refused
+  with 429 `{ waiting, wanted, limit }` **before anything is queued**: in
+  `POST /v1/runs` after the codes are known, in `POST /v1/api/test-requests`
+  on every provider's runs together and before the `test_request` row, so
+  the Idempotency-Key is not used up. **A new route that queues runs calls
+  it.** A rate limit on a route says how often it is called, not how much is
+  waiting: the two are different limits. The count is `INDEXED BY
+  idx_runs_active` with that index's exact `status IN ('QUEUED',
+  'RUNNING')`: left to itself SQLite takes `idx_runs_user_id` and walks the
+  account's whole history.
+- **A JSON body is 1 MB at most; the data file save reads its 5 MB after its
+  authorisation** (#1371, 1.11.569). `utils/bodyLimits.js`:
+  `generalJsonParser()` is the public app's only JSON parser and skips one
+  request, `PUT /v1/company/datafile/json` (`isDatafileSave()`), whose own
+  `datafileJsonParser()` sits in the route after the limiter and
+  `authorizeDatafileWrite()`. **A new route that needs a larger JSON body
+  gets a parser of its own after its authorisation, and its path in
+  `isDatafileSave()`'s place**; `body-limits.test.js` lists the users of
+  `datafileJsonParser()`. A test app whose own `express.json()` already read
+  the body makes the route's parser a no-op, so route tests are unchanged.
+  **supertest resets a request still being sent when an early answer comes**
+  (`read ECONNRESET` for a 20 MB body refused before it is read): a real
+  client gets its answer; test such a case with `app.listen(0)` and `fetch`.
+  `ALLOW_PRIVATE_TARGETS` is said at each start and on Server Config
+  (`server_info.private_targets_allowed`), with the bootstrap token's and the
+  mail settings' notes: **a setting that turns a protection off is shown
+  while it is on.**
+- **A read route names its rate limit in its own chain; `/health` keeps its
+  disk checks; the credential fingerprint is keyed** (#1377, 1.11.570). CodeQL
+  reads a limit only where the route names it (`router.get(path, limiter, …)`),
+  not one set with `router.use()` or in `server.js` for a whole router:
+  `GET /health` (`healthLimiter`, 300 a minute), `GET /v1/auth/me`
+  (`sessionReadLimiter`, 600, before `requireAuth`), `GET
+  /v1/runs/:id/artifacts/:aid` (`artifactReadLimiter`, 300). `/logout` stays
+  without one on purpose (`health-checks.test.js` holds the comment and the
+  route together). `utils/healthChecks.js` `diskChecks()` keeps the data
+  folder's write test and the free space for `KEEP_MS` (10 s, under the
+  shortest probe period). **An answer anyone can read carries an error's code
+  (`errorCode()`), never `err.message`**: the words can hold a path, and go to
+  the log. `utils/credentialFingerprint.js`:
+  `tester_credentials.cached_token_cred_fp` is `v2:` + scrypt salted with a key
+  derived from `ENCRYPTION_KEY`, awaited (Node's thread pool, `COST` N 1024,
+  2 ms). An HMAC there is still `js/insufficient-password-hash` for CodeQL,
+  which reads a field named `oauth_*` as a password and any `createHash` /
+  `createHmac` as a fast hash. A fingerprint of an earlier version never
+  matches, so the token is asked again once (`isCurrentForm()` chooses the log
+  line). **`access-token.js` held a raw NUL**: an editing tool had stored the
+  typed escape as the character, git read the file as binary and showed no
+  diff. Make such a character with `String.fromCodePoint()`;
+  `credential-fingerprint.test.js` refuses a NUL in any source file. **In Git
+  Bash an argument that starts with `//` loses a slash** (MSYS path
+  conversion): `export MSYS_NO_PATHCONV=1` before passing a comment line as an
+  anchor. **On a pull request CodeQL reports on the changed lines only**
+  ("Persisted N diff range(s)"); the whole reading is `main`'s next analysis.
 - **`canUserSeeRun()` is the only run-visibility rule — route every new
   run-scoped read through it** (`src/api/helpers/run-access.js`, v1.10.0/#60,
   enforced everywhere as of v1.11.194). It returns the run row or `null`;

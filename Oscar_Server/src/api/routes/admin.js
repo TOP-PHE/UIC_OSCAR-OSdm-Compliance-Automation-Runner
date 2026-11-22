@@ -44,6 +44,8 @@ const path = require('node:path');
 const AccessRequests = require('../../utils/accessRequests');
 const alertmanagerConfig = require('../../utils/alertmanagerConfig');
 const mailSettings = require('../../utils/mailSettings');
+const bootstrapToken = require('../../utils/bootstrapToken');
+const { allowPrivate } = require('../../utils/urlPolicy');
 const { deploymentKind } = require('../../utils/deployment');
 const log = require('../../utils/logger').child({ module: 'admin' });
 
@@ -838,6 +840,10 @@ const CONFIG_SCHEMA = {
   // #1336: on a cluster, a run's pod that took the run and writes no line is
   // given up, whatever the limit above says. 0 turns it off.
   RUN_FIRST_LINE_TIMEOUT_MS: { description: 'On a cluster (pods for runs), stop a run whose pod writes no line this long after taking it (ms; default 180000 = 3 min, 0 = off). Applied even when the Silent Run Limit is off: every scenario writes its first lines at once.', type: 'number', default: 180000, min: 0, max: 3600000 },
+  // #1369: the runs one person or one Company API account may have queued or
+  // running at once, all companies together. A launch that would go over is
+  // refused (429) before anything is queued (helpers/runLaunch.js).
+  MAX_WAITING_RUNS_PER_ACCOUNT: { description: 'Runs one person or one Company API account may have queued or running at once, all companies and providers together. A launch that would go over is refused and queues nothing (default 5000; a campaign is a few hundred scenarios on each of a few providers).', type: 'number', default: 5000, min: 100, max: 100000 },
   // Logging — applied immediately on save
   LOG_LEVEL: {
     description: 'Server log verbosity (info = production-friendly, debug = verbose for troubleshooting)',
@@ -916,6 +922,12 @@ router.get('/config', (req, res) => {
     mail_source:     mail.source,
     mail_replaced:   mail.replaced,
     mail_warnings:   mail.warnings,
+    // #1365: the bootstrap token is still in the server's environment. An
+    // administrator reads this, so one exists and the token is of no use.
+    bootstrap_token_set: bootstrapToken.tokenSet(),
+    // #1371: ALLOW_PRIVATE_TARGETS is on, so outbound calls are not kept to
+    // public https addresses.
+    private_targets_allowed: allowPrivate(),
   };
   if (serverInfo.alerting_mode === 'kubernetes') serverInfo.alerting_commands = alertmanagerConfig.KUBERNETES_COMMANDS;
 

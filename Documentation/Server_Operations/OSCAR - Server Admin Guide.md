@@ -261,7 +261,7 @@ MAX_CONCURRENT_RUNS=1
 | `ALLOWED_ORIGINS` | (all) | Comma-separated CORS whitelist |
 | `APP_URL` | `http://localhost:3001` | Base URL for email verification links |
 | `NODE_ENV` | (unset) | Set to `production` for SMTP email sending |
-| `PLATFORM_BOOTSTRAP_TOKEN` | (unset) | One-time token for creating admin users |
+| `PLATFORM_BOOTSTRAP_TOKEN` | (unset) | Token for creating the first administrator. The route creates no other account once one exists (server 1.11.566); remove the token afterwards. While it is still set, the server says so at each start and *Server Config* shows it |
 
 #### SMTP (required for invitations, password resets and alerts)
 
@@ -748,6 +748,7 @@ Once you log in as **administrator**, the top navigation exposes a set of admin-
 
 - **Runtime Config** — change `MAX_CONCURRENT_RUNS`, `PARALLEL_STAGGER_MS`, `RUN_TIMEOUT_MS`, `LOG_LEVEL` and the alerting settings. Save applies immediately — the worker queue re-reads on every drain, the runner re-reads per run, and `LOG_LEVEL` swaps the active pino sink. **No restart needed.** Audit-logged.
   - **The mail server's settings are shown, not changed** (server 1.11.565, #1363): they are the server's environment's (section 7, "SMTP"). The page says where the ones in use come from. A save that asks for another value is refused, named in the answer and written to the audit log (`config_mail_change_refused`).
+  - **Max Waiting Runs per Account** (`MAX_WAITING_RUNS_PER_ACCOUNT`, server 1.11.568, #1369): the runs one person or one Company API account may have queued or running at once, all companies and providers together; 5,000 by default, 100 to 100,000. A launch that would go over is refused (`429`) and queues nothing. A campaign is a few hundred scenarios on each of a few providers: the default is there for a pipeline that asks in a loop, whose runs would otherwise fill the queue and the disk shared by every company.
   - **An empty number field means the default** (#1338). Saving it empty removes the stored value, and the setting reads its `.env` value, else its default, again; the empty field shows that default (*Empty = default (…)*). Type `0` to turn a limit off. Before 1.11.555 an empty field was stored as `0`. A save of the page turned the *Silent Run Limit* and the *Run Pod First Line Limit* off wherever they had never been set: check both after an upgrade.
 - **Server Info** — read-only: version, Node version, platform, uptime, collection path, Bruno binary path, DB path. Useful when filing a bug or talking to support.
 
@@ -1464,9 +1465,11 @@ an internal address is caught too.
 What to check on your deployment:
 
 - **If your providers are genuinely on `localhost` or your LAN** (a self-hosted
-  or development box), set `ALLOW_PRIVATE_TARGETS=1` in the server's `.env`. That
-  turns the policy off. It is read per request, so no restart is needed. A public
-  VPS deployment must **not** set it.
+  or development box), set `ALLOW_PRIVATE_TARGETS=1` in the server's `.env`, then
+  create the container again (`docker compose up -d oscar`; a `restart` keeps the
+  old environment). That turns the policy off. From server 1.11.569 the server
+  says so at each start and *Server Config* shows it while it is on. A public VPS
+  deployment must **not** set it.
 - A Test Manager saving a non-public endpoint now gets a 400 that says it must be
   a public https host. A tester saving a non-public `token_url` gets the same.
 - If a company's runs start failing with "This run was not started … public

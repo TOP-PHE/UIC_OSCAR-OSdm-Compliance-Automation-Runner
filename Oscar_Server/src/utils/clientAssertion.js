@@ -76,6 +76,28 @@ function peek(assertion) {
 }
 
 /**
+ * Why an assertion's times are refused, or null (#1367). The five minutes are
+ * counted from OSCAR's clock (`nowS`, in seconds): `exp` and `iat` are both the
+ * client's to write, so their difference alone bounds nothing. With no `iat`,
+ * or one written later than now, an assertion expiring years ahead used to
+ * be accepted until then.
+ *   - exp at most MAX_LIFETIME_S after now, plus the tolerance for the
+ *     client's clock;
+ *   - iat, when there, a number, not later than now plus that tolerance, and
+ *     at most MAX_LIFETIME_S before exp.
+ * That it has not expired yet is jwt.verify()'s to say, with the signature.
+ */
+function lifetimeRefusal(payload, nowS) {
+  if (!Number.isFinite(payload.exp)) return 'no exp';
+  if (payload.exp - nowS > MAX_LIFETIME_S + CLOCK_TOLERANCE_S) return 'expires more than five minutes from now';
+  if (payload.iat === undefined) return null;
+  if (!Number.isFinite(payload.iat)) return 'iat is not a number';
+  if (payload.iat - nowS > CLOCK_TOLERANCE_S) return 'issued in the future';
+  if (payload.exp - payload.iat > MAX_LIFETIME_S) return 'lives longer than five minutes';
+  return null;
+}
+
+/**
  * Checks a client assertion against the client's keys. Returns
  * { ok: true, clientId, jti, exp, keyId } or { ok: false, why }. `why` is for
  * the log; the client is only told invalid_client.
@@ -89,9 +111,9 @@ function verifyAssertion(assertion, { clientId, keys, audiences, now }) {
   if (!ALGORITHMS.includes(header.alg)) return { ok: false, why: `alg ${header.alg}` };
   if (payload.iss !== clientId || payload.sub !== clientId) return { ok: false, why: 'iss or sub is not the client' };
   if (typeof payload.jti !== 'string' || payload.jti.length < 8 || payload.jti.length > 200) return { ok: false, why: 'no jti' };
-  if (!Number.isFinite(payload.exp)) return { ok: false, why: 'no exp' };
-  const issuedAt = Number.isFinite(payload.iat) ? payload.iat : payload.exp - MAX_LIFETIME_S;
-  if (payload.exp - issuedAt > MAX_LIFETIME_S) return { ok: false, why: 'lives longer than five minutes' };
+  const nowS = Math.floor(now.getTime() / 1000);
+  const times = lifetimeRefusal(payload, nowS);
+  if (times) return { ok: false, why: times };
   const candidates = keys.filter(k => k.alg === header.alg && (!header.kid || header.kid === k.fingerprint));
   for (const key of candidates) {
     try {
@@ -101,7 +123,7 @@ function verifyAssertion(assertion, { clientId, keys, audiences, now }) {
         issuer: clientId,
         subject: clientId,
         clockTolerance: CLOCK_TOLERANCE_S,
-        clockTimestamp: Math.floor(now.getTime() / 1000),
+        clockTimestamp: nowS,
       });
       return { ok: true, clientId, jti: payload.jti, exp: payload.exp, keyId: key.id };
     } catch (err) {
@@ -113,4 +135,4 @@ function verifyAssertion(assertion, { clientId, keys, audiences, now }) {
   return { ok: false, why: candidates.length ? 'signature' : 'no key of that kind' };
 }
 
-module.exports = { ALGORITHMS, ASSERTION_TYPE, MAX_LIFETIME_S, CLOCK_TOLERANCE_S, MAX_KEYS, publicKeyOf, peek, verifyAssertion };
+module.exports = { ALGORITHMS, ASSERTION_TYPE, MAX_LIFETIME_S, CLOCK_TOLERANCE_S, MAX_KEYS, publicKeyOf, peek, lifetimeRefusal, verifyAssertion };

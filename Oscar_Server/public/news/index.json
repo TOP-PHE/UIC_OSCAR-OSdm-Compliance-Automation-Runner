@@ -1,5 +1,29 @@
 [
   {
+    "id": "2026-11-22-waiting-runs-ceiling",
+    "date": "November 22, 2026",
+    "tag": "Operations",
+    "title": "A limit on the runs one account has waiting",
+    "summary": "A launch is refused when the person or the Company API account would have more than 5,000 runs queued or running. Nothing changes for a normal campaign.",
+    "content": "OSCAR now limits the runs one person, or one Company API account, has queued or running at the same time, all companies and providers together. The limit is 5,000 by default; an administrator can change it on Server Config.\n\nA campaign is a few hundred scenarios on each of a few providers, so you should never meet it. It is there for an automation that asks for tests in a loop: its runs would fill the queue and the storage that every company shares.\n\nIf a launch is refused for this reason, the message says how many runs are waiting, how many were asked and the limit, and nothing was queued. Wait for the runs to finish, or cancel them on the Dashboard, then launch again. If it comes from your automation, check that it does not ask the same tests again and again."
+  },
+  {
+    "id": "2026-11-22-api-account-key-revoked",
+    "date": "November 22, 2026",
+    "tag": "Improvement",
+    "title": "Company API accounts: revoking a key ends its tokens at once",
+    "summary": "A token obtained with a key is refused as soon as that key is revoked. The account's other key keeps working, so a key is changed without a stop.",
+    "content": "This concerns Test Managers whose automation calls OSCAR with a Company API account.\n\nUntil now, revoking a key stopped new tokens, and a token already obtained with it went on working until it expired, up to a quarter of an hour. From now on such a token is refused at once. The account's second key and the tokens obtained with it are not touched: add the new key, switch your automation to it, then revoke the old one, as before.\n\nIf a private key may have been copied, revoking its key on the API Accounts page is enough.\n\nThe signed request your automation sends to get a token is also held more strictly to its five minutes, counted from OSCAR's clock. The example client and the examples of the Test Automation API Guide sign for one minute from now, and are not affected. If your own client is refused after this release, check that its clock is right and that it signs for a few minutes at most."
+  },
+  {
+    "id": "2026-11-22-first-administrator",
+    "date": "November 22, 2026",
+    "tag": "Operations",
+    "title": "For administrators: the bootstrap token creates the first administrator only",
+    "summary": "Once an administrator exists, the installation route creates no other account. A token still set on the server is shown on Server Config, with how to remove it.",
+    "content": "This concerns whoever installs and operates an OSCAR server. Testers and Test Managers have nothing to do.\n\nAn installation creates its first administrator with a token set on the server. That route now creates this first administrator only: once an administrator exists, it answers that one exists and creates nobody. Further administrators and certifiers are invited from Admin, Manage Users, as before, and choose their own password from the link they receive.\n\nIf the token is still set on your server, Admin, Server Config now says so at the top of the page, with the two steps that remove it; the server also says it each time it starts. Removing it changes nothing else.\n\nIf no administrator can sign in any more, the route works again once every administrator is suspended: this is the way back in for whoever can set the token on the server."
+  },
+  {
     "id": "2026-11-22-mail-server-settings",
     "date": "November 22, 2026",
     "tag": "Operations",

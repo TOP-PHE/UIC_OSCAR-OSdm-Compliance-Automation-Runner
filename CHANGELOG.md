@@ -24,6 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Workflows: a read-only token in three workflows; CodeQL reads the workflow files again** (#1375). CI only, no version.
+  - **Seen:** five code-scanning alerts on the workflows' token had been open on `main` since 7 May. `sonar.yml`, `ci-server.yml` and `ci-collection.yml` named no `permissions`, so their token took the repository's default. The fifth alert was about a job of `refresh-collection.yml` that has had its block for months.
+  - **Why it never closed:** the workflow files were no longer analysed. `codeql.yml` listed `javascript-typescript` only; the alerts' last analysis (category `/language:actions`) was of 7 May. Nothing added to a workflow since then was looked at, and the workflows hold the deploy keys and the release steps.
+  - **Now:** `permissions: contents: read` at the top of the three workflows (their jobs check out, build and test; the image scan keeps its own block), and `actions` among the languages of `codeql.yml`. Alerts that are fixed close by themselves from the next analysis of `main`, and new ones show on a pull request.
+
 - **Guides: an edited `.env` needs `docker compose up -d`, not `restart`; the session secret is not rotated through `.env`** (#1361). Documentation and one comment in a deployment example, no version.
   - **Seen:** *Self-Hosted Quick Start* (step 6 and its troubleshooting table) said to clear `PLATFORM_BOOTSTRAP_TOKEN` in `.env`, then `docker compose restart oscar`. *Security Operations Policy* 3.3 rotated `JWT_SECRET` by writing a new value in `.env`, then the same restart.
   - **Why it did nothing:**
@@ -611,6 +616,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `buildOfferCollection()` is back under the complexity limit (S3776), and the
   trip id's seed is a string of its own (S4624). The answers are the same, trip
   ids included: no simulator version, nothing to install.
+
+---
+
+## [server-1.11.570] — 2026-11-22
+
+The code-scanning alerts left on `main`, read one by one (#1377). Not released on its own: listed in `compatibility.json` (2026.609) without moving `current_release`.
+
+### Changed
+- **Three read routes name a rate limit in their own chain**: `GET /health` (300 a minute per address), `GET /v1/auth/me` (600, before the session is read) and `GET /v1/runs/:id/artifacts/:aid` (300, the ceiling of the other file downloads). All far above real use: a readiness and a liveness probe make 6 calls a minute, a page asks `/me` once as it loads and `/health` once while its version line is cached.
+- **`GET /health` keeps its two disk checks for 10 seconds** (`utils/healthChecks.js`). At every call it wrote and removed a file in the data folder and asked the file system for its free space, on the server's one thread. A probe every 15 or 30 seconds still reads the disk each time; a burst of calls reads it once.
+- **A failed health check answers a code** (`EACCES`, `ENOSPC`, `ERR_SQLITE_ERROR`…; `error` when the error has none), and the artifact route's `500` a fixed sentence. Both answered the error's own words, which can hold a path of the machine; the words go to the server's log.
+- **The fingerprint kept beside a tester's access token is keyed** (`utils/credentialFingerprint.js`: scrypt, salted with a key derived from `ENCRYPTION_KEY`, which is not in the database; made on Node's thread pool, about 2 ms each and 50 at once in about 30 ms, never on the server's thread). OSCAR keeps it to know whether the credentials are still those that obtained the token (#208); it was a plain SHA-256 of the same values. A new fingerprint starts with `v2:` and one kept by an earlier version never equals it, so **each tester's token is asked again once after the update**; the run's log then says "the token was kept by an earlier version of the server", not "credentials changed".
+- **The trip editor's `setTripFieldByPath()` refuses `__proto__`, `constructor` and `prototype`** as a path segment. The paths come from the page's own fields; the helper no longer relies on that.
+
+### Fixed
+- **`worker/access-token.js` held a NUL character**, stored months ago by an editing tool in place of the escape that was typed. The code worked, but git read the file as binary: every change to the module that resolves a tester's token showed as "Binary files differ" in a review. The character is now made with `String.fromCodePoint(0)`, in the new module, and `credential-fingerprint.test.js` refuses a NUL in any source file of the server, the pages, the tests, the collection library, the simulator and the MCP server.
+- Names nothing read: an import in `services/credentialTest.js`, a caught error in `worker/auth-profiles.js` (ESLint's one warning on `src/`), and five names in four test files, one of them a helper no test called.
+
+### Tests
+- `health-checks.test.js` and `credential-fingerprint.test.js` (new), three tests of `/health` in `server.test.js`, three of the token cache in `access-token.test.js`, one of the trip editor in `ui-scripts.test.js`. 24 mutations of the changed code, each caught by a test.
+
+### Not changed, on purpose
+- The alerts in `Bruno_Collection/` (two exports of `refunds.js`, two notes): a collection release of their own, with the simulator replay.
+- Those that describe a choice made and written in the code: the sign-out has no limit, since it must always go through (a test now holds the comment and the route together); limits set once for a whole router; a placeholder in the collection's settings; one reading kept as it is in the Report Builder (#527). They are closed in GitHub with their reason.
+
+### Documentation
+- *installation-guide* (what a failed check answers) and the OpenAPI description of `/health`.
+- No news entry: nothing changes for testers or Test Managers.
+
+## [server-1.11.569] — 2026-11-22
+
+The 5 MB JSON limit only where a data file is saved; `ALLOW_PRIVATE_TARGETS` said when it is on (#1371). Not released on its own: listed in `compatibility.json` (2026.608) without moving `current_release`.
+
+### Changed
+- **The general JSON body limit is 1 MB.** One parser of 5 MB came first on every route, sized for the largest data file: a body of that size was read and parsed on the server's one thread before any route's authentication or rate limit. `utils/bodyLimits.js` `generalJsonParser()` reads at most 1 MB and leaves one request alone, the Test Config save.
+- **`PUT /v1/company/datafile/json` keeps 5 MB, read after its authorisation.** Its own parser (`datafileJsonParser()`) comes after the limiter and `authorizeDatafileWrite()`: a caller who may not save is answered before a byte of the body is read, as the data file upload already did. Measured with a real client on a real port: a refused caller gets its answer whatever it sends (20 of 20 at each size up to 20 MB).
+- **A `413` names the limit that applied** (`tooLargeText()`): 1 MB for a route, 5 MB for the save. It said 5 MB everywhere.
+- **`ALLOW_PRIVATE_TARGETS` is said when it is on**: a warning at each start (`PRIVATE_TARGETS_WARNING`, `utils/urlPolicy.js`) and a note above the server information on *Admin → Server Config* (`server_info.private_targets_allowed`). It turns off the policy that keeps OSCAR's outbound calls on public https addresses, and nothing showed it.
+
+### Documentation
+- *Security Operations Policy* and *Server Admin Guide* (the setting; the guide said it "is read per request, so no restart is needed", which holds for the process but not for a container, whose environment is set when it is created), `OSCAR_Deploy/.env.example`.
+- No news entry: nothing changes for testers or Test Managers, and the administrator's note is on the page.
+
+### Tests
+- `body-limits.test.js` (new): which request is the save; an app wired as the server is (under and over each limit, a refused caller with no body read, a real client sending 20 MB); the server's wiring; the setting's warning. `server.test.js`: the two tests that sent a refused body to the save without a session now use an ordinary route, and a third says the save answers 401 first. `ui-scripts.test.js`: the page's note.
+
+---
+
+## [server-1.11.568] — 2026-11-22
+
+A ceiling on the runs an account has waiting (#1369). Not released on its own: listed in `compatibility.json` (2026.607) without moving `current_release`.
+
+### Added
+- **One person or one Company API account has at most `MAX_WAITING_RUNS_PER_ACCOUNT` runs queued or running**, all companies and providers together (Server Config, *Max Waiting Runs per Account*: 5,000 by default, 100 to 100,000). Each launch route limited how often it is called, and none looked at what was already waiting: a pipeline asking again and again could queue tens of thousands of runs, and the queue, the `runs` table and the stored results are shared by every company.
+- **A launch that would go over is refused before anything is queued**: `429` with `{ waiting, wanted, limit }` and a sentence saying to wait for the runs or cancel them. Both routes go through `waitingRoomRefusal()` (`helpers/runLaunch.js`): `POST /v1/runs` once its scenarios are known, `POST /v1/api/test-requests` on the runs of every provider of the request together, before the request is recorded, so its `Idempotency-Key` is not used up.
+- The count reads the partial index of the runs waiting (`INDEXED BY idx_runs_active`), never an account's whole history.
+
+### Documentation
+- *Server Admin Guide* (the Server Config tab), *Test Automation API Guide* (the `429` of a test request), OpenAPI (both launch routes).
+
+### Tests
+- `waiting-runs-ceiling.test.js` (new): the default and a stored value; under, at and over the ceiling on both routes; finished runs not counted, running ones counted; the count across companies; another account not counted; no run, no test request and no used key after a refusal; the count's plan.
+
+---
+
+## [server-1.11.567] — 2026-11-22
+
+API accounts: an assertion's lifetime counted from the server's clock; a revoked key ends its tokens (#1367). Not released on its own: listed in `compatibility.json` (2026.606) without moving `current_release`.
+
+### Changed
+- **An assertion's five minutes are counted from OSCAR's clock.** The rule was checked between `exp` and `iat`, two values the assertion carries: with no `iat`, or one written later than now, an assertion whose `exp` was far ahead was accepted until then. `lifetimeRefusal()` (`utils/clientAssertion.js`) now asks `exp` at most five minutes after the time of the check, plus the minute of tolerance for the client's clock; an `iat`, when there, a number, not later than that tolerance, and at most five minutes before `exp`. A refused assertion uses up no `jti`. The example client and the guide's examples sign for 60 seconds from now: nothing changes for them.
+- **Revoking a key ends the tokens obtained with it, at once, and no other.** A token lived its quarter of an hour after its key was revoked (the API document said so). A token now names the key its assertion was signed with (claim `key`, `Tokens.issue(…, keyId)`), and `accountOf()` (`middleware/apiCaller.js`) checks at each call that it is still an active key of that account. The account's second key and its tokens go on, so a key is changed without a stop, as before. A token issued before this change names no key and lives out its quarter of an hour; one naming a key of another account, or none that exists, is refused.
+
+### Documentation
+- *Test Automation API Guide* (sections 3 and 4), OpenAPI (the token endpoint, the key's revocation).
+
+### Tests
+- `api-sign-in.test.js` (new): the lifetime rule case by case, with a real key the assertions that were accepted (no `iat` and ten years; an `iat` a minute before an `exp` in ten years), the token's key claim.
+- `api-oauth-key-and-lifetime.test.js` (new, a file of its own: the token endpoint takes 30 requests a minute from an address): the same on the routes; a revoked key ends its tokens and leaves the other key's and an older token.
+
+---
+
+## [server-1.11.566] — 2026-11-22
+
+The bootstrap route creates the first administrator only (#1365). Not released on its own: listed in `compatibility.json` (2026.605) without moving `current_release`.
+
+### Changed
+- **`POST /v1/auth/bootstrap/platform-user` creates nobody once an active administrator exists.** It answered for as long as `PLATFORM_BOOTSTRAP_TOKEN` was set, with the password sent, for an administrator or a certifier; the guides called it one-time (#1361 made them say what the server did). It now answers `409` (`administrator_exists: true`), saying that further administrators and certifiers are invited from *Admin → Manage Users* and that the token should be removed. The token is checked first, so a caller without it gets the same `401` whether an administrator exists or not; the rule comes before anything is read from the body.
+- **With no active administrator it works as before**: a new installation, or every administrator suspended or deleted. That is the way back in for an installation locked out, for whoever can set the token on the server. "Active" is the status a session asks (`sessionUser()`): an administrator counted is one who can sign in.
+- **A refusal is written to the audit log** (`bootstrap_refused:administrator_exists`, with the address and the user agent, never what was sent): someone holds the token.
+- **A token left in the environment is said.** At each start, as a warning while an administrator exists (`utils/bootstrapToken.js` `startLine()`); on *Admin → Server Config*, above the server information, with the two steps that remove it (`server_info.bootstrap_token_set`, `bootstrapTokenNote()`).
+
+### Documentation
+- *Self-Hosted Quick Start* (steps 2 and 6), *installation-guide.md* (section 5), *Security Operations Policy* (3.1, 5.5), *Server Admin Guide* (the variable's row), *k3s on one VPS* (what a `409` means), `OSCAR_Deploy/.env.example`, OpenAPI.
+- Not changed: `OSCAR_Deploy/scripts/oscar-user-management.ps1` (April 2026), which reads the token from the environment file at each run and calls routes that no longer exist.
+
+### Tests
+- `auth-routes.test.js`: the first administrator created; then `409` for another administrator and for a certifier, nobody created; the audit line; the same `401` without the token whether one exists or not; every administrator suspended, the route works again; an administrator that is not active, and other active roles, do not count; an e-mail that has an account is still its own `409`.
+- `bootstrap-token.test.js` (new): the module, the start line, the order of the route's checks. `ui-scripts.test.js`: the page's note.
 
 ---
 

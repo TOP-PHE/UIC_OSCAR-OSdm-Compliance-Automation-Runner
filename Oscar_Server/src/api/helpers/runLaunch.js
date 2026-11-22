@@ -16,13 +16,16 @@
  *     cannot start: endpoint suspended, endpoint or credentials or data file
  *     missing, data file unreadable. The answers are those POST /v1/runs has
  *     always given.
+ *   waitingRoomRefusal(userId, wanted) — the ceiling on the runs one person
+ *     or one Company API account has queued or running (#1369): null, or the
+ *     429 to answer before anything is queued.
  *   enqueueBatch({ … }) — one run per code, written in one transaction and
  *     queued; the batch's selection kept when there is one (#1029).
  */
 
 const fs = require('node:fs');
 const { randomUUID } = require('node:crypto');
-const { get, all, run: dbRun, transaction, colDecrypt } = require('../../db/db');
+const { get, all, run: dbRun, transaction, colDecrypt, getConfig } = require('../../db/db');
 const queue = require('../../worker/queue');
 const { credentialsFor } = require('../../utils/testerCredentials');
 const { endpointSuspension } = require('../../utils/intrusion');
@@ -30,6 +33,46 @@ const RF = require('../../utils/runFilters');
 
 const SUSPENDED_ENDPOINT = Object.freeze({ status: 409, title: 'Conflict', endpoint_suspended: true,
   detail: 'The OSDM endpoint is suspended: an answer meant to attack OSCAR was detected during a run. A Test Manager resumes it on the API Config page once the provider is checked.' });
+
+// ── The runs an account has waiting (#1369) ──────────────────────────────────
+// Each launch route limits how often it is called; none looked at what was
+// already waiting, so a pipeline asking again and again could queue tens of
+// thousands of runs: the queue, the runs table and the stored results are the
+// server's, shared by every company. The ceiling counts the runs of one
+// person or one Company API account that are queued or running, all
+// companies and providers together.
+const WAITING_RUNS_DEFAULT = 5000;
+
+/** The ceiling, from Server Config (MAX_WAITING_RUNS_PER_ACCOUNT), else its default. */
+function waitingRunsCeiling() {
+  const stored = Number.parseInt(getConfig('MAX_WAITING_RUNS_PER_ACCOUNT', '5000'), 10);
+  return Number.isInteger(stored) && stored >= 1 ? stored : WAITING_RUNS_DEFAULT;
+}
+
+/**
+ * The runs of `userId` queued or running now. The statuses are written as
+ * the partial index idx_runs_active has them, so that SQLite reads that
+ * index: the runs waiting, never the whole table.
+ */
+function waitingRunsOf(userId) {
+  return Number(get(`SELECT COUNT(*) AS n FROM runs INDEXED BY idx_runs_active WHERE status IN ('QUEUED', 'RUNNING') AND user_id = ?`, [userId])?.n) || 0;
+}
+
+/**
+ * Whether `wanted` more runs fit under the ceiling for `userId`: null, or the
+ * refusal [429, body] to answer before anything is queued.
+ */
+function waitingRoomRefusal(userId, wanted) {
+  const waiting = waitingRunsOf(userId);
+  const limit = waitingRunsCeiling();
+  if (waiting + wanted <= limit) return null;
+  return [429, {
+    status: 429, title: 'Too Many Requests',
+    detail: `This launch asks for ${wanted} run(s) and ${waiting} are already queued or running for this account: `
+      + `together they pass the limit of ${limit}. Wait for the runs to finish, or cancel them, then launch again; nothing was queued.`,
+    waiting, wanted, limit,
+  }];
+}
 
 // What a run needs of the user's credentials, in words (the runner reads the
 // same row when the job is dequeued; checking here answers at once).
@@ -136,4 +179,4 @@ function enqueueBatch({ companyId, userId, company, credentials, codes, concurre
   };
 }
 
-module.exports = { launchReadiness, enqueueBatch, missingCredentials, concurrentLimitOf };
+module.exports = { launchReadiness, enqueueBatch, missingCredentials, concurrentLimitOf, waitingRoomRefusal, waitingRunsOf, waitingRunsCeiling, WAITING_RUNS_DEFAULT };

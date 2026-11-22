@@ -194,6 +194,25 @@ describe('js/scenarios.js — setTripFieldByPath', () => {
     expect(trip).toEqual({ trip: { searchCriteria: { via: [{ viaPlace: { stopPlaceRef: 'urn:uic:stn:8500010' } }] } } });
   });
 
+  test('never writes a member every object inherits', () => {
+    const paths = ['__proto__.polluted', 'constructor.prototype.polluted', 'trip.__proto__.polluted',
+      'trip.constructor.polluted', '__proto__', 'trip.constructor', 'trip.prototype', 'polluted.__proto__'];
+    try {
+      for (const path of paths) {
+        const trip = { trip: {} };
+        const { set, context } = setter(trip);
+        set(0, path, 'yes');
+        expect(Object.prototype.polluted).toBeUndefined();
+        expect({}.polluted).toBeUndefined();
+        expect(Object.getPrototypeOf(trip)).toBe(Object.prototype);
+        expect(Object.keys(trip.trip)).toEqual([]);
+        expect(context.dirty).toBe(0);
+      }
+    } finally {
+      delete Object.prototype.polluted;
+    }
+  });
+
   test('a numeric last segment sets an array element', () => {
     const trip = { tags: ['a', 'b'] };
     const { set } = setter(trip);
@@ -910,6 +929,51 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
       expect(html).toContain('From is &lt;b&gt;odd&lt;/b&gt;');
       expect(html).not.toContain('<b>odd</b>');
       expect(html).toContain('second');
+    });
+  });
+
+  describe('admin.html — a bootstrap token left in the environment (#1365)', () => {
+    const bootstrapTokenNote = loadFunction('admin.html', 'bootstrapTokenNote');
+    const page = read('admin.html');
+
+    test('nothing unless the server says the token is set', () => {
+      for (const value of [false, undefined, null, 'true', 1]) expect(bootstrapTokenNote(value)).toBe('');
+    });
+
+    test('set: what it is, that it creates no account, and how to remove it', () => {
+      const note = bootstrapTokenNote(true);
+      expect(note).toMatch(/still set in the server's environment/);
+      expect(note).toMatch(/creates no account any more/);
+      expect(note).toContain('<code>PLATFORM_BOOTSTRAP_TOKEN</code>');
+      expect(note).toContain('docker compose up -d oscar');
+      expect(note).not.toContain('restart oscar');
+    });
+
+    test("drawn with the server information, from the server's own flag", () => {
+      expect(page).toContain('bootstrapTokenNote(si.bootstrap_token_set)');
+      const admin = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'api', 'routes', 'admin.js'), 'utf8');
+      expect(admin).toContain('bootstrap_token_set: bootstrapToken.tokenSet()');
+    });
+  });
+
+  describe('admin.html — private targets allowed (#1371)', () => {
+    const privateTargetsNote = loadFunction('admin.html', 'privateTargetsNote');
+    const page = read('admin.html');
+
+    test('nothing unless the server says the setting is on', () => {
+      for (const value of [false, undefined, null, 'true', 1]) expect(privateTargetsNote(value)).toBe('');
+    });
+
+    test('on: the setting, what it turns off, what it is for and how to remove it', () => {
+      const note = privateTargetsNote(true);
+      expect(note).toContain('<code>ALLOW_PRIVATE_TARGETS</code>');
+      expect(note).toMatch(/not kept to public https addresses/);
+      expect(note).toMatch(/development PC/);
+      expect(note).toMatch(/remove it from the server's environment/);
+    });
+
+    test("drawn with the server information, from the server's own flag", () => {
+      expect(page).toContain('privateTargetsNote(si.private_targets_allowed)');
     });
   });
 

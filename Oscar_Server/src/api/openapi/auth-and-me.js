@@ -46,11 +46,11 @@ module.exports = {
       responses: { 200: { description: 'An administrator' }, 401: { description: 'No session, or an ended one' }, 403: { description: 'A session, not an administrator\'s' }, 429: { description: 'Too many checks' } } },
   },
   '/v1/auth/bootstrap/platform-user': {
-    post: { tags: ['Auth'], summary: 'Create an administrator or certifier with the server\'s bootstrap token', security: open,
+    post: { tags: ['Auth'], summary: 'Create the first administrator with the server\'s bootstrap token', security: open,
       description: `No session: the X-Platform-Bootstrap-Token header must equal the server's PLATFORM_BOOTSTRAP_TOKEN (compared in constant time); without that setting the route answers 503. Body: { email, password, role? } (role administrator, the default, or certification_user; the password rules of a reset). The user joins the platform company. ${AUTH_LIMIT}`,
       parameters: [{ name: 'X-Platform-Bootstrap-Token', in: 'header', required: true, schema: { type: 'string' } }],
       requestBody: jsonBody('{ email, password, role? }'),
-      responses: { 201: { description: '{ user: { id, email, role, company_id } }' }, 400: { description: 'A field refused' }, 401: { description: 'Wrong or missing bootstrap token' }, 409: { description: 'E-mail already registered' }, 429: { description: 'Too many attempts' }, 503: { description: 'No bootstrap token configured' } } },
+      responses: { 201: { description: '{ user: { id, email, role, company_id } }' }, 400: { description: 'A field refused' }, 401: { description: 'Wrong or missing bootstrap token' }, 409: { description: 'An active administrator already exists (administrator_exists: true): the route creates the first one only (#1365). Or the e-mail is already registered' }, 429: { description: 'Too many attempts' }, 503: { description: 'No bootstrap token configured' } } },
   },
   '/v1/auth/logout': {
     post: { tags: ['Auth'], summary: 'Sign out: the session token is revoked and the cookie cleared', security: bearer,
