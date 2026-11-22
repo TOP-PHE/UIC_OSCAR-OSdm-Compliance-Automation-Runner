@@ -850,6 +850,69 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
     });
   });
 
+  describe("admin.html — the mail server's settings are shown, not saved (#1363)", () => {
+    const esc = require('../../public/js/esc.js').esc;
+    const configFieldId = loadFunction('admin.html', 'configFieldId');
+    const mailSettingsNote = loadFunction('admin.html', 'mailSettingsNote');
+    const mailWarningsHtml = loadFunction('admin.html', 'mailWarningsHtml', { esc });
+    const page = read('admin.html');
+
+    test('a setting only shown has another id than the fields the save collects', () => {
+      expect(configFieldId('LOG_LEVEL', { type: 'enum' })).toBe('cfg-LOG_LEVEL');
+      expect(configFieldId('SMTP_HOST', { read_only: true })).toBe('cfg-shown-SMTP_HOST');
+      expect(configFieldId('SMTP_HOST', undefined)).toBe('cfg-SMTP_HOST');
+      // saveConfig() collects 'cfg-' + key, and leaves out a read-only setting besides.
+      expect(page).toContain("document.getElementById('cfg-' + key)");
+      expect(page).toMatch(/_configCache\[key\]\.read_only\) continue;/);
+    });
+
+    test('a read-only setting is drawn as a field that cannot be typed in', () => {
+      const row = page.slice(page.indexOf('if (cfg.read_only) {'), page.indexOf('} else if (isEnum) {'));
+      expect(row).toContain('readonly');
+      expect(row).toContain('id="${fieldId}"');
+      expect(row).toContain('esc(cfg.value');
+    });
+
+    test('the note says where the settings come from and where they are changed', () => {
+      const env = mailSettingsNote('environment');
+      expect(env.warn).toBe(false);
+      expect(env.html).toMatch(/Set in the server's environment/);
+      const stored = mailSettingsNote('stored');
+      expect(stored.warn).toBe(true);
+      expect(stored.html).toMatch(/earlier version/);
+      expect(stored.html).toMatch(/can no longer be changed here/);
+      const none = mailSettingsNote('none');
+      expect(none.warn).toBe(true);
+      expect(none.html).toMatch(/No mail server is set/);
+      // Each one names the environment and the command that applies a change.
+      for (const note of [env, stored, none, mailSettingsNote(undefined)]) {
+        expect(note.html).toContain('<code>.env</code>');
+        expect(note.html).toContain('docker compose up -d oscar');
+        expect(note.html).not.toContain('restart oscar');
+      }
+      // An old .env: the saved settings the environment replaces are named,
+      // as names only, and the note becomes a warning.
+      const replaced = mailSettingsNote('environment', ['SMTP_HOST', 'SMTP_PASS', '<b>x</b>', 42]);
+      expect(replaced.warn).toBe(true);
+      expect(replaced.html).toContain('another value for SMTP_HOST, SMTP_PASS.');
+      expect(replaced.html).not.toContain('<b>x</b>');
+      expect(mailSettingsNote('environment', []).warn).toBe(false);
+      expect(mailSettingsNote('stored', ['SMTP_HOST']).html).not.toContain('another value');
+      // The sources are the server's: utils/mailSettings.js.
+      const { sourceOf } = require('../../src/utils/mailSettings');
+      expect([sourceOf('', { SMTP_HOST: 'h' }), sourceOf('h', {}), sourceOf('', {})]).toEqual(['environment', 'stored', 'none']);
+    });
+
+    test("the server's hints are shown as text", () => {
+      expect(mailWarningsHtml([])).toBe('');
+      expect(mailWarningsHtml(undefined)).toBe('');
+      const html = mailWarningsHtml(['From is <b>odd</b>', 'second']);
+      expect(html).toContain('From is &lt;b&gt;odd&lt;/b&gt;');
+      expect(html).not.toContain('<b>odd</b>');
+      expect(html).toContain('second');
+    });
+  });
+
   describe('index.html — back to Grafana or Prometheus once signed in (#1199)', () => {
     const nextAfterSignIn = loadFunction('index.html', 'nextAfterSignIn', { URLSearchParams });
     const page = read('index.html');

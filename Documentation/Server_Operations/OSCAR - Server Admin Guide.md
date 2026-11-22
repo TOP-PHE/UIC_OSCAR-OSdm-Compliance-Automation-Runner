@@ -200,7 +200,9 @@ node src/server.js
 
 All **boot-time** server configuration is in `oscar-server\.env`. The server reads this file on startup.
 
-> **Since v1.7.0**, most operational settings (`MAX_CONCURRENT_RUNS`, `PARALLEL_STAGGER_MS`, `RUN_TIMEOUT_MS`, `LOG_LEVEL`, all `SMTP_*`) are also editable at runtime from **Admin → Server Config** in the web UI, **without a restart**. The DB value takes precedence over the matching `.env` value as soon as you save it. The `.env` file is still used to seed the database on first boot, and to hold the secrets that must exist before the DB is even open (`ENCRYPTION_KEY`, `JWT_SECRET`, `OSCAR_DB_PATH`, `PORT`).
+> **Since v1.7.0**, most operational settings (`MAX_CONCURRENT_RUNS`, `PARALLEL_STAGGER_MS`, `RUN_TIMEOUT_MS`, `LOG_LEVEL`) are also editable at runtime from **Admin → Server Config** in the web UI, **without a restart**. The DB value takes precedence over the matching `.env` value as soon as you save it. The `.env` file is still used to seed the database on first boot, and to hold the secrets that must exist before the DB is even open (`ENCRYPTION_KEY`, `OSCAR_DB_PATH`, `PORT`).
+>
+> **The mail server (`SMTP_*`) is the other way round since server 1.11.565** (#1363): it is part of the installation, so it is read from the server's environment (`.env`; on Kubernetes the settings and the Secret) and *Server Config* shows it without changing it. See "SMTP" below.
 
 ```ini
 # Port the server listens on
@@ -261,16 +263,44 @@ MAX_CONCURRENT_RUNS=1
 | `NODE_ENV` | (unset) | Set to `production` for SMTP email sending |
 | `PLATFORM_BOOTSTRAP_TOKEN` | (unset) | One-time token for creating admin users |
 
-#### SMTP (required for email verification in production)
+#### SMTP (required for invitations, password resets and alerts)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SMTP_HOST` | (unset) | SMTP server hostname |
+| `SMTP_HOST` | (unset) | SMTP server hostname. **Set, it makes the environment the source of every mail setting** |
 | `SMTP_PORT` | `587` | SMTP port |
 | `SMTP_SECURE` | `false` | Use TLS (`true` for port 465) |
 | `SMTP_USER` | (unset) | SMTP username |
 | `SMTP_PASS` | (unset) | SMTP password |
-| `SMTP_FROM` | `noreply@oscar` | From header for emails |
+| `SMTP_FROM` | `OSCAR Platform <noreply@oscar.uic.org>` | From header for emails |
+
+**Where the mail settings come from (server 1.11.565, #1363).** The mail
+server is part of the installation, as the encryption key is. *Server
+Config* shows the settings in use and sends a test e-mail; it changes none
+of them.
+
+| The environment… | The settings read | *Server Config* says |
+|---|---|---|
+| names a mail server (`SMTP_HOST` set) | the environment's, all six; one it leaves out takes its default, never a saved value | "Set in the server's environment" |
+| names none, and an earlier version saved one from the page | the saved ones, as before | "Saved from this page by an earlier version" |
+| names none, and none was saved | none: no e-mail is sent | "No mail server is set" |
+
+**To change the mail server:** edit the `SMTP_*` lines of
+`/opt/OSCAR/OSCAR_Deploy/.env`, then create the container again, when no
+run is in progress (a `restart` keeps the container and its old values):
+
+```bash
+cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose up -d oscar
+```
+
+Then *Server Config* → **Send test email**, and, with the alerting stack,
+**Apply alerting config** so that Alertmanager gets the new settings. On
+Kubernetes: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_FROM` in the
+settings, `SMTP_PASS` in the Secret, apply and restart the server.
+
+The server says once at its start where it reads them (`Mail settings: …`),
+as a warning while they are still the saved ones. A mail server named by the
+environment is not copied into the database.
 
 All passwords must be at least 12 characters and contain uppercase, lowercase, and a digit.
 
@@ -716,7 +746,8 @@ Once you log in as **administrator**, the top navigation exposes a set of admin-
 
 `/admin.html?tab=config`. Two cards:
 
-- **Runtime Config** — change `MAX_CONCURRENT_RUNS`, `PARALLEL_STAGGER_MS`, `RUN_TIMEOUT_MS`, `LOG_LEVEL`, and all `SMTP_*` settings. Save applies immediately — the worker queue re-reads on every drain, the runner re-reads per run, and `LOG_LEVEL` swaps the active pino sink. **No restart needed.** Audit-logged.
+- **Runtime Config** — change `MAX_CONCURRENT_RUNS`, `PARALLEL_STAGGER_MS`, `RUN_TIMEOUT_MS`, `LOG_LEVEL` and the alerting settings. Save applies immediately — the worker queue re-reads on every drain, the runner re-reads per run, and `LOG_LEVEL` swaps the active pino sink. **No restart needed.** Audit-logged.
+  - **The mail server's settings are shown, not changed** (server 1.11.565, #1363): they are the server's environment's (section 7, "SMTP"). The page says where the ones in use come from. A save that asks for another value is refused, named in the answer and written to the audit log (`config_mail_change_refused`).
   - **An empty number field means the default** (#1338). Saving it empty removes the stored value, and the setting reads its `.env` value, else its default, again; the empty field shows that default (*Empty = default (…)*). Type `0` to turn a limit off. Before 1.11.555 an empty field was stored as `0`. A save of the page turned the *Silent Run Limit* and the *Run Pod First Line Limit* off wherever they had never been set: check both after an upgrade.
 - **Server Info** — read-only: version, Node version, platform, uptime, collection path, Bruno binary path, DB path. Useful when filing a bug or talking to support.
 
@@ -771,7 +802,7 @@ OSCAR ships a self-healing + paging stack so production incidents get caught and
 | `OscarRestartLoop` | critical | >3 container restarts in 10 min | Persistent boot-time failure — DB corruption, full disk, broken migration, missing env var. Stop autoheal first, debug, fix, restart. |
 | `OscarQueueStuck` | warning | `oscar_queue_depth > 0` AND no run ended in 10 min, for 5 min (could not fire before #1286) | Hung Bruno child: restart the OSCAR container, which kills zombie children. A campaign of long scenarios (expiry probes) holding every slot for over 10 min sets it off too: check the Dashboard before restarting. |
 | `OscarRunFailureRateHigh` | warning | >50 % of runs FAILED over 15 min, for 10 min (before #1286, 100 % from a single failure) | Vendor outage, expired OAuth credentials, or a bad collection update. A campaign including deliberately wrong `SIM_WRONG_…` scenarios counts their failures too. |
-| `OscarSmtpDegraded` | warning | Any SMTP failure in last 10 min | Check SMTP creds in Server Config tab. Use **Send test email** to reproduce. |
+| `OscarSmtpDegraded` | warning | Any SMTP failure in last 10 min | Read the mail settings in use on the Server Config tab (they are set in the server's environment). Use **Send test email** to reproduce. |
 | `OscarLoginAttackBurst` | warning | >50 failed logins in 5 min | Possible brute force / credential stuffing. Check Server Activity for source IP, block at firewall. |
 | `OscarHighMemory` | warning | RSS >1 GB for 15 min | Likely a leak. Snapshot heap before restarting if you want to investigate. |
 | `OscarEventLoopLag` | warning | p99 lag >200 ms for 10 min (could not fire before server 1.11.502, #1205) | Heavy synchronous work: many runs at once, or a giant report-builder query. Grafana → *OSCAR · Overview* → row *OSCAR's thread* says which; lower *Max Concurrent Runs* if it is the runs. |
@@ -780,8 +811,9 @@ Rule definitions live in `OSCAR_Deploy/prometheus/alerts/oscar-alerts.yml`. Edit
 
 ### 14.3 First-time setup (one-shot per VPS)
 
-**Since v1.9.0 the alerting recipient list and SMTP credentials are managed
-entirely from the Server Config tab in OSCAR.** No more host-file editing.
+**Since v1.9.0 the alerting recipient list is managed from the Server Config
+tab in OSCAR**, and Alertmanager's file is written from there. The mail
+server itself is set in the server's environment (section 7, "SMTP").
 
 After you `git pull` v1.9.0 on the VPS:
 
@@ -806,7 +838,7 @@ curl -s http://127.0.0.1:9093/api/v2/status | head -20
 **Then in the OSCAR web UI:**
 
 1. Log in as administrator → **Server Config tab**
-2. Under **SMTP / Email Settings** — fill in `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` (relay login), `SMTP_PASS`, `SMTP_FROM` (verified sender). Click *Save*.
+2. Under **SMTP / Email Settings** — check that the page shows your mail server (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_FROM`; the password masked). It is set in the server's environment, not here: section 7, "SMTP".
 3. Click **Send test email** to confirm SMTP is healthy end-to-end (uses these credentials → if you get the test email, alerts will work too).
 4. Under **Alerting** — fill in `ALERT_RECIPIENTS` (comma-separated admin emails) and accept the default `1h` / `4h` re-page intervals. Click *Save*.
 5. Click **⚡ Apply alerting config to Alertmanager**. The button generates `alertmanager.yml` from the same SMTP credentials you set above, writes it to the shared docker volume, hot-reloads Alertmanager, and surfaces the verbatim result inline.

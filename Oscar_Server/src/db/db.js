@@ -18,6 +18,7 @@ const fs     = require('node:fs');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 const checkIndexes = require('./checkIndexes');
+const mailSettings = require('../utils/mailSettings');
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 // OSCAR_DB_PATH env var overrides the default DB location — used by test
@@ -1410,7 +1411,9 @@ function _safeAlter(sql) {
     MAX_CONCURRENT_RUNS: process.env.MAX_CONCURRENT_RUNS || '10',
     PARALLEL_STAGGER_MS: process.env.PARALLEL_STAGGER_MS || '2000',
     RUN_TIMEOUT_MS:      process.env.RUN_TIMEOUT_MS      || '600000',
-    // SMTP settings — seed from env vars so they're editable via admin UI
+    // SMTP settings. Kept as before for a server whose environment names no
+    // mail server; when it names one (#1363) they are read from the
+    // environment and never copied here (see the loop below).
     SMTP_HOST:   process.env.SMTP_HOST   || '',
     SMTP_PORT:   process.env.SMTP_PORT   || '587',
     SMTP_SECURE: process.env.SMTP_SECURE || 'false',
@@ -1427,7 +1430,11 @@ function _safeAlter(sql) {
     ALERT_REPEAT_CRITICAL: process.env.ALERT_REPEAT_CRITICAL || '1h',
     ALERT_REPEAT_WARNING:  process.env.ALERT_REPEAT_WARNING  || '4h',
   };
+  // #1363: a mail server named by the environment stays there. Its password
+  // has no reason to be written into the database as well.
+  const mailFromEnvironment = mailSettings.fromEnvironment();
   for (const [key, val] of Object.entries(defaults)) {
+    if (mailFromEnvironment && mailSettings.isMailKey(key)) continue;
     const exists = db.prepare('SELECT key FROM server_config WHERE key = ?').get(key);
     if (!exists) {
       db.prepare('INSERT INTO server_config (key, value) VALUES (?, ?)').run(key, val);
@@ -1644,7 +1651,15 @@ function colDecrypt(stored) {
 // ── Server config helper ─────────────────────────────────────────────────────
 // Reads from server_config table first, falls back to env var, then default.
 // This allows runtime changes via the admin UI without server restart.
+//
+// The mail server's settings are the exception (#1363, utils/mailSettings.js):
+// when the environment names a mail server, each of them is the
+// environment's, and what server_config holds for them is not read. The
+// environment is read at each call, as the stored values are.
 function getConfig(key, defaultValue) {
+  if (mailSettings.isMailKey(key) && mailSettings.fromEnvironment()) {
+    return mailSettings.environmentValue(key) ?? defaultValue;
+  }
   const row = db.prepare('SELECT value FROM server_config WHERE key = ?').get(key);
   return row ? row.value : (process.env[key] || defaultValue);
 }

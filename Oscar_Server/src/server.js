@@ -75,6 +75,16 @@ if (!jwtRow) {
 }
 process.env.JWT_SECRET = jwtRow.value;
 
+// #1363: where the mail server's settings come from, said once at the start.
+// A warning while they are still the ones saved from Server Config, or when
+// the environment replaces saved ones with other values (an old .env).
+const mailSettings = require('./utils/mailSettings');
+const mailStored = Object.fromEntries(
+  dbAll("SELECT key, value FROM server_config WHERE key LIKE 'SMTP!_%' ESCAPE '!'").map(r => [r.key, r.value]));
+const mailStart = mailSettings.startLine(
+  mailSettings.sourceOf(mailStored.SMTP_HOST), mailSettings.replacedByEnvironment(mailStored));
+log[mailStart.level](mailStart.text);
+
 // ── Attach queue event listeners ──────────────────────────────────────────────
 const queue = require('./worker/queue');
 const metricsForQueue = require('./utils/metrics');

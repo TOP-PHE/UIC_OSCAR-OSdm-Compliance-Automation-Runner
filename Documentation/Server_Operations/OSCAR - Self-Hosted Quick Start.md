@@ -180,12 +180,15 @@ JWT_SECRET=<paste from step 2>
 ALLOWED_REDIRECT_HOSTS=oscar.example.org   # your domain
 ```
 
-Everything else (`SMTP_*`, `RUN_TIMEOUT_MS`, `MAX_CONCURRENT_RUNS`,
-`LOG_LEVEL`, `ALERT_RECIPIENTS`, …) is **optional at first boot**. The
-`.env` file only seeds the database on the very first start — after that,
-all of these values are editable from the admin UI's *Server Config* tab
-without restarting the server. Leave the SMTP block blank for now;
-you'll fill it in via the UI in Step 7.
+Everything else (`RUN_TIMEOUT_MS`, `MAX_CONCURRENT_RUNS`, `LOG_LEVEL`,
+`ALERT_RECIPIENTS`, …) is **optional at first boot**. For these the `.env`
+file only seeds the database on the very first start — after that they are
+editable from the admin UI's *Server Config* tab without restarting the
+server.
+
+The mail server (`SMTP_*`) is the exception: it is read from `.env` at each
+start and is not changed from the page. You can leave the block blank for
+now and fill it in at Step 7.
 
 ---
 
@@ -336,15 +339,38 @@ one; the token is not needed for them.
 
 ---
 
-## Step 7 — SMTP via the admin UI (no .env edits needed)
+## Step 7 — The mail server, in `.env`
 
-This answers the *"do I configure SMTP in `.env`?"* question: **no, not
-anymore**. Since v1.7 SMTP credentials are runtime-editable from the
-admin UI, and since v1.9.0 they're also the single source of truth for
-the alerting system. One configuration, used by everything.
+The mail server is part of the installation, as the encryption key is: it
+is set in `.env`, on the server. The admin UI's *Server Config* tab shows
+the settings in use and sends a test e-mail; it does not change them
+(since server 1.11.565). One mail server sends OSCAR's own e-mails and,
+with Step 8, the alerts.
 
-1. Sign in as administrator → top nav → **Server Config**
-2. Scroll to **SMTP / Email Settings** and fill in your relay's credentials.
+1. On the server, fill in the `SMTP_*` lines of `.env`:
+
+   ```bash
+   sudo nano /opt/OSCAR/OSCAR_Deploy/.env
+   ```
+
+   ```bash
+   SMTP_HOST=smtp-relay.brevo.com
+   SMTP_PORT=587
+   SMTP_USER=<your relay's login>
+   SMTP_PASS=<your relay's password or key>
+   SMTP_FROM=OSCAR <noreply@yourdomain.org>
+   ```
+
+2. Create the container again, so that it starts with them (a `restart`
+   keeps the container and its old values):
+
+   ```bash
+   cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose up -d oscar
+   ```
+
+   The server is back within a minute. A run in progress would fail: do
+   this when none is.
+
    Tested relays:
 
    | Provider | `SMTP_HOST` | `SMTP_PORT` | `SMTP_USER` | `SMTP_PASS` |
@@ -354,21 +380,29 @@ the alerting system. One configuration, used by everything.
    | Gmail (workspace) | `smtp.gmail.com` | `587` | your Gmail address | a 16-char app password |
    | Mailgun | `smtp.mailgun.org` | `587` | postmaster@mg.yourdomain.com | the Mailgun SMTP password |
 
-3. **Critical field:** `SMTP_FROM` (relabelled "Display 'From' Address") —
-   must be on a domain your relay has *verified*. The address recipients
-   will see in their inbox. **Not** the SMTP login — those are different
-   values. Common gotcha: pasting the relay's internal id
-   (`xxxxx@smtp-brevo.com`) into `SMTP_FROM` makes every email get spam-
-   filtered. OSCAR will warn you inline if it spots this pattern.
+3. **Critical field:** `SMTP_FROM` — must be on a domain your relay has
+   *verified*. The address recipients will see in their inbox. **Not** the
+   SMTP login — those are different values. Common gotcha: pasting the
+   relay's internal id (`xxxxx@smtp-brevo.com`) into `SMTP_FROM` makes
+   every email get spam-filtered. *Server Config* says so under the mail
+   settings if it spots this pattern.
 
-4. Click **Save** → then **Send test email** to yourself. If it arrives,
-   SMTP is working end-to-end. If not, the verbatim relay error is shown
-   on the page (typically `535 authentication failed` or `550 sender domain
-   not verified`).
+4. Sign in as administrator → **Server Config**. Under **SMTP / Email
+   Settings** the page shows the settings it reads and says they come from
+   the server's environment. Click **Send test email** to yourself. If it
+   arrives, SMTP is working end-to-end. If not, the verbatim relay error is
+   shown on the page (typically `535 authentication failed` or `550 sender
+   domain not verified`): correct `.env` and repeat step 2.
 
-5. Once SMTP works, self-service password reset, registration verification,
-   and admin alerts (Step 8) all work automatically — they share this same
-   config.
+5. Once SMTP works, invitations, self-service password reset and admin
+   alerts (Step 8) all work — they share this same mail server.
+
+> **Upgrading an OSCAR whose mail server was set from the page.** Nothing
+> stops: the settings saved earlier keep working, and *Server Config* says
+> they were "saved from this page by an earlier version". They can no
+> longer be changed there. Put them in `.env` as above when you next change
+> them, or now: from the moment `.env` names a mail server (`SMTP_HOST`),
+> its values are the ones read and the saved ones are ignored.
 
 > **DNS hardening (recommended once you're past the test stage):**
 > Add SPF + DKIM records for your domain in your DNS zone, following your
@@ -403,7 +437,7 @@ Then in the admin UI:
 1. **Server Config tab → Alerting card** — fill in `ALERT_RECIPIENTS` (the
    admin email(s) that should receive alerts). Save.
 2. Click **⚡ Apply alerting config to Alertmanager**. OSCAR generates
-   `alertmanager.yml` from the SMTP credentials you set in Step 7 and the
+   `alertmanager.yml` from the mail server of Step 7 and the
    recipient list, writes it to a shared docker volume, and hot-reloads
    Alertmanager.
 3. Verify with a synthetic alert:

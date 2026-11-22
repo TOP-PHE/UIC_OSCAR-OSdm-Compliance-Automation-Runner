@@ -1215,38 +1215,6 @@ describe('PATCH /v1/admin/config', () => {
     run(`UPDATE server_config SET value = 'info' WHERE key = 'LOG_LEVEL'`);
   });
 
-  test('a masked (unchanged) sensitive value is skipped rather than overwritten', async () => {
-    const token = makeToken('administrator');
-    // Seed a real SMTP_PASS, then PATCH with the masked placeholder shape —
-    // the route should skip it and leave the real value untouched.
-    run(
-      `INSERT INTO server_config (key, value, updated_at, updated_by)
-       VALUES ('SMTP_PASS', 'realsecretvalue123', datetime('now'), 'test-setup')
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
-    );
-    const res = await request(app)
-      .patch('/v1/admin/config')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ SMTP_PASS: 'real****' });
-    expect(res.status).toBe(200);
-    const row = get(`SELECT value FROM server_config WHERE key = 'SMTP_PASS'`);
-    expect(row.value).toBe('realsecretvalue123');
-    run(`DELETE FROM server_config WHERE key = 'SMTP_PASS'`);
-  });
-
-  test('surfaces a soft warning when SMTP_FROM equals SMTP_USER', async () => {
-    const token = makeToken('administrator');
-    const res = await request(app)
-      .patch('/v1/admin/config')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ SMTP_USER: 'a731f1001@smtp-brevo.com', SMTP_FROM: 'a731f1001@smtp-brevo.com' });
-    expect(res.status).toBe(200);
-    expect(res.body.warnings.length).toBeGreaterThan(0);
-    expect(res.body.warnings[0]).toHaveProperty('key', 'SMTP_FROM');
-    // restore
-    run(`DELETE FROM server_config WHERE key IN ('SMTP_USER', 'SMTP_FROM')`);
-  });
-
   test('errors for unknown keys are returned alongside successful updates in the same request', async () => {
     const token = makeToken('administrator');
     const res = await request(app)
@@ -1256,6 +1224,148 @@ describe('PATCH /v1/admin/config', () => {
     expect(res.status).toBe(200); // partial success — updated.length > 0
     expect(res.body.updated).toEqual(expect.arrayContaining([{ key: 'MAX_CONCURRENT_RUNS', value: '8' }]));
     expect(res.body.errors.some(e => e.includes('BOGUS_KEY_XYZ'))).toBe(true);
+  });
+});
+
+// ── The mail server's settings are the server's environment's (#1363) ────────
+// Server Config shows them and writes none. When the environment names a mail
+// server its values are the ones read; until then the values an earlier
+// version saved from the page keep working. A save answers what a read gives.
+describe("Server Config: the mail server's settings are not changed from the page (#1363)", () => {
+  const MAIL_KEYS = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM'];
+  const SECRET = 'xsmtpsib-supersecretvalue12345';
+  const stored = (key) => get('SELECT value FROM server_config WHERE key = ?', [key])?.value;
+  const store = (key, value) => run(`INSERT INTO server_config (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`, [key, value]);
+  const admin = () => `Bearer ${makeToken('administrator')}`;
+  const patch = (body) => request(app).patch('/v1/admin/config').set('Authorization', admin()).send(body);
+  const read = () => request(app).get('/v1/admin/config').set('Authorization', admin());
+  const refusals = () => all("SELECT event_type FROM auth_events WHERE event_type LIKE 'config_mail_change_refused:%'").map(r => r.event_type);
+
+  let before;
+  let envBefore;
+  beforeEach(() => {
+    before = Object.fromEntries(MAIL_KEYS.map(key => [key, stored(key)]));
+    envBefore = Object.fromEntries(MAIL_KEYS.map(key => [key, process.env[key]]));
+    for (const key of MAIL_KEYS) delete process.env[key];
+    store('SMTP_HOST', 'smtp.stored.example');
+    store('SMTP_PORT', '587');
+    store('SMTP_SECURE', 'false');
+    store('SMTP_USER', 'stored-login');
+    store('SMTP_PASS', SECRET);
+    store('SMTP_FROM', 'OSCAR <noreply@stored.example>');
+    run("DELETE FROM auth_events WHERE event_type LIKE 'config_mail_change_refused:%'");
+  });
+  afterEach(() => {
+    for (const key of MAIL_KEYS) {
+      if (before[key] === undefined) run('DELETE FROM server_config WHERE key = ?', [key]);
+      else store(key, before[key]);
+      if (envBefore[key] === undefined) delete process.env[key];
+      else process.env[key] = envBefore[key];
+    }
+    store('MAX_CONCURRENT_RUNS', '10');
+  });
+
+  test('a read marks every mail setting read_only, and no other', async () => {
+    const res = await read();
+    expect(res.status).toBe(200);
+    const readOnly = Object.entries(res.body.config).filter(([, c]) => c.read_only).map(([key]) => key);
+    expect(readOnly.sort()).toEqual([...MAIL_KEYS].sort());
+  });
+
+  test('settings saved earlier are still read, and said to be stored', async () => {
+    const res = await read();
+    expect(res.body.server_info.mail_source).toBe('stored');
+    expect(res.body.config.SMTP_HOST.value).toBe('smtp.stored.example');
+    expect(res.body.config.SMTP_PASS.value).toBe('xsmt****');
+  });
+
+  test('a mail server named by the environment is the one read, whatever is stored', async () => {
+    process.env.SMTP_HOST = 'smtp.env.example';
+    process.env.SMTP_USER = 'env-login';
+    process.env.SMTP_PASS = 'env-password-0123456789';
+    const res = await read();
+    expect(res.body.server_info.mail_source).toBe('environment');
+    expect(res.body.config.SMTP_HOST.value).toBe('smtp.env.example');
+    expect(res.body.config.SMTP_USER.value).toBe('env-login');
+    expect(res.body.config.SMTP_PASS.value).toBe('env-****');
+    // What the environment does not give is not taken from what is stored.
+    expect(res.body.config.SMTP_FROM.value).toBe('');
+    const answer = JSON.stringify(res.body);
+    for (const kept of ['smtp.stored.example', 'stored-login', SECRET]) expect(answer).not.toContain(kept);
+    // The saved settings it replaces with another value are named, for the
+    // page to say that an old .env may be the one read.
+    expect(res.body.server_info.mail_replaced).toEqual(['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM']);
+  });
+
+  test('nothing is named as replaced while the saved settings are the ones read', async () => {
+    expect((await read()).body.server_info.mail_replaced).toEqual([]);
+  });
+
+  test('no mail server anywhere is said as none', async () => {
+    store('SMTP_HOST', '');
+    expect((await read()).body.server_info.mail_source).toBe('none');
+  });
+
+  test.each(MAIL_KEYS)('a new value for %s is refused, and nothing is written', async (key) => {
+    const res = await patch({ [key]: key === 'SMTP_PORT' ? 2525 : 'changed.example' });
+    expect(res.status).toBe(400);
+    expect(res.body.detail).toContain(key);
+    expect(res.body.detail).toMatch(/set in the server's environment/);
+    expect(MAIL_KEYS.map(stored)).toEqual(['smtp.stored.example', '587', 'false', 'stored-login', SECRET, 'OSCAR <noreply@stored.example>']);
+    expect(refusals()).toEqual([`config_mail_change_refused:${key}`]);
+  });
+
+  test('an emptied mail field removes nothing (the number field too)', async () => {
+    const res = await patch({ SMTP_PORT: '', SMTP_HOST: '' });
+    expect(res.status).toBe(400);
+    expect(stored('SMTP_PORT')).toBe('587');
+    expect(stored('SMTP_HOST')).toBe('smtp.stored.example');
+  });
+
+  test('with another setting: that one is saved, the mail setting refused and named', async () => {
+    const res = await patch({ MAX_CONCURRENT_RUNS: 7, SMTP_HOST: 'changed.example' });
+    expect(res.status).toBe(200);
+    expect(res.body.updated).toEqual([{ key: 'MAX_CONCURRENT_RUNS', value: '7' }]);
+    expect(res.body.errors).toHaveLength(1);
+    expect(res.body.errors[0]).toMatch(/^SMTP_HOST: .*server's environment/);
+    expect(stored('SMTP_HOST')).toBe('smtp.stored.example');
+  });
+
+  test('a page from before sends every field as it was shown: nothing asked, nothing refused', async () => {
+    const shown = (await read()).body.config;
+    const body = Object.fromEntries(Object.entries(shown).map(([key, c]) => [key, c.value]));
+    expect(body.SMTP_PASS).toBe('xsmt****');
+    const res = await patch(body);
+    expect(res.status).toBe(200);
+    expect(res.body.errors).toEqual([]);
+    expect(stored('SMTP_PASS')).toBe(SECRET);
+    expect(refusals()).toEqual([]);
+  });
+
+  test('the same holds when the environment is the source', async () => {
+    process.env.SMTP_HOST = 'smtp.env.example';
+    const res = await patch({ SMTP_HOST: 'changed.example' });
+    expect(res.status).toBe(400);
+    expect(stored('SMTP_HOST')).toBe('smtp.stored.example');
+    expect((await patch({ SMTP_HOST: 'smtp.env.example' })).status).toBe(200);
+  });
+
+  test('a save answers what a read gives: no sensitive value in clear, anywhere in it', async () => {
+    const res = await patch({ MAX_CONCURRENT_RUNS: 7 });
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(res.body)).not.toContain(SECRET);
+    expect(res.body.config.SMTP_PASS.value).toBe('xsmt****');
+    expect(res.body.config).toEqual((await read()).body.config);
+  });
+
+  test('the hints on the sender address come with the read', async () => {
+    store('SMTP_USER', 'a731f1001@smtp-brevo.com');
+    store('SMTP_FROM', 'a731f1001@smtp-brevo.com');
+    const res = await read();
+    expect(res.body.server_info.mail_warnings.length).toBeGreaterThan(0);
+    store('SMTP_FROM', 'OSCAR <noreply@stored.example>');
+    expect((await read()).body.server_info.mail_warnings).toEqual([]);
   });
 });
 

@@ -613,6 +613,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.565] — 2026-11-22
+
+The mail server's settings come from the server's environment (#1363, maintainer's decision of 2026-11-22: the mail server is part of the deployment, as the encryption key and the collection path are, and is set where the server is installed). Not released on its own: listed in `compatibility.json` (2026.604) without moving `current_release`, so no release tag is made; it goes out with the next release (maintainer, 2026-11-22: a release holds a set of changes).
+
+### Changed
+- **The environment is read first for the mail settings.** `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` and `SMTP_FROM` were saved from *Admin → Server Config* into the database, which won over the environment after the first start. Once the environment names a mail server (`SMTP_HOST`), each of the six is now the environment's; one it leaves out takes its default, never a saved value. `getConfig()` (`db/db.js`) asks the new `utils/mailSettings.js` (pure) first, so the mailer and the Alertmanager file follow without a change. The environment is read at each call.
+- **Nothing stops at the upgrade.** While the environment names no mail server, the settings an earlier version saved from the page are read as before (`mail_source: stored`); with none anywhere, no e-mail is sent, as before.
+- **Server Config shows the mail settings and changes none.** `GET /v1/admin/config` marks them `read_only` and says where the ones in use come from (`server_info.mail_source`: `environment`, `stored` or `none`). The page draws them as fields that cannot be typed in, with a note saying where they are set and how a change is applied, and its save sends none of them. `PATCH /v1/admin/config` writes and removes nothing of a mail setting whatever is sent: one sent as it is shown asks for nothing (a page loaded before the upgrade sends every field), any other value is refused, named in `errors` and written to the audit log (`config_mail_change_refused:<keys>`). The test e-mail is unchanged.
+- **A save of Server Config answers what a read gives**: the same view, built by one function (`configView()`), sensitive values masked.
+- **A mail server named by the environment is not copied into the database** at a first start (`seedServerConfig()`). Without one the rows are seeded as before.
+- **The hints on the sender address** (a relay's internal identity, the login used as sender) came with a save of `SMTP_FROM`; they now come with the read (`server_info.mail_warnings`) and are shown under the settings.
+- The server says once at its start where it reads the mail settings (`Mail settings: …`), as a warning while they are still the saved ones.
+- The save handler is split (`checkedSetting()`, `storeSetting()`): the other settings are checked and stored as before.
+
+### To check at the upgrade
+- **An `.env` that still holds an older mail server.** Before 1.7 the mail server was set in `.env`, and that line may still be there with a relay or a key changed since from the page. From this release it is the one read. The server's start line and *Server Config* name the saved settings the environment replaces with another value (`server_info.mail_replaced`, names only): send a test e-mail from *Server Config* after the upgrade, and correct `.env` if it fails.
+
+### Documentation
+- *Self-Hosted Quick Start*: step 3 and step 7 (the mail server in `.env`, `docker compose up -d oscar`, the test e-mail, upgrading an OSCAR whose mail server was set from the page). *Server Admin Guide*: section 7 (where the mail settings come from, how to change them), the Server Config tab, the alerting set-up. *Security Operations Policy* 3.4 and 5.5 (rotation of the mail server's key). *Kubernetes and OpenShift Deployment Guide* and *k3s on one VPS* (the mail server in the settings and the Secret, with the commands). Both `.env.example` and the cluster's `settings.env`. OpenAPI: the two entries of `/v1/admin/config`.
+
+### Tests
+- `mail-settings.test.js` (new): the module; `getConfig()` on the real database with and without a mail server in the environment; the mailer and the Alertmanager file; a first start on a database of its own (a password of the environment is in no row); the list of the files of `src/` that write `server_config`, so that a new writer is read first.
+- `admin-routes.test.js`: each of the six settings refused and nothing written, an emptied field removing nothing, a page from before sending every field as shown, the environment as source, a save's answer equal to a read's and holding no sensitive value. The two tests that saved mail settings are replaced.
+- `ui-scripts.test.js`: the field ids, the note for each source, the hints shown as text.
+
+---
+
 ## [server-1.11.564] — 2026-11-21
 
 Release 2026.603 (`current_release`). What the first real set-up of a Company API account met (#1355, maintainer's request: document every problem, fix the points still open).

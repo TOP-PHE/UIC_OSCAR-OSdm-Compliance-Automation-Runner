@@ -586,7 +586,9 @@ backup.
 - **Max Concurrent Runs** is the VPS's: set it for this machine (section 7,
   *Parallel runs* only: the rest of section 7 is for a new OSCAR).
 - **SMTP and Alerting: nothing to change.** They are the VPS's: the mail
-  server, the alert recipients, how often an alert is sent again. OSCAR's
+  server, the alert recipients, how often an alert is sent again. The page
+  shows the mail server as "saved from this page by an earlier version":
+  it keeps working, and is changed as in section 7, *E-mail*. OSCAR's
   e-mails (sign-in links, access requests) work at once, and their links name
   `$HOST`. Alertmanager gets the same values at step 7.
 - **Do not click *Apply alerting config***: it writes the VPS's file, which
@@ -704,10 +706,42 @@ sudo kubectl -n oscar patch secret oscar-secrets --type=json \
 sudo kubectl -n oscar rollout restart deployment/oscar
 ```
 
-**E-mail (a new OSCAR only).** Set the SMTP server in Admin → *Server
-Config*. People get into
-OSCAR by an e-mailed link, the first Test Manager of a company included:
-without e-mail, nobody but the administrator can sign in.
+**E-mail.** People get into OSCAR by an e-mailed link, the first Test
+Manager of a company included: without e-mail, nobody but the administrator
+can sign in. The mail server is set here, on the machine (from server
+1.11.565 Admin → *Server Config* shows it and does not change it): its
+address and login in your overlay, its password in the Secret. Needed for a
+new OSCAR; after section 6a only to change the mail server the VPS had.
+
+Type the password, which is not shown (alone on its line, then Enter):
+
+```bash
+read -rs SMTP_PASS
+```
+
+Then, in the same session:
+
+```bash
+SMTP_HOST=smtp-relay.example.org            # ← yours: the mail server
+SMTP_PORT=587                               # ← yours: 587, or 465 with SMTP_SECURE=true
+SMTP_USER=CHANGE-ME                         # ← yours: the login your mail server gave
+SMTP_FROM='OSCAR <noreply@example.org>'     # ← yours: a sender your mail server accepts
+cd /opt/oscar
+K=OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml
+sed -i '/^      - SMTP_[A-Z]*=/d' "$K"
+sed -i "s|^      - APP_URL=.*|&\n      - SMTP_HOST=$SMTP_HOST\n      - SMTP_PORT=$SMTP_PORT\n      - SMTP_USER=$SMTP_USER\n      - SMTP_FROM=$SMTP_FROM|" "$K"
+grep -n "SMTP_" "$K"
+sudo kubectl -n oscar patch secret oscar-secrets --type=merge -p "{\"data\":{\"SMTP_PASS\":\"$(printf %s "$SMTP_PASS" | base64 -w0)\"}}"
+unset SMTP_PASS
+sudo kubectl -n oscar apply -k OSCAR_Deploy/kubernetes/overlays/site
+sudo kubectl -n oscar rollout restart deployment/oscar
+sudo kubectl -n oscar rollout status deployment/oscar
+```
+
+`grep` shows the four lines under `literals:`. The restart fails a run in
+progress: do this when none is. Then Admin → *Server Config*: the page says
+"Set in the server's environment" and shows these values; **Send test
+email**. The block can be run again with other values.
 
 **Parallel runs.** Admin → *Server Config* → *Max Concurrent Runs*.
 - Each run is a pod: Bruno takes 0.4 to 0.7 CPU while it starts (about 7 s
@@ -798,7 +832,8 @@ sudo kubectl apply -f OSCAR_Deploy/kubernetes/monitoring/stack/namespace.yaml
 ```
 
 Then the Secret. These lines are the same the first time and after every
-change of *SMTP* or *Alerting* in Server Config; from server 1.11.495 the page
+change of the mail server (section 7, *E-mail*) or of *Alerting* in Server
+Config; from server 1.11.495 the page
 shows them too, at the end of its *Alerting* section:
 
 ```bash
