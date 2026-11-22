@@ -21,6 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - An unknown value stops the tool with the values OSCAR knows. The values are OSCAR's own: a test pins them to `runFilters.js` and `capabilities.js` when the repository is there.
   - The README's `--selection` example said `"refund"`, which OSCAR refuses: `"Refund"`.
 
+### Changed
+
+- **Text answers are compressed at the proxy** (#1379). Deployment files, CI and guides, no version.
+  - **Seen:** production sent `scenarios.js` as 555,602 bytes with no `Content-Encoding`, and every JSON answer the same way. OSCAR compresses nothing itself, on purpose (its one thread serves every page and every run); the nginx example set nothing, so an installation got its distribution's `gzip on;` alone, which compresses `text/html` and nothing else.
+  - **nginx:** `OSCAR_Deploy/nginx/oscar.conf.example` has `gzip_types` for JSON, JavaScript, CSS, plain text, CSV, XML and SVG (level 5, from 1 KB). Measured: `scenarios.js` 555,602 → 149,347 bytes; the simulator's data file 1,902,824 → 110,966.
+  - **k3s:** the overlay has a Traefik `compress` Middleware for the same types (`overlays/k3s/compression.yaml`), named on the Ingress next to the body limit.
+  - **ingress-nginx and OpenShift:** compression is a setting of the whole controller there; the guide names it, the files do not set it.
+  - **Checked on real proxies in CI:** a new job runs Ubuntu's nginx with the example in front of a stand-in (text compressed, an image not, nothing without `Accept-Encoding`, `/metrics` still 404), and the k3s job asks Traefik for a compressed `scenarios.js`. `kubernetes-manifests.test.js` holds the two lists of types together and refuses a compression dependency in the server.
+  - **An installed nginx is not changed by a release:** *installation-guide* says what to add and how to check.
+
 ### Fixed
 
 - **Workflows: a read-only token in three workflows; CodeQL reads the workflow files again** (#1375). CI only, no version.

@@ -24,6 +24,20 @@ server {
     # Data-file uploads (Test Config / company datafile).
     client_max_body_size 50M;
 
+    # Compression. OSCAR sends text (JSON, JavaScript, CSS, HTML reports) and
+    # compresses nothing itself: its one thread serves every page and every
+    # run, so this proxy does it. The Test Config script is 556 KB as OSCAR
+    # sends it and about 150 KB on the wire; a data file of 1.9 MB, about
+    # 110 KB. A distribution's nginx.conf often has "gzip on" alone, which
+    # compresses text/html and nothing else: the types are what matters.
+    # text/html is always compressed and is not listed.
+    gzip            on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_proxied    any;
+    gzip_vary       on;
+    gzip_types      application/json application/problem+json application/javascript text/javascript text/css text/plain text/csv application/xml image/svg+xml;
+
     location / {
         proxy_pass         http://127.0.0.1:3001;
         proxy_http_version 1.1;
