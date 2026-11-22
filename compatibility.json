@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.603",
+  "current_release": "2026.610",
   "releases": [
     {
       "release": "2026.610",
@@ -11,6 +11,7 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
+        "Release 2026.610 (current_release): everything merged since 2026.603. Server 1.11.565 to 1.11.571, each described in its own entry below (2026.604 to 2026.610): the mail server's settings read from the server's environment; the bootstrap route creating the first administrator only; an API assertion's lifetime counted from the server's clock and a revoked key ending its tokens; a ceiling on the runs an account has waiting; the general JSON body limit at 1 MB; three read routes with a rate limit of their own and /health keeping its disk checks; a run's warning lines kept on their own. Without a version of their own: workflow tokens read-only and CodeQL reading the workflow files, text answers compressed at the proxy (nginx example and k3s), ESLint on the tests, scripts and the Bruno library with two limits on a new function, SonarCloud's version read from package.json, the page OSCAR - GitHub and CI set-up. To do on a VPS with this release: check that .env names no old SMTP_HOST before the update (it becomes the mail server in use), and add the gzip lines of the nginx example to the installed nginx. Collection unchanged.",
         "Server 1.11.571 (#1383): a run's warning lines are kept a second time by the log's writer (run_warning_lines, migration 61) and read from there for the runs started by this version; the coverage report, the AI analysis and a run's detail no longer walk those runs' whole logs (1.9 s to 48 ms for 300 runs on the bench). The runs of before are read from their log, as before; no index is made on the log table. The list of reference configurations is read once per version of its files (101 ms to 10.5 ms a call). Not released on its own: current_release is not moved. Collection unchanged."
       ]
     },
