@@ -46,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The set-up page gives the quality gate coverage floor as it now is: 83 %** (#1391). Documentation only. The maintainer set it in SonarCloud on 2026-11-22; it had stayed at 35 % while the repository documented 83 %. The page also says that a changed gate shows in the answer of the API only after the next analysis.
+
 - **Workflows: a read-only token in three workflows; CodeQL reads the workflow files again** (#1375). CI only, no version.
   - **Seen:** five code-scanning alerts on the workflows' token had been open on `main` since 7 May. `sonar.yml`, `ci-server.yml` and `ci-collection.yml` named no `permissions`, so their token took the repository's default. The fifth alert was about a job of `refresh-collection.yml` that has had its block for months.
   - **Why it never closed:** the workflow files were no longer analysed. `codeql.yml` listed `javascript-typescript` only; the alerts' last analysis (category `/language:actions`) was of 7 May. Nothing added to a workflow since then was looked at, and the workflows hold the deploy keys and the release steps.

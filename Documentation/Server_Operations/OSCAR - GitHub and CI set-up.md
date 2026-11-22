@@ -146,16 +146,16 @@ the script.
   | Reliability rating | worse than A: **one new bug fails it** | A |
   | Security rating | worse than A: one new vulnerability fails it | A |
   | Maintainability rating | worse than A. Code smells alone do not fail it while the rating stays A | A |
-  | Coverage | below **35 %** | 95.2 % |
+  | Coverage | below **83 %** | 95.2 % |
   | Duplicated lines | above 4 % | 0.1 % |
   | Security hotspots reviewed | below 100 % | 100 % |
 
-  **The coverage floor is not the one the repository documents.**
-  `sonar-project.properties` records a floor raised step by step to 83 %; the
-  gate in SonarCloud still says 35 %. Until it is set to 83 % in SonarCloud
-  (*Quality Gates → OSCAR Gate*, an administrator of the organization), new
-  code may go far under the documented floor without failing. Change the two
-  together from then on.
+  The coverage floor is the one `sonar-project.properties` documents. It had
+  stayed at 35 % in SonarCloud while the repository recorded a floor raised
+  step by step to 83 %; it was set to 83 % on 2026-11-22 (*Quality Gates →
+  OSCAR Gate*, by an administrator of the organization). Change the two
+  together. A changed gate shows in the answer of § 10 only after the next
+  analysis: that answer gives the conditions as the last analysis was judged.
 - **New code** is what changed since the previous *version* of the project
   (SonarCloud's "previous version" period). The version is the server's:
   `sonar.yml` reads it from `Oscar_Server/package.json` at each analysis and
