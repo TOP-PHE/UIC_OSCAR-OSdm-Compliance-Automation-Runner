@@ -2397,7 +2397,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `public` and library blocks, not the tests. What was over them is ESLint's
   own baseline (bulk suppressions, ESLint 9.24+): `eslint-suppressions.json`
   (found by itself in the folder ESLint starts in: 107 + 22) and
-  `eslint-library-suppressions.json` (`--suppressions-location`, 82 + 23),
+  `eslint-library-suppressions.json` (`--suppressions-location`, 79 + 21
+  since #1388),
   paths with forward slashes from that folder. **One more function over a
   limit in a file fails (exit 1, every one of the file listed); one less
   fails too (exit 2, "suppressions left that do not occur anymore") until
@@ -2407,6 +2408,32 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   max-lines-per-function`. Raising a count is a hand edit of the JSON and of
   the totals in `lint-config.test.js`. It is cyclomatic complexity, not
   Sonar's cognitive one (S3776): the two numbers differ for one function.
+- **`parseScenarioData()` is split by stage** (#1388, OTST_V2.0.269; M2 of
+  the #221 review, one function a PR). `scenarioToRun()` chooses the
+  scenario, `loadScenario()` calls one function per stage **in the order of
+  the old function**: a stage reads what an earlier one set (the expired-flow
+  queue reads the switches and the booking-flow actions; the exchange trip and
+  the passengers read `__travelDay`). A new scenario field goes in its
+  stage's function: a switch is `flagText(scenario.x)`, an optional value
+  `filledOrNull()`, a word with a default `wordOr()`, so it adds no path.
+  **How a split of a library function is proved** (scratch scripts, not in
+  the repository):
+  - the new file is assembled by a script from the old file's line ranges, so
+    moved code is never typed again, and the tokens of each moved range are
+    compared (espree, comments included);
+  - a harness runs the old and the new function in a process each, with a
+    recording `bru`, a fixed `Date` and `crypto.randomUUID`, on every
+    scenario of every data file, the ways of choosing a scenario and seeded
+    variants, and compares the SHA-256 of all it does (reads, sets, removals,
+    log lines, checks, return or throw, the data file after);
+  - `NODE_V8_COVERAGE` says which new lines the cases never ran (cases were
+    added until none), and one fault at a time in the new code says what the
+    comparison does not see;
+  - then the replay, which compares checks and warnings only.
+  The harness' own generator must tolerate what its earlier changes left (a
+  list made a string): pass a change over, never crash. **Jest, a replay and
+  such a run together overload this PC**: a replay scenario went from 9 to
+  49 s; run them one after the other.
 - **CI required checks:** Lint/audit/test, CodeQL, Trivy (image scan), Docker
   build, Gitleaks, SonarCloud scan, Bruno-collection validation, PR labeler,
   **`SonarQube Quality Gate check`** (added to required list 2026-07-02 via

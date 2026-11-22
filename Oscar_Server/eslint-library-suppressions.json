@@ -134,10 +134,7 @@
   },
   "Bruno_Collection/library-bruno/scenarioParser.js": {
     "complexity": {
-      "count": 7
-    },
-    "max-lines-per-function": {
-      "count": 2
+      "count": 4
     }
   },
   "Bruno_Collection/library-bruno/seatReservations.js": {

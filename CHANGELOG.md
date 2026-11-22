@@ -641,6 +641,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [collection-OTST_V2.0.269] — 2026-11-22
+
+`parseScenarioData()` split by stage, behaviour unchanged (#1388; point M2 of the code quality review for #221). Not released on its own: listed in `compatibility.json` (2026.611) without moving `current_release`. Server unchanged.
+
+### Changed
+- **`parseScenarioData()` is 50 functions instead of one.** Every run loads its scenario through it, and every new scenario field was added to it: 620 lines of code and 194 paths in one function, where `npm run lint` allows 100 and 15.
+  - It now chooses the scenario (`scenarioToRun()`), finds it in the data file and hands it to `loadScenario()`, which calls one function per stage, **in the order of before**: what the scenario is, its expiry tests, the tariff and the fares, the reservations and places, the probes, the partial refund, the booking-flow actions, the expired-flow queue, the trip, the exchange trip, the purchaser, the passengers, the offer search criteria, the fulfilment options.
+  - Each stage keeps its own variables. The largest new function has 13 paths and 35 lines; `parseScenarioData()` itself has 9 and 31.
+  - Five small readers replace the expressions written out line after line: `filledOrNull()`, `wordOr()`, `flagOn()`, `flagText()`, `waitMinutes()`. A new switch of a scenario is one line and adds no path to its function.
+  - The six expiry tests are one list read by one loop; two of them were written out before the loop of the other four.
+  - The messages, the variables and their values are those of before.
+- **The lint's record goes down.** `scenarioParser.js`: 7 functions over the path limit become 4 (`getScenarioData`, `prepareExchangeTrip`, `capabilityWarning`, `osdmOfferSearchCriteria`, not touched here), and 2 over the line limit become none. The library's totals in `lint-config.test.js` go from 82 and 23 to 79 and 21.
+
+### How it was checked
+- **The moved code was not typed again.** A script assembled the new functions from the line ranges of the old one: 86 ranges, 4,376 tokens (comments included), the same token for token before and after. 28 expressions were rewritten into the five readers, and the scaffolding around the stages is new.
+- **The same calls, in the same order, with the same values.** A second script runs the function of before and the new one, each in a process of its own, on the same cases, with a recording `bru`, a fixed clock and fixed identifiers. It records everything the function does: each variable read, set or removed, each log line, each console line, each check, the runner's stop, what the call returns or throws, the environment and the data file after it. 42,390 cases:
+  - every scenario of the six data files of the collection (1,299), gamma's and the providers' own again under two other dates (the night before a clock change, New Year's Eve);
+  - 559 ways of choosing the scenario to run: `scenariosToRun` in each of its forms, the index, the target, the override, and files whose codes are missing, repeated or not text;
+  - 40,000 drawn variants of the scenarios and of the data they name (a member given an odd value, a trip, passengers list, purchaser, criteria or fulfilment list emptied, unlinked or malformed, an environment that refuses a variable).
+
+  The two records are equal (one SHA-256 for both, `0aba6387…2fe9d3`). 4,020 of the cases end in an error thrown, the same one on both sides.
+- **The cases run every line.** V8's coverage of the new functions under those cases: 588 lines of code, none left out.
+- **The comparison sees a fault.** 696 faults were put in the new code, one at a time: a condition negated, the two answers of a `? :` swapped, `&&` and `||` exchanged, a comparison turned round, a statement removed, a number or a variable's name changed, a returned true or false flipped.
+  - 687 changed the record (685), failed the run (1) or made it never end (1).
+  - The 9 others each named cases the comparison lacked, which were added: files of one and of two scenarios, a list of exactly 21 codes, a manual place flow with the older seat-map mode, the forms of the place-selection probes, a return under a refund by leg. With them, 7 are seen.
+  - 2 are left, both without effect: `idx < 1` for `idx < 0` where the index is then set to 0, and the answer for a trip type that is none of the three, where nothing is built either way.
+- **The simulator replay**, recorded before (a `git archive` copy of `main`) and after with Bruno 4.3.0, on gamma's 212 scenarios and 25 of the other five versions (`OSDM_Simulator/scripts/replay.js`): "The two recordings are the same (237 scenarios)", 69,200 checks and 247 warning lines each.
+
+### Tests
+- `bruno-parse-scenario-stages.test.js`, new, 40 tests: the stages a run of the simulator never reaches, which until now only the comparison above covered. Which scenario is loaded when OSCAR names none (list, text, `ALL`, index, target, a list at its end), how a switch, a wait and a word of a scenario are read, and what is said when the scenario or the data it names cannot be used (an unknown trip, passengers list or fulfilment list, a trip that lacks a member, a partial refund that cannot be made).
+- **Mutation.** 153 faults were put, one at a time, on the lines of the new functions that no other test file runs (the kinds listed above). The first 36 tests saw 118 of them; the tests added for the others bring it to 152. The one left is the fault without effect on a trip type that is none of the three.
+- The 44 test files that load the parser, unchanged, pass.
+
+### Not done here
+- The stages keep the order of the old function, so two of them hold values of more than one subject (`setSaleExpectations()`, `setRefusalProbes()`). Grouping them by subject moves calls and log lines, and is left for a change of its own.
+- The four other functions of `scenarioParser.js` over the path limit, and the other functions of M2 (`runSteps`, the delegates of `scenarios.js`, `postCreateBookingResponse`, `mergeTesterSave`): one pull request each.
+
 ## [server-1.11.571] — 2026-11-22
 
 Two heavy reads taken off the server's thread: a run's warning lines, the list of references (#1383).

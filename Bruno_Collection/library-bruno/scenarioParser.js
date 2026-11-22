@@ -540,36 +540,48 @@ function pad(n) {
   return String(n).padStart(2, '0');
 }
 
-// Function to parse scenario data from JSON
-function parseScenarioData(jsonData) {
-  // Apply root-level systemInfoParameters as env vars (e.g. masterDataLayoutId)
-  setSystemInfoParameters(jsonData);
-  // #398: load the provider's known-deviation baseline (root-level).
-  setKnownDeviations(jsonData);
+// A value of a scenario left empty ("" or the word "null") reads as none.
+function filledOrNull(value) {
+  return ["", "null"].includes(value) ? null : value;
+}
 
+// A word of a scenario as text, or the default when the scenario gives none.
+function wordOr(value, fallback) {
+  return ["", "null", null, undefined].includes(value) ? fallback : String(value);
+}
+
+// A switch of a scenario is on when it is true, or the word true, on or yes.
+function flagOn(value) {
+  return value === true || ["true", "on", "yes"].includes(String(value).toLowerCase());
+}
+
+// A switch of a scenario as the run's variables hold it: "true" or "false".
+function flagText(value) {
+  return flagOn(value) ? "true" : "false";
+}
+
+// The minutes of a wait a scenario allows, 1 to 60, as a whole number in
+// text; "" when not given or out of range.
+function waitMinutes(value) {
+  const n = Number(value);
+  return (Number.isFinite(n) && n >= 1 && n <= 60) ? String(Math.floor(n)) : "";
+}
+
+// The day a trip is dated on when neither the scenario nor its trip names
+// one: today plus departureDateFromToday days (10 when unset), as YYYY-MM-DD.
+function defaultTripDay() {
   const plusDays = Number.parseInt(bru.getEnvVar("departureDateFromToday"), 10) || 10;
   const today = new Date();
   today.setDate(today.getDate() + plusDays);
 
-  const nextWeekdayString = today.getFullYear() + "-" +
+  return today.getFullYear() + "-" +
     pad(today.getMonth() + 1) + "-" +
     pad(today.getDate());
+}
 
-  // ── Resolve which scenario to run ────────────────────────────────────────
-  // scenariosToRun (data file root) is the sole source of truth:
-  //   "ALL"                   → all scenarios in the file, in order
-  //   ["code1","code2",...]   → only those codes, in that order
-  //
-  // An index counter (scenariosToRunIndex env var) advances on each collection run.
-  // This lets you click "Run Collection" N times and each run picks the next scenario.
-  // The index wraps back to 0 after the last scenario so the cycle repeats.
-  //
-  // NOTE: The scenarioCode env var static initial value in environment files is no longer
-  // used as a fallback. scenarioCode is only written at runtime by this function after
-  // the scenario is resolved from scenariosToRun.
-  const allCodes = (jsonData.scenarios || []).map(s => s.code);
-  let scenarioCode = null; // always resolved from scenariosToRun — no env var fallback
-
+// The codes scenariosToRun names, in its order. It throws when the data
+// file has no scenariosToRun, or when none of its codes is in the file.
+function scenariosToRunList(jsonData, allCodes) {
   if (jsonData.scenariosToRun == null) {
     throw new Error(
       `[ERROR] ❌ scenariosToRun is missing from the data file. ` +
@@ -609,25 +621,119 @@ function parseScenarioData(jsonData) {
       `Check that the codes in scenariosToRun match the codes in the scenarios array of the data file.`
     );
   }
+  return effectiveList;
+}
 
-  // ── Parallel execution mode ──────────────────────────────────────────────
-  // If scenario_override is set (by OSCAR runner for parallel batch runs),
-  // run only that specific scenario instead of the full list.
+// ── Parallel execution mode ──────────────────────────────────────────────
+// If scenario_override is set (by OSCAR runner for parallel batch runs),
+// run only that specific scenario instead of the full list.
+function scenarioListOfRun(effectiveList, allCodes) {
   const scenarioOverride = bru.getEnvVar('scenario_override');
-  if (scenarioOverride) {
-    if (!allCodes.includes(scenarioOverride)) {
-      // The codes in the file are counted, not listed. Under OSCAR this message
-      // lands in the run log of whoever started the run, and the data file
-      // holds every tester's scenarios, private ones included.
+  if (!scenarioOverride) return effectiveList;
+  if (!allCodes.includes(scenarioOverride)) {
+    // The codes in the file are counted, not listed. Under OSCAR this message
+    // lands in the run log of whoever started the run, and the data file
+    // holds every tester's scenarios, private ones included.
+    throw new Error(
+      `[ERROR] ❌ scenario_override "${scenarioOverride}" not found in scenarios list ` +
+      `(the data file holds ${allCodes.length} scenario${allCodes.length === 1 ? '' : 's'}). ` +
+      `It may have been renamed or deleted after the run was started.`
+    );
+  }
+  validationLogger(`[INFO] ⚡ Parallel mode — running only: ${scenarioOverride}`);
+  return [scenarioOverride];
+}
+
+// scenarioTarget (manual unitary targeting): the scenario it names, by its
+// index in the list or by its code.
+function targetedScenarioCode(_scenarioTarget, effectiveList, allCodes) {
+  const _asNum = Number.parseInt(_scenarioTarget, 10);
+  if (!Number.isNaN(_asNum) && String(_asNum) === _scenarioTarget) {
+    // Numeric index
+    if (_asNum < 0 || _asNum >= effectiveList.length) {
       throw new Error(
-        `[ERROR] ❌ scenario_override "${scenarioOverride}" not found in scenarios list ` +
-        `(the data file holds ${allCodes.length} scenario${allCodes.length === 1 ? '' : 's'}). ` +
-        `It may have been renamed or deleted after the run was started.`
+        `[ERROR] ❌ scenarioTarget index ${_asNum} is out of range. ` +
+        `effectiveList has ${effectiveList.length} entries (0–${effectiveList.length - 1}).`
       );
     }
-    effectiveList = [scenarioOverride];
-    validationLogger(`[INFO] ⚡ Parallel mode — running only: ${scenarioOverride}`);
+    const scenarioCode = effectiveList[_asNum];
+    validationLogger(`[INFO] 🎯 scenarioTarget (index ${_asNum}): "${scenarioCode}" — scenariosToRunIndex NOT advanced`);
+    return scenarioCode;
   }
+  // Scenario code string
+  if (!allCodes.includes(_scenarioTarget)) {
+    throw new Error(
+      `[ERROR] ❌ scenarioTarget "${_scenarioTarget}" not found in scenarios list. ` +
+      `Available: ${allCodes.join(', ')}`
+    );
+  }
+  validationLogger(`[INFO] 🎯 scenarioTarget (name): "${_scenarioTarget}" — scenariosToRunIndex NOT advanced`);
+  return _scenarioTarget;
+}
+
+// ── Normal sequential mode — read and advance scenariosToRunIndex ───────
+// Gives { code }, or null when every scenario of the list was attempted and
+// the run was told to stop.
+function nextScenarioInList(effectiveList) {
+  let idx = Number.parseInt(bru.getEnvVar("scenariosToRunIndex") || "0", 10);
+  if (Number.isNaN(idx) || idx < 0) idx = 0;
+  // If index exceeds list length, all scenarios have been attempted.
+  // In a loopback context (__loopback was recently true), stop execution.
+  // Otherwise (fresh run or unitary run), wrap to 0 so the run can proceed.
+  if (idx >= effectiveList.length) {
+    if (effectiveList.length > 0 && bru.getEnvVar('__scenariosList')) {
+      // Multi-scenario run completed — stop gracefully
+      console.log('[INFO] ✅ All ' + effectiveList.length + ' scenarios attempted — stopping run (index ' + idx + ')');
+      bru.runner.stopExecution();
+      return null;
+    }
+    // Fresh run or stale index from previous session — wrap to 0
+    console.log('[INFO] Index ' + idx + ' exceeds list length ' + effectiveList.length + ' — resetting to 0');
+    idx = 0;
+  }
+
+  const scenarioCode = effectiveList[idx];
+
+  // Advance index WITHOUT wrapping back to 0.
+  const nextIdx = idx + 1;
+  bru.setEnvVar("scenariosToRunIndex", String(nextIdx));
+
+  // v1.11.10: keep the unitary-load wrapper in opencollection.yml synchronised
+  // with the index we just consumed. The wrapper's reload condition is
+  //   (_targetNow === '' && _lastUnitaryIdx !== _idxNow)
+  // which fires on every non-/versions request in an OSCAR collection run
+  // when __unitaryLoadedIdx is undefined while scenariosToRunIndex is post-
+  // advance. Setting __unitaryLoadedIdx here (i.e. wherever the parser is
+  // invoked — /versions, loop-back, or the wrapper itself) keeps the
+  // wrapper from re-firing on requests #2..N within the same scenario
+  // iteration. See Documentation/Bruno_Collection/PR68-loop-regression-
+  // root-cause.md for the full trace.
+  bru.setEnvVar("__unitaryLoadedIdx", String(nextIdx));
+
+  validationLogger(
+    `[INFO] 🎯 scenariosToRun [${idx + 1}/${effectiveList.length}]: selected "${scenarioCode}"` +
+    (nextIdx >= effectiveList.length ? ` — last in list, run will stop after this scenario` : ` — next will pick index ${nextIdx}`)
+  );
+  return { code: scenarioCode };
+}
+
+// ── Resolve which scenario to run ────────────────────────────────────────
+// scenariosToRun (data file root) is the sole source of truth:
+//   "ALL"                   → all scenarios in the file, in order
+//   ["code1","code2",...]   → only those codes, in that order
+//
+// An index counter (scenariosToRunIndex env var) advances on each collection run.
+// This lets you click "Run Collection" N times and each run picks the next scenario.
+// The index wraps back to 0 after the last scenario so the cycle repeats.
+//
+// NOTE: The scenarioCode env var static initial value in environment files is no longer
+// used as a fallback. scenarioCode is only written at runtime by this function after
+// the scenario is resolved from scenariosToRun.
+//
+// Gives { code }, or null when the run is over.
+function scenarioToRun(jsonData) {
+  const allCodes = (jsonData.scenarios || []).map(s => s.code);
+  const effectiveList = scenarioListOfRun(scenariosToRunList(jsonData, allCodes), allCodes);
 
   // Persist the full resolved list so terminal requests can decide whether to
   // loop back for the next scenario or truly stop the runner.
@@ -642,71 +748,24 @@ function parseScenarioData(jsonData) {
   // the normal multi-scenario sequence is not disrupted.
   const _scenarioTarget = (bru.getEnvVar('scenarioTarget') || '').trim();
   if (_scenarioTarget !== '') {
-    const _asNum = Number.parseInt(_scenarioTarget, 10);
-    if (!Number.isNaN(_asNum) && String(_asNum) === _scenarioTarget) {
-      // Numeric index
-      if (_asNum < 0 || _asNum >= effectiveList.length) {
-        throw new Error(
-          `[ERROR] ❌ scenarioTarget index ${_asNum} is out of range. ` +
-          `effectiveList has ${effectiveList.length} entries (0–${effectiveList.length - 1}).`
-        );
-      }
-      scenarioCode = effectiveList[_asNum];
-      validationLogger(`[INFO] 🎯 scenarioTarget (index ${_asNum}): "${scenarioCode}" — scenariosToRunIndex NOT advanced`);
-    } else {
-      // Scenario code string
-      if (!allCodes.includes(_scenarioTarget)) {
-        throw new Error(
-          `[ERROR] ❌ scenarioTarget "${_scenarioTarget}" not found in scenarios list. ` +
-          `Available: ${allCodes.join(', ')}`
-        );
-      }
-      scenarioCode = _scenarioTarget;
-      validationLogger(`[INFO] 🎯 scenarioTarget (name): "${scenarioCode}" — scenariosToRunIndex NOT advanced`);
-    }
     // scenariosToRunIndex is intentionally left unchanged
-  } else {
-    // ── Normal sequential mode — read and advance scenariosToRunIndex ───────
-    let idx = Number.parseInt(bru.getEnvVar("scenariosToRunIndex") || "0", 10);
-    if (Number.isNaN(idx) || idx < 0) idx = 0;
-    // If index exceeds list length, all scenarios have been attempted.
-    // In a loopback context (__loopback was recently true), stop execution.
-    // Otherwise (fresh run or unitary run), wrap to 0 so the run can proceed.
-    if (idx >= effectiveList.length) {
-      if (effectiveList.length > 0 && bru.getEnvVar('__scenariosList')) {
-        // Multi-scenario run completed — stop gracefully
-        console.log('[INFO] ✅ All ' + effectiveList.length + ' scenarios attempted — stopping run (index ' + idx + ')');
-        bru.runner.stopExecution();
-        return;
-      }
-      // Fresh run or stale index from previous session — wrap to 0
-      console.log('[INFO] Index ' + idx + ' exceeds list length ' + effectiveList.length + ' — resetting to 0');
-      idx = 0;
-    }
-
-    scenarioCode = effectiveList[idx];
-
-    // Advance index WITHOUT wrapping back to 0.
-    const nextIdx = idx + 1;
-    bru.setEnvVar("scenariosToRunIndex", String(nextIdx));
-
-    // v1.11.10: keep the unitary-load wrapper in opencollection.yml synchronised
-    // with the index we just consumed. The wrapper's reload condition is
-    //   (_targetNow === '' && _lastUnitaryIdx !== _idxNow)
-    // which fires on every non-/versions request in an OSCAR collection run
-    // when __unitaryLoadedIdx is undefined while scenariosToRunIndex is post-
-    // advance. Setting __unitaryLoadedIdx here (i.e. wherever the parser is
-    // invoked — /versions, loop-back, or the wrapper itself) keeps the
-    // wrapper from re-firing on requests #2..N within the same scenario
-    // iteration. See Documentation/Bruno_Collection/PR68-loop-regression-
-    // root-cause.md for the full trace.
-    bru.setEnvVar("__unitaryLoadedIdx", String(nextIdx));
-
-    validationLogger(
-      `[INFO] 🎯 scenariosToRun [${idx + 1}/${effectiveList.length}]: selected "${scenarioCode}"` +
-      (nextIdx >= effectiveList.length ? ` — last in list, run will stop after this scenario` : ` — next will pick index ${nextIdx}`)
-    );
+    return { code: targetedScenarioCode(_scenarioTarget, effectiveList, allCodes) };
   }
+  return nextScenarioInList(effectiveList);
+}
+
+// Function to parse scenario data from JSON
+function parseScenarioData(jsonData) {
+  // Apply root-level systemInfoParameters as env vars (e.g. masterDataLayoutId)
+  setSystemInfoParameters(jsonData);
+  // #398: load the provider's known-deviation baseline (root-level).
+  setKnownDeviations(jsonData);
+
+  const nextWeekdayString = defaultTripDay();
+  const chosen = scenarioToRun(jsonData);
+  // Every scenario of the list was attempted: the run was told to stop.
+  if (chosen === null) return;
+  const scenarioCode = chosen.code;
 
   let dataFileIndex = 0;
   const dataFileLength = (jsonData.scenarios || []).length;
@@ -716,762 +775,7 @@ function parseScenarioData(jsonData) {
     const scenario = jsonData.scenarios[dataFileIndex];
 
     if (scenario.code === scenarioCode) {
-      // ── Framework-gating warnings (#218 follow-up) ─────────────────────
-      // The Oscar_Server's GET /v1/company/datafile annotator injects
-      // __featureNotDeclaredWarnings on each scenario whose armed feature
-      // isn't declared in the test framework's salesFlows[]. Emit one
-      // [WARNING] per entry so the test report explains that the scenario
-      // is exercising an undeclared capability (soft validation — the run
-      // proceeds anyway, the runtime will degrade as the underlying
-      // feature requires).
-      const _fwWarnings = Array.isArray(scenario.__featureNotDeclaredWarnings)
-        ? scenario.__featureNotDeclaredWarnings : [];
-      for (const _field of _fwWarnings) {
-        validationLogger(featureNotDeclaredWarning(scenario, _field));
-      }
-
-      // Set environment variables for the scenario
-      bru.setEnvVar("osdmVersion", ["", "null"].includes(scenario.osdmVersion) ? null : scenario.osdmVersion);
-      bru.setEnvVar("loggingType", ["", "null"].includes(scenario.loggingType) ? null : scenario.loggingType);
-      // #361: step-failure policy — HARD_STOP (default) vs CONTINUE; read by
-      // failStepOrContinue() in loopback.js at the non-critical call sites.
-      bru.setEnvVar("stepFailurePolicy", ["", "null", null, undefined].includes(scenario.stepFailurePolicy) ? "HARD_STOP" : String(scenario.stepFailurePolicy).toUpperCase());
-      bru.setEnvVar("scenarioCode", scenario.code);
-      bru.setEnvVar("scenarioType", ["", "null"].includes(scenario.scenarioType) ? null : scenario.scenarioType);
-      bru.setEnvVar("scenarioAction", ["", "null"].includes(scenario.scenarioAction) ? null : scenario.scenarioAction);
-      // RI negative probe (#258 Phase 3c): off (default) | omit | invalid.
-      bru.setEnvVar("requestedInformationProbe", ["", "null", null, undefined].includes(scenario.requestedInformationProbe) ? "off" : String(scenario.requestedInformationProbe).toLowerCase());
-      // Purchaser at booking (#258 / #203): inline (default — purchaser in the
-      // booking request) | deferred (omit, then POST it to satisfy the demand) |
-      // omit (never supply) | invalid (POST a bad purchaser → expect rejection).
-      // invalid_at_booking (#899): the bad purchaser in the booking itself.
-      bru.setEnvVar("bookingPurchaserMode", ["", "null", null, undefined].includes(scenario.bookingPurchaserMode) ? "inline" : String(scenario.bookingPurchaserMode).toLowerCase());
-      // Expired-booking negative test (#204): when true, OSCAR waits until just
-      // past booking.confirmationTimeLimit, then attempts fulfillment and asserts
-      // the provider rejects it (booking expired). Default false.
-      bru.setEnvVar("expiredBookingTest", (scenario.expiredBookingTest === true || ["true", "on", "yes"].includes(String(scenario.expiredBookingTest).toLowerCase())) ? "true" : "false");
-
-      // Per-scenario max wait budget for the expired-booking test (#204), in
-      // minutes (1..60). When set AND expiredBookingTest is 'on', 06.yml uses
-      // this as the wait budget instead of the runner-injected runHardDeadlineMs
-      // (which reflects the server-wide RUN_TIMEOUT_MS). The runner also
-      // auto-extends the worker SIGTERM to cover this wait, clamped to
-      // RUN_HARD_MAX_TIMEOUT_MS. Empty / null / out-of-range = unset (default).
-      const _maxWaitRaw = scenario.expiredBookingMaxWaitMinutes;
-      const _maxWaitN   = Number(_maxWaitRaw);
-      if (Number.isFinite(_maxWaitN) && _maxWaitN >= 1 && _maxWaitN <= 60) {
-        bru.setEnvVar("expiredBookingMaxWaitMinutes", String(Math.floor(_maxWaitN)));
-      } else {
-        bru.setEnvVar("expiredBookingMaxWaitMinutes", "");
-      }
-
-      // Expired-offer negative test (Phase 2 of the expired-flow generalization):
-      // when true, OSCAR waits until just past the earliest OfferPart.validUntil
-      // from the selected offer, then attempts POST /bookings and asserts the
-      // provider rejects it (offer expired). Default false. Mirrors the
-      // expiredBookingTest plumbing above.
-      bru.setEnvVar("expiredOfferTest", (scenario.expiredOfferTest === true || ["true", "on", "yes"].includes(String(scenario.expiredOfferTest).toLowerCase())) ? "true" : "false");
-
-      // Per-scenario max wait budget for the expired-offer test, in minutes
-      // (1..60). Same semantics as expiredBookingMaxWaitMinutes (see above): the
-      // runner auto-extends the worker SIGTERM to cover this wait, clamped to
-      // RUN_HARD_MAX_TIMEOUT_MS. Empty / null / out-of-range = unset (default).
-      const _maxOfferWaitRaw = scenario.expiredOfferMaxWaitMinutes;
-      const _maxOfferWaitN   = Number(_maxOfferWaitRaw);
-      if (Number.isFinite(_maxOfferWaitN) && _maxOfferWaitN >= 1 && _maxOfferWaitN <= 60) {
-        bru.setEnvVar("expiredOfferMaxWaitMinutes", String(Math.floor(_maxOfferWaitN)));
-      } else {
-        bru.setEnvVar("expiredOfferMaxWaitMinutes", "");
-      }
-
-      // Phase 3+4+5a+5b: expired-X negative tests for refund / exchange /
-      // add-reservation / add-ancillary. All follow the same shape as
-      // expiredOfferTest / expiredBookingTest above. Each has a per-scenario
-      // Max wait input with identical semantics (1..60 min, auto-extends the
-      // runner SIGTERM via EXPIRED_FLOW_TIMERS in runner.js).
-      const _expiredFlowFields = [
-        ["expiredAddReservationOfferTest", "expiredAddReservationOfferMaxWaitMinutes"],
-        ["expiredAddAncillaryOfferTest",   "expiredAddAncillaryOfferMaxWaitMinutes"],
-        ["expiredRefundOfferTest",         "expiredRefundOfferMaxWaitMinutes"],
-        ["expiredExchangeOfferTest",       "expiredExchangeOfferMaxWaitMinutes"],
-      ];
-      for (const [_flagKey, _waitKey] of _expiredFlowFields) {
-        const _raw = scenario[_flagKey];
-        bru.setEnvVar(_flagKey,
-          (_raw === true || ["true", "on", "yes"].includes(String(_raw).toLowerCase())) ? "true" : "false");
-        const _wRaw = scenario[_waitKey];
-        const _wN   = Number(_wRaw);
-        bru.setEnvVar(_waitKey,
-          (Number.isFinite(_wN) && _wN >= 1 && _wN <= 60) ? String(Math.floor(_wN)) : "");
-      }
-
-      // osdmVersion priority: scenario value (data file) > environment file value > null
-      // The data file is the per-scenario source of truth; the env file is the fallback
-      // when the scenario does not explicitly define an osdmVersion.
-      //const _scenarioOsdmVersion = (scenario.osdmVersion && !["", "null"].includes(String(scenario.osdmVersion)))
-      //  ? String(scenario.osdmVersion)
-      //  : null;
-      validationLogger(`[INFO] 📋 Scenario selected: "${scenario.code}" ; Scenario Type: "${bru.getEnvVar("scenarioType")}" ; Scenario Action: "${bru.getEnvVar("scenarioAction")}" ; OSDM version: "${bru.getEnvVar("osdmVersion")}"`);
-      bru.setEnvVar("desiredFlexibility", ["", "null"].includes(scenario.desiredFlexibility) ? null : scenario.desiredFlexibility);
-      // #903: fares — the section of the trip the provider prices, the
-      // international flag of a trip specification, the cluster to book.
-      const _fareFields = require('./fares.js').fareFieldsOf(scenario);
-      // #905 N4: an empty list the scenario holds is kept; the request sends
-      // it only when it asks for fares (sectionsToSend).
-      let _sections = null;
-      if (_fareFields.requestedSections.length) _sections = JSON.stringify(_fareFields.requestedSections);
-      else if (_fareFields.emptySectionList) _sections = "[]";
-      bru.setEnvVar("requestedSections", _sections);
-      bru.setEnvVar("isPartOfInternationalTrip", _fareFields.isPartOfInternationalTrip === null ? null : String(_fareFields.isPartOfInternationalTrip));
-      bru.setEnvVar("desiredFareCluster", _fareFields.desiredFareCluster);
-      bru.setEnvVar("bookMode", _fareFields.bookMode);
-      // #905: a negative scenario expects no fare in the answer.
-      bru.setEnvVar("expectFares", _fareFields.expectFares === false ? "false" : null);
-      // #907: the fee stated in the refund of a CLUSTERING fare, in cents.
-      bru.setEnvVar("fareRefundFee", _fareFields.fareRefundFee === null ? null : String(_fareFields.fareRefundFee));
-      bru.setEnvVar("accommodationSelection", ["", "null"].includes(scenario.accommodationSelection) ? null : scenario.accommodationSelection);
-      // #211 — desired gender-segregated placeProperties value (MEN/LADIES/MIXED)
-      // for COUCHETTE/BERTH night-train compartments. Sibling of accommodationSelection.
-      bru.setEnvVar("accommodationGenderPreference", ["", "null"].includes(scenario.accommodationGenderPreference) ? null : scenario.accommodationGenderPreference);
-      // #239 — book mandatory reservations via optionalReservationSelections.
-      bru.setEnvVar("bookMandatoryReservations",
-        (scenario.bookMandatoryReservations === true || String(scenario.bookMandatoryReservations).toLowerCase() === "true") ? "true" : "false");
-      // #601: how the optional reservations are booked (mandatory ones always are).
-      // #766: seat preferences (PlaceProperty codes) asked in the booking; a
-      // scenario that asks for some books its optional reservations by
-      // placeSelections unless it names another form.
-      const _placePreferences = require('./placeSelection.js').preferencesOfScenario(scenario);
-      bru.setEnvVar("placePreferences", JSON.stringify(_placePreferences));
-      // #766 PR 3: a scenario naming a manual flow itself (and no older seat
-      // map mode) names a place or compartment on the place map.
-      const _np = require('./namedPlaces.js');
-      const _namedPlace = _np.isManual(scenario.placeSelectionFlow) && !["SEATMAP_AT_OFFER", "ADD_TO_BOOKING"].includes(String(scenario.placeSelectionMode || "").toUpperCase());
-      bru.setEnvVar("namedPlaceKind", _namedPlace ? _np.kindOfScenario(scenario) : null);
-      // #766 PR 4: the reference place of the NEARBY flow ("7/15").
-      // #776: empty or "AUTO", it comes from a first booking made in the run.
-      const _nearby = String(scenario.placeSelectionFlow || "").toUpperCase() === "AUTOMATIC_PLACE_SELECTION_NEARBY" ? _np.referenceOfScenario(scenario) : null;
-      const _nearbyAuto = require('./referenceBooking.js').isAutoReference(scenario);
-      bru.setEnvVar("nearbyReference", _nearby ? JSON.stringify(_nearby) : null);
-      bru.setEnvVar("nearbyReferenceAuto", _nearbyAuto ? "true" : null);
-      bru.setEnvVar("reservationBookingForm", require('./seatReservations.js').normaliseForm(scenario.reservationBookingForm)
-        || (_placePreferences.length > 0 || _namedPlace || _nearby || _nearbyAuto ? "PLACE_SELECTION" : null));
-      // #793: a mandatory reservation without a seat choice: a placeSelection
-      // (default) or nothing; the run's copy carries the Test Framework's.
-      bru.setEnvVar("mandatoryReservationForm", require('./seatReservations.js').normaliseMandatoryForm(scenario.mandatoryReservationForm));
-      // Which passengers step 03 updates (ALL, or MAIN = the first only).
-      bru.setEnvVar("passengerUpdateScope", passengerUpdateScope(scenario));
-      // #378: place-selection NHF probe sweep. The wizard stores an object of
-      // booleans; the env carries an ORDERED array of the enabled probe keys
-      // (omit → unknown type → wrong id). Default: no probes. The booking step
-      // self-loops once per key (corrupted passes), then books clean.
-      const _ppSel = scenario.placeSelectionProbes;
-      const _ppOrder = ["omitPlaceSelections", "unknownAccommodationType", "wrongReservationId"];
-      let _ppKeys = [];
-      if (Array.isArray(_ppSel)) _ppKeys = _ppOrder.filter((k) => _ppSel.includes(k));
-      else if (_ppSel && typeof _ppSel === "object") _ppKeys = _ppOrder.filter((k) => _ppSel[k] === true);
-      bru.setEnvVar("placeSelectionProbes", JSON.stringify(_ppKeys));
-      bru.setEnvVar("__placeProbeIndex", "0");
-      if (_ppKeys.length > 0) {
-        validationLogger(`[INFO] 🧪 Place-selection probe sweep ARMED (${_ppKeys.length} probe(s): ${_ppKeys.join(", ")}) — the booking step will first fire ${_ppKeys.length} corrupted request(s), then book clean.`);
-      }
-      bru.setEnvVar("requiresPlaceSelection", ["", "null"].includes(scenario.requiresPlaceSelection) ? null : scenario.requiresPlaceSelection);
-      bru.setEnvVar("overruleCode", ["", "null"].includes(scenario.overruleCode) ? null : scenario.overruleCode);
-      // #598: the product (tariff) the scenario expects: a code, or words of its name.
-      bru.setEnvVar("expectedProduct", typeof scenario.expectedProduct === "string" && scenario.expectedProduct.trim() ? scenario.expectedProduct.trim() : null);
-      // #833: the faults the OSDM simulator answers this scenario with (header X-Simulator-Faults).
-      bru.setEnvVar("simulatorFaults", simulatorFaultsValue(scenario.simulatorFaults) || null);
-      // #600: the travel class expected on each leg, in the order of the legs.
-      const _legClasses = require('./legClasses.js').normaliseLegClasses(scenario.legTravelClasses);
-      bru.setEnvVar("legTravelClasses", _legClasses ? JSON.stringify(_legClasses) : null);
-      // #766: the place selection flow the scenario exercises (null: none).
-      bru.setEnvVar("placeSelectionFlow", require('./placeSelection.js').flowOfScenario(scenario));
-      // #599: the expected product must NOT be offered (a group its rules exclude).
-      bru.setEnvVar("expectedProductAbsent", (scenario.expectedProductAbsent === true || ["true", "on", "yes"].includes(String(scenario.expectedProductAbsent).toLowerCase())) ? "true" : "false");
-      // #780: the scenario tests its offer search criteria and ends after the offer.
-      bru.setEnvVar("offerSearchProbe", (scenario.offerSearchProbe === true || ["true", "on", "yes"].includes(String(scenario.offerSearchProbe).toLowerCase())) ? "true" : "false");
-      // #596: negative probe — the provider is expected to refuse this overrule code.
-      bru.setEnvVar("overruleCodeExpectRejection", (scenario.overruleCodeExpectRejection === true || ["true", "on", "yes"].includes(String(scenario.overruleCodeExpectRejection).toLowerCase())) ? "true" : "false");
-      bru.setEnvVar("refundDate", ["", "null"].includes(scenario.refundDate) ? null : scenario.refundDate);
-      // #602: offers asked for a trip of POST /trips-collection, by its id.
-      // Only a one-way journey from a SEARCH trip is asked this way.
-      const _flagOn = (v) => v === true || ["true", "on", "yes"].includes(String(v).toLowerCase());
-      let _byTripIds = _flagOn(scenario.offersByTripIds);
-      if (_byTripIds) {
-        const _tr = (jsonData.tripRequirements || []).find((t) => t && t.id === scenario.tripRequirementId);
-        const _offset = returnOptsFromScenario(scenario).offsetDays;
-        if (_tr && _tr.tripType !== "SEARCH") {
-          validationLogger(`[WARNING] Scenario "${scenario.code}": offers by trip id need a SEARCH trip (origin, destination, time); this one is ${_tr.tripType}. The offers are asked by the trip as it is.`);
-          _byTripIds = false;
-        } else if (_offset !== undefined && _offset !== null && _offset !== "") {
-          validationLogger(`[WARNING] Scenario "${scenario.code}": offers by trip id are asked for a one-way journey only; this scenario is a return. The offers are asked by search criteria.`);
-          _byTripIds = false;
-        }
-      }
-      bru.setEnvVar("offersByTripIds", _byTripIds ? "true" : "false");
-      // #603: how long to wait for the refund receipt after a refund, 1 to 60 minutes.
-      const _receiptWait = Number.parseInt(scenario.refundReceiptMaxWaitMinutes, 10);
-      bru.setEnvVar("refundReceiptMaxWaitMinutes", _receiptWait >= 1 && _receiptWait <= 60 ? String(_receiptWait) : null);
-      // #604: send the booking and the confirmation again with the same Idempotency-Key.
-      bru.setEnvVar("idempotencyCheck", _flagOn(scenario.idempotencyCheck) ? "true" : "false");
-      // #602: negative probe — offers asked for a trip id the provider never gave.
-      bru.setEnvVar("tripIdsExpectRejection", _flagOn(scenario.tripIdsExpectRejection) ? "true" : "false");
-      // #699: negative probe — one passenger over the provider's maximum.
-      bru.setEnvVar("passengerLimitExpectRejection", _flagOn(scenario.passengerLimitExpectRejection) ? "true" : "false");
-      // #703: negative probe — an offer request with no passenger.
-      bru.setEnvVar("emptyPassengersExpectRejection", _flagOn(scenario.emptyPassengersExpectRejection) ? "true" : "false");
-      // #1266: the lost card a CARD_LOST replacement names at booking, and the
-      // probe that expects an unknown one refused.
-      const _lostCard = require("./lostItems.js").lostCardOf(scenario.lostCard);
-      bru.setEnvVar("__lostCard", _lostCard ? JSON.stringify(_lostCard) : null);
-      bru.setEnvVar("lostCardExpectRejection", _flagOn(scenario.lostCardExpectRejection) ? "true" : "false");
-      // #1266: the probe of a NUTS code the provider does not know.
-      bru.setEnvVar("nutsCodeExpectRejection", _flagOn(scenario.nutsCodeExpectRejection) ? "true" : "false");
-      // #704: a departure date of the scenario's own, and the probe that
-      // expects it refused (past, or beyond the sales horizon).
-      bru.setEnvVar("departureDaysFromToday", Number.isInteger(scenario.departureDaysFromToday) ? String(scenario.departureDaysFromToday) : null);
-      bru.setEnvVar("departureExpectRejection", _flagOn(scenario.departureExpectRejection) ? "true" : "false");
-      // #781: the currency the offers are in when none is asked, and the probe
-      // asking for one the provider does not sell.
-      bru.setEnvVar("expectedCurrency", typeof scenario.expectedCurrency === "string" && /^[A-Z]{3}$/.test(scenario.expectedCurrency) ? scenario.expectedCurrency : null);
-      bru.setEnvVar("currencyExpectRejection", _flagOn(scenario.currencyExpectRejection) ? "true" : "false");
-      // #780 PR C: the probe asking for an offer search option value the framework leaves out.
-      bru.setEnvVar("offerOptionExpectRejection", _flagOn(scenario.offerOptionExpectRejection) ? "true" : "false");
-      // #227: which optional parameters of the offer request the provider supports.
-      bru.setEnvVar("offerOptionDiscovery", _flagOn(scenario.offerOptionDiscovery) ? "true" : "false");
-      const _optionBudget = Number.parseInt(scenario.offerOptionMaxRequests, 10);
-      bru.setEnvVar("offerOptionMaxRequests", Number.isFinite(_optionBudget) ? String(_optionBudget) : null);
-      bru.setEnvVar("offerOptionValues", scenario.offerOptionValues && typeof scenario.offerOptionValues === "object" && !Array.isArray(scenario.offerOptionValues) ? JSON.stringify(scenario.offerOptionValues) : null);
-      bru.setEnvVar("offerOptionInvalidValues", scenario.offerOptionInvalidValues === "skip" ? "skip" : "random");
-      const _optionSeed = Number.parseInt(scenario.offerOptionSeed, 10);
-      bru.setEnvVar("offerOptionSeed", Number.isFinite(_optionSeed) ? String(_optionSeed >>> 0) : null);
-      // #227 part 2: which options the Test Framework says the provider supports (the run's copy).
-      bru.setEnvVar("offerOptionDeclared", declaredOptionsOf(scenario));
-      // #700: after-sale requests that must be refused.
-      bru.setEnvVar("refundAgainProbe", _flagOn(scenario.refundAgainProbe) ? "true" : "false");
-      bru.setEnvVar("exchangeRefundedProbe", _flagOn(scenario.exchangeRefundedProbe) ? "true" : "false");
-      bru.setEnvVar("confirmAgainProbe", _flagOn(scenario.confirmAgainProbe) ? "true" : "false");
-
-      // ── Partial refund (issue #218) ─────────────────────────────────────
-      // Two orthogonal scope axes: by leg (subset of admissions/reservations)
-      // and by passenger (subset of pax). The wizard blocks save in the
-      // OBVIOUSLY-impossible cases (per-pax with only 1 passenger; per-leg
-      // with a SPECIFICATION trip that's already single-leg); the SEARCH-mode
-      // per-leg case is validated at offer-runtime in 10. POST Refund Offers'
-      // before-request and degrades to full refund with a [WARNING].
-      const _prByLeg = (scenario.partialRefundByLeg === true ||
-                        ["true", "on", "yes"].includes(String(scenario.partialRefundByLeg).toLowerCase()));
-      const _prByPax = (scenario.partialRefundByPax === true ||
-                        ["true", "on", "yes"].includes(String(scenario.partialRefundByPax).toLowerCase()));
-      bru.setEnvVar("partialRefundByLeg", _prByLeg ? "true" : "false");
-      bru.setEnvVar("partialRefundByPax", _prByPax ? "true" : "false");
-      const _legDefault = _prByLeg ? "first" : "";  // default to first when armed
-      const _paxDefault = _prByPax ? "first" : "";
-      bru.setEnvVar("partialRefundLegSelection",
-        ["", "null", null, undefined].includes(scenario.partialRefundLegSelection)
-          ? _legDefault
-          : String(scenario.partialRefundLegSelection));
-      bru.setEnvVar("partialRefundPaxSelection",
-        ["", "null", null, undefined].includes(scenario.partialRefundPaxSelection)
-          ? _paxDefault
-          : String(scenario.partialRefundPaxSelection));
-      // #595: the refund of one whole fulfillment (first, last, outbound,
-      // inbound), for providers that refund per fulfillment only.
-      const _prByFf = (scenario.partialRefundByFulfillment === true ||
-                       ["true", "on", "yes"].includes(String(scenario.partialRefundByFulfillment).toLowerCase()));
-      bru.setEnvVar("partialRefundByFulfillment", _prByFf ? "true" : "false");
-      const _prFfDefault = _prByFf ? "first" : "";
-      bru.setEnvVar("partialRefundFulfillmentSelection",
-        ["", "null", null, undefined].includes(scenario.partialRefundFulfillmentSelection)
-          ? _prFfDefault
-          : String(scenario.partialRefundFulfillmentSelection));
-
-      // Setup-time consistency checks. The wizard does these proactively too;
-      // re-check here so a hand-edited data file can't bypass the wizard.
-      if (_prByPax || _prByLeg) {
-        // Per-pax requires >=2 passengers in the resolved passenger list.
-        if (_prByPax) {
-          // Log-audit round 2: the root property in the data file is
-          // `passengersList` (an ARRAY of lists — the schema's required root
-          // field), not `passengersLists`. The old plural lookup was always
-          // undefined, so _paxCount was 0 for EVERY per-pax scenario and this
-          // warning fired even with 3 passengers correctly linked (list #62
-          // false-positive, 2026-06-10). Keep the plural as a fallback for
-          // hand-edited files, and compare ids loosely ("62" vs 62) since
-          // hand-edited files are exactly what this re-check exists for.
-          const _plRoot = jsonData.passengersList || jsonData.passengersLists;
-          const _passengersList = Array.isArray(_plRoot)
-            ? _plRoot.find((pl) => pl && String(pl.id) === String(scenario.passengersListId))
-            : undefined;
-          const _paxCount = Array.isArray(_passengersList?.passengers)
-            ? _passengersList.passengers.length : 0;
-          if (_paxCount < 2) {
-            const _listState = _passengersList ? `has only ${_paxCount} passenger(s)` : `was not found in the data file's passengersList[]`;
-            validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByPax is on but passengersList #${scenario.passengersListId} ${_listState} — per-pax partial refund cannot fire. ${_passengersList ? 'Add a passenger or turn partialRefundByPax off.' : 'Check the scenario’s passengersListId linkage in Test Config.'}`);
-          }
-        }
-        // Per-leg with SPECIFICATION trip can be statically validated.
-        // (SEARCH mode is checked at offer time in 10.yml.)
-        if (_prByLeg) {
-          const _tripReq = jsonData.tripRequirements?.find(
-            (tr) => tr && tr.id === scenario.tripRequirementId);
-          if (_tripReq?.tripType === "SPECIFICATION") {
-            const _legCount = Array.isArray(_tripReq.legs) ? _tripReq.legs.length : 0;
-            if (_legCount < 2) {
-              validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByLeg is on but the SPECIFICATION trip has ${_legCount} leg(s) — per-leg partial refund cannot fire. Either turn partialRefundByLeg off, or use a multi-leg trip.`);
-            }
-            const _hasReturn = !!(_tripReq.returnSearchParameters || _tripReq.tripType === "RETURN");
-            const _legSel = String(scenario.partialRefundLegSelection || "first");
-            if ((_legSel === "outbound" || _legSel === "inbound") && !_hasReturn) {
-              validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundLegSelection='${_legSel}' is only valid for return-trips; this trip is one-way. OSCAR will fall back to 'first'.`);
-              bru.setEnvVar("partialRefundLegSelection", "first");
-            }
-          }
-        }
-      }
-
-      // Optional intermediate booking-flow actions. The scenario may carry a
-      // `salesFlowActions` map { patchPassengers, placeSelection, addAncillary,
-      // getBooking, deleteAncillary } indicating which steps to exercise
-      // between POST /bookings and POST /fulfillments. Resolution + defaults are
-      // centralised in resolveSalesFlowActions() (issue #107): the optional
-      // features default OFF, patchPassengers/getBooking default ON. Each flag
-      // is exported as `salesFlow_<key>` = "true"/"false" so individual .bru
-      // files can branch on it with a simple getEnvVar.
-      const _salesActions = resolveSalesFlowActions(scenario.salesFlowActions);
-      Object.keys(_salesActions).forEach(function (k) {
-        bru.setEnvVar("salesFlow_" + k, _salesActions[k] ? "true" : "false");
-      });
-      validationLogger("[INFO] 🛒 Sales-flow actions: " +
-        Object.keys(_salesActions).map(function (k) {
-          return k + "=" + bru.getEnvVar("salesFlow_" + k);
-        }).join(", "));
-
-      // Place-selection mode (issue #107): SEATMAP_AT_OFFER (seat map → booking)
-      // or ADD_TO_BOOKING (reservation added to an existing booking). Chosen per
-      // scenario from the framework-authorised set; null when not applicable.
-      bru.setEnvVar("placeSelectionMode", ["", "null"].includes(scenario.placeSelectionMode) ? null : scenario.placeSelectionMode);
-
-      // #1117: the run filter skips 01/02 GET Coach (the coach layouts, read
-      // after this, at the scenario's start) where the framework declares no
-      // seat map.
-      bru.setEnvVar("__coachLayoutsSkip", coachLayoutsSkipped(scenario) ? "true" : "false");
-
-      // ── Expired-flow auto-expansion: build the per-scenario queue (PR B) ──
-      // When 2+ expired-X timers are armed on this scenario, OSCAR runs the
-      // scenario N times — one pass per armed timer. The queue builder reads
-      // the timer flags + the gating env vars set above (scenarioType,
-      // salesFlow_*, placeSelectionMode) so we MUST call it after those are
-      // resolved. Single-timer scenarios behave identically to today — the
-      // queue has length 1 and the existing after-response short-circuit
-      // routes straight to the next scenario.
-      try {
-        // Log-audit round 2: sibling-relative require. This file lives IN
-        // library-bruno/, so the YML-style library_base prefix
-        // ("./library-bruno/") double-nested to
-        // library-bruno/library-bruno/expiredFlow.js and FAILED ON EVERY RUN
-        // ("Cannot find module ..."), emitting a confusing [WARNING] even
-        // with zero timers armed — and silently disabling the multi-timer
-        // auto-expansion for scenarios that DID arm 2+ timers. Same sibling
-        // pattern as loopback.js → envUtils.js; reportGenerator.js documents
-        // the identical trap.
-        const { buildAndArmExpiredFlowQueue } = require("./expiredFlow.js");
-        buildAndArmExpiredFlowQueue();
-        // With 0 timers armed the builder is silent (empty queue, no log) —
-        // so this block emits nothing on ordinary scenarios.
-      } catch (_e) {
-        // With the path fixed, a throw here is a genuine feature failure:
-        // armed expiry timers would not run their extra passes.
-        validationLogger(`[ERROR] expiredFlow queue build failed: ${_e?.message} — armed expiry-timer tests will NOT run their extra passes this scenario.`);
-      }
-
-      // Trip requirements — verify the scenario's reference resolves BEFORE
-      // walking the list. #328 (v1.11.109): when a new user authors a
-      // datafile in the wizard and the scenario's tripRequirementId doesn't
-      // match any tripRequirements[].id, every downstream variable
-      // (offerTripSearchCriteria, offerTripSpecifications, leg*StopPlaceRef,
-      // …) stays unset and the user only sees the downstream symptom:
-      // "Required scenario variable 'offerTripSearchCriteria' is empty or
-      // not set." That message points at data_base but doesn't tell them
-      // the cause is the unresolved tripRequirementId. Emit a precise
-      // ERROR up front so the next reader sees the linkage gap directly.
-      const _tripList    = Array.isArray(jsonData.tripRequirements) ? jsonData.tripRequirements : [];
-      const _tripWantId  = scenario.tripRequirementId;
-      const _tripFound   = _tripList.some(function (tr) { return tr && tr.id === _tripWantId; });
-      if (!_tripFound) {
-        const _availIds = _tripList.map(function (tr) { return tr?.id; }).filter(function (id) { return id != null; });
-        validationLogger(
-          '[ERROR] Scenario "' + scenario.code + '" references tripRequirementId=' +
-          JSON.stringify(_tripWantId) + ' but no matching entry exists in datafile.tripRequirements[]. ' +
-          'Available ids: [' + _availIds.join(', ') + ']. ' +
-          'Fix in the wizard: open the Test Data → Trip Requirements section, ' +
-          'confirm at least one entry exists and that the scenario\'s tripRequirementId points at one of them. ' +
-          'When tripRequirementId is unresolved, every downstream variable ' +
-          '(offerTripSearchCriteria, offerTripSpecifications, leg*StopPlaceRef, …) stays unset and the request body cannot be built.'
-        );
-      }
-      jsonData.tripRequirements?.some(function (tripRequirement) {
-        if (tripRequirement.id === scenario.tripRequirementId) {
-          bru.setEnvVar("TripType", tripRequirement.tripType);
-
-          // #330 (v1.11.110): the SEARCH branch reads tripRequirement.trip.*
-          // and the SPECIFICATION branch reads tripRequirement.legs[*].* —
-          // without these the silent failure mode is that osdmTripSearchCriteria
-          // / osdmTripSpecification never get called and the downstream symptom
-          // is "Required scenario variable offerTripSearchCriteria is empty".
-          // Validate the shape BEFORE entering the branch so the user sees the
-          // precise data-shape gap instead of the downstream consequence.
-          // [DEBUG] dump of the actual structure is included for deeper
-          // investigation but stays invisible at default INFO logging level.
-          const _trCtx = 'tripRequirement #' + JSON.stringify(tripRequirement.id);
-          if (tripRequirement.tripType === "SEARCH") {
-            const _missing = [];
-            if (!tripRequirement.trip || typeof tripRequirement.trip !== 'object') {
-              _missing.push('trip (sub-object missing)');
-            } else {
-              if (!tripRequirement.trip.origin)        _missing.push('trip.origin');
-              if (!tripRequirement.trip.destination)   _missing.push('trip.destination');
-              if (!tripRequirement.trip.startDatetime) _missing.push('trip.startDatetime');
-            }
-            if (_missing.length > 0) {
-              validationLogger(
-                '[ERROR] Scenario "' + scenario.code + '": ' + _trCtx +
-                ' has tripType=SEARCH but the .trip sub-object is missing required field(s): [' +
-                _missing.join(', ') + ']. The SEARCH branch needs origin / destination / startDatetime to build a TripSearchCriteria; offerTripSearchCriteria stays unset and the request body cannot be built. ' +
-                'Fix in the wizard: open Test Data → Trip Requirements, open this entry and complete the SEARCH trip\'s origin, destination, and start datetime.'
-              );
-              validationLogger('[DEBUG] ' + _trCtx + '.trip dump = ' + JSON.stringify(tripRequirement.trip));
-              return true;  // stop iterating; the downstream parseEnvJson error will name the same problem.
-            }
-          } else if (tripRequirement.tripType === "NON_TRIP") {
-            // #1258: offers without a trip, by stop places or zones.
-            const _nonTrip = require("./nonTrip.js").nonTripRequirementOf(tripRequirement);
-            if (_nonTrip.problem) {
-              validationLogger(
-                '[ERROR] Scenario "' + scenario.code + '": ' + _trCtx + ' ' + _nonTrip.problem + '. ' +
-                'Fix in the wizard: open Test Data → Trip Requirements, open this entry and name the stop places (or a name to look them up) or the zones.'
-              );
-              validationLogger('[DEBUG] ' + _trCtx + ' dump = ' + JSON.stringify(tripRequirement));
-              return true;
-            }
-          } else if (tripRequirement.tripType === "SPECIFICATION") {
-            if (!Array.isArray(tripRequirement.legs) || tripRequirement.legs.length === 0) {
-              validationLogger(
-                '[ERROR] Scenario "' + scenario.code + '": ' + _trCtx +
-                ' has tripType=SPECIFICATION but .legs[] is empty or missing. The SPECIFICATION branch needs at least one leg with origin / destination / startDatetime / endDatetime to build a TripSpecification; offerTripSpecifications stays unset and the request body cannot be built. ' +
-                'Fix in the wizard: open Test Data → Trip Requirements, open this entry and add at least one leg.'
-              );
-              validationLogger('[DEBUG] ' + _trCtx + ' dump = ' + JSON.stringify(tripRequirement));
-              return true;
-            }
-            const _badLegs = [];
-            tripRequirement.legs.forEach(function (leg, i) {
-              const _m = [];
-              if (!leg || typeof leg !== 'object') { _badLegs.push({ index: i, missing: ['leg (not an object)'] }); return; }
-              if (!leg.origin)        _m.push('origin');
-              if (!leg.destination)   _m.push('destination');
-              if (!leg.startDatetime) _m.push('startDatetime');
-              if (!leg.endDatetime)   _m.push('endDatetime');
-              if (_m.length > 0) _badLegs.push({ index: i, missing: _m });
-            });
-            if (_badLegs.length > 0) {
-              const _summary = _badLegs.map(function (b) { return 'legs[' + b.index + '] missing [' + b.missing.join(', ') + ']'; }).join('; ');
-              validationLogger(
-                '[ERROR] Scenario "' + scenario.code + '": ' + _trCtx +
-                ' has tripType=SPECIFICATION but ' + _badLegs.length + ' leg(s) are incomplete: ' + _summary + '. ' +
-                'Fix in the wizard: open Test Data → Trip Requirements, open this entry and complete each leg\'s origin / destination / start+end datetimes.'
-              );
-              validationLogger('[DEBUG] ' + _trCtx + '.legs dump = ' + JSON.stringify(tripRequirement.legs));
-              return true;
-            }
-          }
-
-          // #330: wrap the switch so any unexpected throw inside the SEARCH /
-          // SPECIFICATION branches (e.g. subTripDate refusing the format, a
-          // deeper malformed sub-field the validators above didn't catch)
-          // surfaces with the tripRequirement context rather than propagating
-          // as an opaque "Cannot read property X of undefined" or
-          // "Invalid date format".
-          try {
-          switch (tripRequirement.tripType) {
-            case "SPECIFICATION": {
-              validationLogger('[INFO] ⏳ processing a specification');
-              // #363: per-trip departure day (Auto when unset).
-              const _specTripDate = tripDateFor(scenario, nextWeekdayString, tripRequirement);
-              // #705: the day ages are counted on.
-              bru.setEnvVar("__travelDay", _specTripDate);
-              specificationTrip(tripRequirement, _specTripDate, scenario, saleEnv);
-              break;
-            }
-
-            case "NON_TRIP": {
-              validationLogger('[INFO] ⏳ processing a non-trip request');
-              const _nonTripDate = tripDateFor(scenario, nextWeekdayString, tripRequirement);
-              bru.setEnvVar("__travelDay", _nonTripDate);
-              nonTripRequest(tripRequirement, _nonTripDate);
-              break;
-            }
-
-            case "SEARCH": {
-              validationLogger('[INFO] ⏳ processing a search');
-              // #363: per-trip departure day (Auto when unset).
-              const _searchTripDate = tripDateFor(scenario, nextWeekdayString, tripRequirement);
-              // #705: the day ages are counted on.
-              bru.setEnvVar("__travelDay", _searchTripDate);
-              searchTrip(tripRequirement, _searchTripDate, scenario, saleEnv);
-              break;
-            }
-          }
-          } catch (_branchErr) {
-            // #330 (v1.11.110): name the context so the user sees which
-            // tripRequirement and which branch failed instead of a bare
-            // "Cannot read property X of undefined" propagating up.
-            validationLogger(
-              '[ERROR] Scenario "' + scenario.code + '": building TripType=' +
-              tripRequirement.tripType + ' criteria for ' + _trCtx +
-              ' threw: ' + (_branchErr?.message ? _branchErr.message : String(_branchErr)) +
-              '. offerTripSearchCriteria / offerTripSpecifications stays unset and the request body cannot be built. ' +
-              'Fix in the wizard: open Test Data → Trip Requirements, open this entry and verify the trip data is complete and dates parse correctly.'
-            );
-            validationLogger('[DEBUG] ' + _trCtx + ' dump = ' + JSON.stringify(tripRequirement));
-            // Don't rethrow — the downstream parseEnvJson error (with the
-            // v1.11.109 hint) is the actionable signal the user follows. We
-            // just want the named [ERROR] above to appear FIRST so the report
-            // surfaces the root cause before the consequence.
-          }
-          return true;
-        }
-      });
-
-      // #959: the trip and criteria an exchange asks for.
-      prepareExchangeTrip(scenario, jsonData);
-
-      // Purchaser details
-      jsonData.purchaserList?.some(function (purchaserList) {
-        validationLogger('[INFO] Found number of purchaser: ' + purchaserList.purchaser.length);
-        const purchaserSpecs = [];
-        purchaserList.purchaser.forEach(function (purchaser) {
-          const osdmVersion = bru.getEnvVar("osdmVersion");
-          if (require("./personContact.js").usesContactDetail(osdmVersion)) {
-            purchaserSpecs.push(new PurchaserContact(
-              new DetailContact(
-                purchaser.purchaserFirstName,
-                purchaser.purchaserLastName,
-                new Contact(
-                  purchaser.purchaserEmail,
-                  purchaser.purchaserPhoneNumber
-                )
-              )
-            ));
-          } else {
-            purchaserSpecs.push(new Purchaser(
-              new Detail(
-                purchaser.purchaserFirstName,
-                purchaser.purchaserLastName,
-                purchaser.purchaserEmail,
-                purchaser.purchaserPhoneNumber
-              )
-            ));
-          }
-        });
-
-        validationLogger('[DEBUG] Pushed purchaserSpec to environment: ' + JSON.stringify(purchaserSpecs));
-        bru.setEnvVar("bookingPurchaserSpecifications", JSON.stringify(purchaserSpecs[0]));
-        return true;
-      });
-
-      // Passengers — same upfront check as tripRequirements above. #328
-      // (v1.11.109): when scenario.passengersListId doesn't resolve, the
-      // downstream symptom is a missing `offerPassengerSpecifications` env
-      // var. Emit a precise [ERROR] naming the linkage gap.
-      const _paxLists    = Array.isArray(jsonData.passengersList) ? jsonData.passengersList : [];
-      const _paxWantId   = scenario.passengersListId;
-      const _paxFound    = _paxLists.some(function (pl) { return pl && pl.id === _paxWantId; });
-      if (!_paxFound) {
-        const _availIds = _paxLists.map(function (pl) { return pl?.id; }).filter(function (id) { return id != null; });
-        validationLogger(
-          '[ERROR] Scenario "' + scenario.code + '" references passengersListId=' +
-          JSON.stringify(_paxWantId) + ' but no matching entry exists in datafile.passengersList[]. ' +
-          'Available ids: [' + _availIds.join(', ') + ']. ' +
-          'Fix in the wizard: open the Test Data → Passengers section, ' +
-          'confirm at least one entry exists and that the scenario\'s passengersListId points at one of them.'
-        );
-      }
-      jsonData.passengersList?.some(function (passengersList) {
-        if (passengersList.id === scenario.passengersListId) {
-          validationLogger('[INFO] Found number of passengers: ' + passengersList.passengers.length);
-          bru.setEnvVar("offerPassengerNumber", passengersList.passengers.length);
-          const offerPassengerSpecs = [];
-          const passengerSpecs = [];
-          const passengerReferences = [];
-          const passengerAdditionalData = [];
-          let passengerIndex = 0;
-
-          // ── Passenger external-ref format probe ────────────────────────────
-          // NHF parameter: when scenario.passengerExternalRefFormat is set to
-          // a printf-style pattern (e.g. "PAX%04d"), rewrite every passenger
-          // reference in-place BEFORE the loop below uses it. The rewrite
-          // propagates through every downstream env var (offerPassengerSpecs,
-          // bookingPassengerSpecifications, bookingPassengerReferences,
-          // updateFirstName_<i> etc.) because they all read passenger.reference.
-          // Empty / missing pattern → no rewrite, default 00001-style is kept.
-          //
-          // Mutating the loaded data is safe: jsonData is parsed fresh from the
-          // data file on each scenario load (see getScenarioData()), so the
-          // rewrite doesn't leak across runs.
-          const _refFormatProbe = scenario.passengerExternalRefFormat;
-          if (_refFormatProbe && /%0?\d*d/.test(String(_refFormatProbe))) {
-            passengersList.passengers.forEach(function (p, i) {
-              p.reference = applyExternalRefFormat(_refFormatProbe, i + 1);
-            });
-            validationLogger('[INFO] 🪪 passengerExternalRefFormat probe armed (pattern: "' + _refFormatProbe + '") — refs rewritten to: ' + passengersList.passengers.map(function (p) { return p.reference; }).join(', '));
-          } else if (_refFormatProbe) {
-            validationLogger('[WARNING] passengerExternalRefFormat set ("' + _refFormatProbe + '") but missing a %d / %0Nd placeholder — probe ignored, default refs kept.');
-          }
-
-          passengersList.passengers.forEach(function (passenger) {
-            // #705: an age on the day of travel gives the date of birth.
-            const _born = birthDateFor(passenger, bru.getEnvVar("__travelDay"));
-            if (_born) {
-              passenger.dateOfBirth = _born;
-              validationLogger('[INFO] 🎂 Passenger ' + passenger.reference + ': born ' + _born + ', ' + passenger.bornYearsBeforeTravel + ' years before the day of travel' + (passenger.bornDaysAfter ? ' plus ' + passenger.bornDaysAfter + ' day(s)' : '') + (passenger.expectedPassengerType ? '; expected to be priced as ' + passenger.expectedPassengerType : ''));
-            }
-            // #597: the passenger's reduction cards, sent with the offer and
-            // the booking requests. #1045: a transportable without a person's data.
-            const cards = cardsOfPassenger(passenger);
-            const specs = passengerSpecsOf(passenger, cards, bru.getEnvVar("osdmVersion"));
-            offerPassengerSpecs.push(specs.offer);
-            passengerSpecs.push(specs.booking);
-            passengerReferences.push(passenger.reference);
-
-            const passengerDataStruct = {
-              updateFirstName: passenger.firstName,
-              updateLastName: passenger.lastName,
-              updateDateOfBirth: passenger.dateOfBirth,
-              updateEmail: passenger.email,
-              updatePhoneNumber: passenger.phoneNumber,
-              updateGender: passenger.gender ?? "X",
-            };
-
-            const passengerAdditionalDataStruct = {
-              updateFirstName: passenger.updateFirstName ?? passengerDataStruct.updateFirstName,
-              updateLastName: passenger.updateLastName ?? passengerDataStruct.updateLastName,
-              updateDateOfBirth: passenger.updateDateOfBirth ?? passengerDataStruct.updateDateOfBirth,
-              updateEmail: passenger.updateEmail ?? passengerDataStruct.updateEmail,
-              updatePhoneNumber: passenger.updatePhoneNumber ?? passengerDataStruct.updatePhoneNumber,
-              updateGender: passenger.updateGender ?? passengerDataStruct.updateGender,
-            };
-
-            // A passenger step 03 does not update is read back at step 04
-            // against the values the booking sent: every passenger when the
-            // scenario turns the PATCH off, the others than the first when
-            // only the main passenger is updated.
-            const _updated = resolveSalesFlowActions(scenario.salesFlowActions).patchPassengers
-              && (passengerUpdateScope(scenario) === "ALL" || passengerIndex === 0);
-            passengerAdditionalData.push(_updated ? passengerAdditionalDataStruct : passengerDataStruct);
-            passengerIndex++;
-
-            if (
-              passenger.updateFirstName == null &&
-              passenger.updateLastName == null &&
-              passenger.updateDateOfBirth == null &&
-              passenger.updateEmail == null &&
-              passenger.updatePhoneNumber == null &&
-              passenger.updateGender == null
-            ) {
-              bru.setEnvVar("skipPatchPassengerRequest", "true");
-            }
-          });
-
-          validationLogger('[DEBUG] Pushed passengerSpec to environment: ' + JSON.stringify(passengerSpecs));
-          bru.setEnvVar("__expectedPassengerTypes", JSON.stringify(expectedTypesOf(passengersList.passengers)));
-          bru.setEnvVar("offerPassengerSpecifications", JSON.stringify(offerPassengerSpecs));
-          // #889: the reduction rate a card holder's card declares, checked at 01c.
-          bru.setEnvVar("__cardRates", JSON.stringify(ratesOfPassengers(passengersList.passengers)));
-          bru.setEnvVar("bookingPassengerSpecifications", JSON.stringify(passengerSpecs));
-          bru.setEnvVar("bookingPassengerReferences", JSON.stringify(passengerReferences));
-          bru.setEnvVar("passengerAdditionalData", JSON.stringify(passengerAdditionalData));
-
-          let passengerData = bru.getEnvVar("passengerAdditionalData");
-          passengerData = typeof passengerData === 'string' ? JSON.parse(passengerData) : passengerData;
-          passengerData.forEach((data, index) => {
-            Object.entries(data).forEach(([key, value]) => {
-              bru.setEnvVar(`${key}_${index}`, value);
-            });
-          });
-          return true;
-        }
-      });
-
-      // Offer search criteria
-      // Priority: inline offerSearchCriteria > offerSearchCriteriaListId reference > legacy defaults
-      let criteria = scenario.offerSearchCriteria || null;
-
-      // Resolve offerSearchCriteriaListId reference when no inline criteria
-      if (!criteria && scenario.offerSearchCriteriaListId != null && Array.isArray(jsonData.offerSearchCriteriaList)) {
-        const listEntry = jsonData.offerSearchCriteriaList.find(e => e.id === scenario.offerSearchCriteriaListId);
-        if (listEntry && Array.isArray(listEntry.offerSearchCriteria) && listEntry.offerSearchCriteria.length > 0) {
-          criteria = listEntry.offerSearchCriteria[0];
-          validationLogger(`[INFO] offerSearchCriteria resolved from offerSearchCriteriaListId=${scenario.offerSearchCriteriaListId}`);
-        }
-      }
-
-      // #600: a class per leg asks for every class it names.
-      const _perLeg = require('./legClasses.js').normaliseLegClasses(scenario.legTravelClasses);
-      if (criteria && typeof criteria === 'object') {
-        osdmOfferSearchCriteria(
-          criteria.currency || null,
-          criteria.offerMode || null,
-          criteria.requestedOfferParts || null,
-          criteria.flexibilities || null,
-          criteria.serviceClass || null,
-          _perLeg ? require('./legClasses.js').requestedClasses(_perLeg) : (criteria.travelClass || null),
-          criteria.productTags || null,
-          criteria.productSelections || null
-        );
-      } else {
-        // Legacy scenario without any offerSearchCriteria — use safe defaults
-        validationLogger(`[WARN] No offerSearchCriteria on scenario '${scenario.code}' — using defaults.`);
-        osdmOfferSearchCriteria('EUR', 'INDIVIDUAL', ['ADMISSION', 'RESERVATION'],
-          null, null, null, null, null);
-      }
-
-      // Requested fulfillment options — same upfront check. #328
-      // (v1.11.109): unresolved requestedFulfillmentOptionsListId leaves
-      // `offerFulfillmentOptions` unset; the request goes out without a
-      // requestedFulfillmentOptions[] array.
-      if (Array.isArray(jsonData.requestedFulfillmentOptionsList) && jsonData.requestedFulfillmentOptionsList.length > 0) {
-        const _ffLists   = jsonData.requestedFulfillmentOptionsList;
-        const _ffWantId  = scenario.requestedFulfillmentOptionsListId;
-        const _ffFound   = _ffLists.some(function (ff) { return ff && ff.id === _ffWantId; });
-        if (!_ffFound) {
-          const _availIds = _ffLists.map(function (ff) { return ff?.id; }).filter(function (id) { return id != null; });
-          validationLogger(
-            '[ERROR] Scenario "' + scenario.code + '" references requestedFulfillmentOptionsListId=' +
-            JSON.stringify(_ffWantId) + ' but no matching entry exists in datafile.requestedFulfillmentOptionsList[]. ' +
-            'Available ids: [' + _availIds.join(', ') + ']. ' +
-            'Fix in the wizard: open the Test Data → Requested Fulfillment Options section ' +
-            'and link this scenario to a defined entry.'
-          );
-        }
-        jsonData.requestedFulfillmentOptionsList.some(function (requestedFulfillmentOptionList) {
-          if (requestedFulfillmentOptionList.id === scenario.requestedFulfillmentOptionsListId) {
-            const requestedFulfillmentOptions = [];
-            requestedFulfillmentOptionList.requestedFulfillmentOptions.forEach(function (requestedFulfillmentOption) {
-              const fulfillmentType = requestedFulfillmentOption.fulfillmentType ?? null;
-              const fulfillmentMedia = requestedFulfillmentOption.fulfillmentMedia ?? null;
-              if (fulfillmentType != null && fulfillmentMedia != null) {
-                requestedFulfillmentOptions.push(new FulfillmentOption(fulfillmentType, fulfillmentMedia));
-              }
-            });
-
-            osdmFulfillmentOptions(requestedFulfillmentOptions);
-            return true;
-          }
-        });
-      } else {
-        validationLogger("[INFO] requestedFulfillmentOptionsList is empty");
-      }
-
+      loadScenario(scenario, jsonData, nextWeekdayString);
       foundCorrectDataSet = true;
       // Log-audit round 2: "Correct data set was found" never said WHICH
       // data — testers read it as a mystery term. Say what actually
@@ -1493,6 +797,875 @@ function parseScenarioData(jsonData) {
       'Fix in the wizard: open Test Config and check the scenario list / scenariosToRun selection.');
     validationLogger(`[ERROR] ⛔ Stopping execution of further requests`);
     throw new Error(`Scenario code "${scenarioCode}" not found`);
+  }
+}
+
+// One scenario of the data file into the run's variables, one stage after
+// the other. The order is kept as it was when all of this was one function:
+// a stage may read what an earlier one set (the expired-flow queue reads the
+// switches and the booking-flow actions; the exchange trip and the
+// passengers read the day of travel the trip sets).
+function loadScenario(scenario, jsonData, nextWeekdayString) {
+  logUndeclaredFeatures(scenario);
+  setScenarioBasics(scenario);
+  setExpiryTests(scenario);
+  // osdmVersion priority: scenario value (data file) > environment file value > null
+  // The data file is the per-scenario source of truth; the env file is the fallback
+  // when the scenario does not explicitly define an osdmVersion.
+  validationLogger(`[INFO] 📋 Scenario selected: "${scenario.code}" ; Scenario Type: "${bru.getEnvVar("scenarioType")}" ; Scenario Action: "${bru.getEnvVar("scenarioAction")}" ; OSDM version: "${bru.getEnvVar("osdmVersion")}"`);
+  setTariffAndFares(scenario);
+  setReservationChoices(scenario);
+  setPlaceSelectionProbes(scenario);
+  setSaleExpectations(scenario);
+  setOffersByTripIds(scenario, jsonData);
+  setRefusalProbes(scenario);
+  setOfferOptionDiscovery(scenario);
+  setAfterSaleProbes(scenario);
+  setPartialRefund(scenario, jsonData);
+  setBookingFlowActions(scenario);
+  armExpiredFlowQueue();
+  setSaleTrip(scenario, jsonData, nextWeekdayString);
+
+  // #959: the trip and criteria an exchange asks for.
+  prepareExchangeTrip(scenario, jsonData);
+  setPurchaser(jsonData);
+  setPassengers(scenario, jsonData);
+  setOfferSearchCriteria(scenario, jsonData);
+  setFulfillmentOptions(scenario, jsonData);
+}
+
+// ── Framework-gating warnings (#218 follow-up) ─────────────────────
+// The Oscar_Server's GET /v1/company/datafile annotator injects
+// __featureNotDeclaredWarnings on each scenario whose armed feature
+// isn't declared in the test framework's salesFlows[]. Emit one
+// [WARNING] per entry so the test report explains that the scenario
+// is exercising an undeclared capability (soft validation — the run
+// proceeds anyway, the runtime will degrade as the underlying
+// feature requires).
+function logUndeclaredFeatures(scenario) {
+  const _fwWarnings = Array.isArray(scenario.__featureNotDeclaredWarnings)
+    ? scenario.__featureNotDeclaredWarnings : [];
+  for (const _field of _fwWarnings) {
+    validationLogger(featureNotDeclaredWarning(scenario, _field));
+  }
+}
+
+// What the scenario is: its OSDM version, type and action, what a failed
+// step does to the run, and how the booking handles requested information
+// and the purchaser.
+function setScenarioBasics(scenario) {
+  bru.setEnvVar("osdmVersion", filledOrNull(scenario.osdmVersion));
+  bru.setEnvVar("loggingType", filledOrNull(scenario.loggingType));
+  // #361: step-failure policy — HARD_STOP (default) vs CONTINUE; read by
+  // failStepOrContinue() in loopback.js at the non-critical call sites.
+  bru.setEnvVar("stepFailurePolicy", wordOr(scenario.stepFailurePolicy, "HARD_STOP").toUpperCase());
+  bru.setEnvVar("scenarioCode", scenario.code);
+  bru.setEnvVar("scenarioType", filledOrNull(scenario.scenarioType));
+  bru.setEnvVar("scenarioAction", filledOrNull(scenario.scenarioAction));
+  // RI negative probe (#258 Phase 3c): off (default) | omit | invalid.
+  bru.setEnvVar("requestedInformationProbe", wordOr(scenario.requestedInformationProbe, "off").toLowerCase());
+  // Purchaser at booking (#258 / #203): inline (default — purchaser in the
+  // booking request) | deferred (omit, then POST it to satisfy the demand) |
+  // omit (never supply) | invalid (POST a bad purchaser → expect rejection).
+  // invalid_at_booking (#899): the bad purchaser in the booking itself.
+  bru.setEnvVar("bookingPurchaserMode", wordOr(scenario.bookingPurchaserMode, "inline").toLowerCase());
+}
+
+// The expired-X negative tests (#204 and the expired-flow generalisation):
+// when one is on, OSCAR waits until just past the deadline of the booking
+// (confirmationTimeLimit), of the selected offer (the earliest
+// OfferPart.validUntil), of the offer to add a reservation or an ancillary,
+// of the refund offer or of the exchange offer, then goes on and asserts the
+// provider refuses (expired). Each is off by default.
+//
+// Each has a per-scenario max wait, in minutes (1..60). When set and the test
+// is on, the step uses it as the wait budget instead of the runner-injected
+// runHardDeadlineMs (the server-wide RUN_TIMEOUT_MS); the runner also extends
+// the worker SIGTERM to cover the wait (EXPIRED_FLOW_TIMERS in runner.js),
+// clamped to RUN_HARD_MAX_TIMEOUT_MS. Empty / null / out-of-range = unset.
+const EXPIRY_TEST_FIELDS = [
+  ["expiredBookingTest",             "expiredBookingMaxWaitMinutes"],
+  ["expiredOfferTest",               "expiredOfferMaxWaitMinutes"],
+  ["expiredAddReservationOfferTest", "expiredAddReservationOfferMaxWaitMinutes"],
+  ["expiredAddAncillaryOfferTest",   "expiredAddAncillaryOfferMaxWaitMinutes"],
+  ["expiredRefundOfferTest",         "expiredRefundOfferMaxWaitMinutes"],
+  ["expiredExchangeOfferTest",       "expiredExchangeOfferMaxWaitMinutes"],
+];
+
+function setExpiryTests(scenario) {
+  for (const [_flagKey, _waitKey] of EXPIRY_TEST_FIELDS) {
+    bru.setEnvVar(_flagKey, flagText(scenario[_flagKey]));
+    bru.setEnvVar(_waitKey, waitMinutes(scenario[_waitKey]));
+  }
+}
+
+// The tariff asked for, and what a scenario of fares asks.
+function setTariffAndFares(scenario) {
+  bru.setEnvVar("desiredFlexibility", filledOrNull(scenario.desiredFlexibility));
+  // #903: fares — the section of the trip the provider prices, the
+  // international flag of a trip specification, the cluster to book.
+  const _fareFields = require('./fares.js').fareFieldsOf(scenario);
+  // #905 N4: an empty list the scenario holds is kept; the request sends
+  // it only when it asks for fares (sectionsToSend).
+  let _sections = null;
+  if (_fareFields.requestedSections.length) _sections = JSON.stringify(_fareFields.requestedSections);
+  else if (_fareFields.emptySectionList) _sections = "[]";
+  bru.setEnvVar("requestedSections", _sections);
+  bru.setEnvVar("isPartOfInternationalTrip", _fareFields.isPartOfInternationalTrip === null ? null : String(_fareFields.isPartOfInternationalTrip));
+  bru.setEnvVar("desiredFareCluster", _fareFields.desiredFareCluster);
+  bru.setEnvVar("bookMode", _fareFields.bookMode);
+  // #905: a negative scenario expects no fare in the answer.
+  bru.setEnvVar("expectFares", _fareFields.expectFares === false ? "false" : null);
+  // #907: the fee stated in the refund of a CLUSTERING fare, in cents.
+  bru.setEnvVar("fareRefundFee", _fareFields.fareRefundFee === null ? null : String(_fareFields.fareRefundFee));
+}
+
+// The accommodation and the reservations: what is asked, and how it is booked.
+function setReservationChoices(scenario) {
+  bru.setEnvVar("accommodationSelection", filledOrNull(scenario.accommodationSelection));
+  // #211 — desired gender-segregated placeProperties value (MEN/LADIES/MIXED)
+  // for COUCHETTE/BERTH night-train compartments. Sibling of accommodationSelection.
+  bru.setEnvVar("accommodationGenderPreference", filledOrNull(scenario.accommodationGenderPreference));
+  // #239 — book mandatory reservations via optionalReservationSelections.
+  bru.setEnvVar("bookMandatoryReservations",
+    (scenario.bookMandatoryReservations === true || String(scenario.bookMandatoryReservations).toLowerCase() === "true") ? "true" : "false");
+  setPlaceChoices(scenario);
+  // #793: a mandatory reservation without a seat choice: a placeSelection
+  // (default) or nothing; the run's copy carries the Test Framework's.
+  bru.setEnvVar("mandatoryReservationForm", require('./seatReservations.js').normaliseMandatoryForm(scenario.mandatoryReservationForm));
+  // Which passengers step 03 updates (ALL, or MAIN = the first only).
+  bru.setEnvVar("passengerUpdateScope", passengerUpdateScope(scenario));
+}
+
+function setPlaceChoices(scenario) {
+  // #601: how the optional reservations are booked (mandatory ones always are).
+  // #766: seat preferences (PlaceProperty codes) asked in the booking; a
+  // scenario that asks for some books its optional reservations by
+  // placeSelections unless it names another form.
+  const _placePreferences = require('./placeSelection.js').preferencesOfScenario(scenario);
+  bru.setEnvVar("placePreferences", JSON.stringify(_placePreferences));
+  // #766 PR 3: a scenario naming a manual flow itself (and no older seat
+  // map mode) names a place or compartment on the place map.
+  const _np = require('./namedPlaces.js');
+  const _namedPlace = _np.isManual(scenario.placeSelectionFlow) && !["SEATMAP_AT_OFFER", "ADD_TO_BOOKING"].includes(String(scenario.placeSelectionMode || "").toUpperCase());
+  bru.setEnvVar("namedPlaceKind", _namedPlace ? _np.kindOfScenario(scenario) : null);
+  // #766 PR 4: the reference place of the NEARBY flow ("7/15").
+  // #776: empty or "AUTO", it comes from a first booking made in the run.
+  const _nearby = String(scenario.placeSelectionFlow || "").toUpperCase() === "AUTOMATIC_PLACE_SELECTION_NEARBY" ? _np.referenceOfScenario(scenario) : null;
+  const _nearbyAuto = require('./referenceBooking.js').isAutoReference(scenario);
+  bru.setEnvVar("nearbyReference", _nearby ? JSON.stringify(_nearby) : null);
+  bru.setEnvVar("nearbyReferenceAuto", _nearbyAuto ? "true" : null);
+  bru.setEnvVar("reservationBookingForm", require('./seatReservations.js').normaliseForm(scenario.reservationBookingForm)
+    || (_placePreferences.length > 0 || _namedPlace || _nearby || _nearbyAuto ? "PLACE_SELECTION" : null));
+}
+
+function setPlaceSelectionProbes(scenario) {
+  // #378: place-selection NHF probe sweep. The wizard stores an object of
+  // booleans; the env carries an ORDERED array of the enabled probe keys
+  // (omit → unknown type → wrong id). Default: no probes. The booking step
+  // self-loops once per key (corrupted passes), then books clean.
+  const _ppSel = scenario.placeSelectionProbes;
+  const _ppOrder = ["omitPlaceSelections", "unknownAccommodationType", "wrongReservationId"];
+  let _ppKeys = [];
+  if (Array.isArray(_ppSel)) _ppKeys = _ppOrder.filter((k) => _ppSel.includes(k));
+  else if (_ppSel && typeof _ppSel === "object") _ppKeys = _ppOrder.filter((k) => _ppSel[k] === true);
+  bru.setEnvVar("placeSelectionProbes", JSON.stringify(_ppKeys));
+  bru.setEnvVar("__placeProbeIndex", "0");
+  if (_ppKeys.length > 0) {
+    validationLogger(`[INFO] 🧪 Place-selection probe sweep ARMED (${_ppKeys.length} probe(s): ${_ppKeys.join(", ")}) — the booking step will first fire ${_ppKeys.length} corrupted request(s), then book clean.`);
+  }
+}
+
+// What the sale expects of the offer (the product, the classes per leg, the
+// place selection flow, the search probe), the overrule code and the date of
+// a refund, and the simulator's faults.
+function setSaleExpectations(scenario) {
+  bru.setEnvVar("requiresPlaceSelection", filledOrNull(scenario.requiresPlaceSelection));
+  bru.setEnvVar("overruleCode", filledOrNull(scenario.overruleCode));
+  // #598: the product (tariff) the scenario expects: a code, or words of its name.
+  bru.setEnvVar("expectedProduct", typeof scenario.expectedProduct === "string" && scenario.expectedProduct.trim() ? scenario.expectedProduct.trim() : null);
+  // #833: the faults the OSDM simulator answers this scenario with (header X-Simulator-Faults).
+  bru.setEnvVar("simulatorFaults", simulatorFaultsValue(scenario.simulatorFaults) || null);
+  // #600: the travel class expected on each leg, in the order of the legs.
+  const _legClasses = require('./legClasses.js').normaliseLegClasses(scenario.legTravelClasses);
+  bru.setEnvVar("legTravelClasses", _legClasses ? JSON.stringify(_legClasses) : null);
+  // #766: the place selection flow the scenario exercises (null: none).
+  bru.setEnvVar("placeSelectionFlow", require('./placeSelection.js').flowOfScenario(scenario));
+  // #599: the expected product must NOT be offered (a group its rules exclude).
+  bru.setEnvVar("expectedProductAbsent", flagText(scenario.expectedProductAbsent));
+  // #780: the scenario tests its offer search criteria and ends after the offer.
+  bru.setEnvVar("offerSearchProbe", flagText(scenario.offerSearchProbe));
+  // #596: negative probe — the provider is expected to refuse this overrule code.
+  bru.setEnvVar("overruleCodeExpectRejection", flagText(scenario.overruleCodeExpectRejection));
+  bru.setEnvVar("refundDate", filledOrNull(scenario.refundDate));
+}
+
+function setOffersByTripIds(scenario, jsonData) {
+  // #602: offers asked for a trip of POST /trips-collection, by its id.
+  // Only a one-way journey from a SEARCH trip is asked this way.
+  let _byTripIds = flagOn(scenario.offersByTripIds);
+  if (_byTripIds) {
+    const _tr = (jsonData.tripRequirements || []).find((t) => t && t.id === scenario.tripRequirementId);
+    const _offset = returnOptsFromScenario(scenario).offsetDays;
+    if (_tr && _tr.tripType !== "SEARCH") {
+      validationLogger(`[WARNING] Scenario "${scenario.code}": offers by trip id need a SEARCH trip (origin, destination, time); this one is ${_tr.tripType}. The offers are asked by the trip as it is.`);
+      _byTripIds = false;
+    } else if (_offset !== undefined && _offset !== null && _offset !== "") {
+      validationLogger(`[WARNING] Scenario "${scenario.code}": offers by trip id are asked for a one-way journey only; this scenario is a return. The offers are asked by search criteria.`);
+      _byTripIds = false;
+    }
+  }
+  bru.setEnvVar("offersByTripIds", _byTripIds ? "true" : "false");
+}
+
+// The probes of a sale that expect a refusal, with the values they go by, and
+// two checks of the flow: the wait for the refund receipt and the request
+// sent again with its Idempotency-Key.
+function setRefusalProbes(scenario) {
+  // #603: how long to wait for the refund receipt after a refund, 1 to 60 minutes.
+  const _receiptWait = Number.parseInt(scenario.refundReceiptMaxWaitMinutes, 10);
+  bru.setEnvVar("refundReceiptMaxWaitMinutes", _receiptWait >= 1 && _receiptWait <= 60 ? String(_receiptWait) : null);
+  // #604: send the booking and the confirmation again with the same Idempotency-Key.
+  bru.setEnvVar("idempotencyCheck", flagText(scenario.idempotencyCheck));
+  // #602: negative probe — offers asked for a trip id the provider never gave.
+  bru.setEnvVar("tripIdsExpectRejection", flagText(scenario.tripIdsExpectRejection));
+  // #699: negative probe — one passenger over the provider's maximum.
+  bru.setEnvVar("passengerLimitExpectRejection", flagText(scenario.passengerLimitExpectRejection));
+  // #703: negative probe — an offer request with no passenger.
+  bru.setEnvVar("emptyPassengersExpectRejection", flagText(scenario.emptyPassengersExpectRejection));
+  // #1266: the lost card a CARD_LOST replacement names at booking, and the
+  // probe that expects an unknown one refused.
+  const _lostCard = require("./lostItems.js").lostCardOf(scenario.lostCard);
+  bru.setEnvVar("__lostCard", _lostCard ? JSON.stringify(_lostCard) : null);
+  bru.setEnvVar("lostCardExpectRejection", flagText(scenario.lostCardExpectRejection));
+  // #1266: the probe of a NUTS code the provider does not know.
+  bru.setEnvVar("nutsCodeExpectRejection", flagText(scenario.nutsCodeExpectRejection));
+  // #704: a departure date of the scenario's own, and the probe that
+  // expects it refused (past, or beyond the sales horizon).
+  bru.setEnvVar("departureDaysFromToday", Number.isInteger(scenario.departureDaysFromToday) ? String(scenario.departureDaysFromToday) : null);
+  bru.setEnvVar("departureExpectRejection", flagText(scenario.departureExpectRejection));
+  // #781: the currency the offers are in when none is asked, and the probe
+  // asking for one the provider does not sell.
+  bru.setEnvVar("expectedCurrency", typeof scenario.expectedCurrency === "string" && /^[A-Z]{3}$/.test(scenario.expectedCurrency) ? scenario.expectedCurrency : null);
+  bru.setEnvVar("currencyExpectRejection", flagText(scenario.currencyExpectRejection));
+  // #780 PR C: the probe asking for an offer search option value the framework leaves out.
+  bru.setEnvVar("offerOptionExpectRejection", flagText(scenario.offerOptionExpectRejection));
+}
+
+function setOfferOptionDiscovery(scenario) {
+  // #227: which optional parameters of the offer request the provider supports.
+  bru.setEnvVar("offerOptionDiscovery", flagText(scenario.offerOptionDiscovery));
+  const _optionBudget = Number.parseInt(scenario.offerOptionMaxRequests, 10);
+  bru.setEnvVar("offerOptionMaxRequests", Number.isFinite(_optionBudget) ? String(_optionBudget) : null);
+  bru.setEnvVar("offerOptionValues", scenario.offerOptionValues && typeof scenario.offerOptionValues === "object" && !Array.isArray(scenario.offerOptionValues) ? JSON.stringify(scenario.offerOptionValues) : null);
+  bru.setEnvVar("offerOptionInvalidValues", scenario.offerOptionInvalidValues === "skip" ? "skip" : "random");
+  const _optionSeed = Number.parseInt(scenario.offerOptionSeed, 10);
+  bru.setEnvVar("offerOptionSeed", Number.isFinite(_optionSeed) ? String(_optionSeed >>> 0) : null);
+  // #227 part 2: which options the Test Framework says the provider supports (the run's copy).
+  bru.setEnvVar("offerOptionDeclared", declaredOptionsOf(scenario));
+}
+
+function setAfterSaleProbes(scenario) {
+  // #700: after-sale requests that must be refused.
+  bru.setEnvVar("refundAgainProbe", flagText(scenario.refundAgainProbe));
+  bru.setEnvVar("exchangeRefundedProbe", flagText(scenario.exchangeRefundedProbe));
+  bru.setEnvVar("confirmAgainProbe", flagText(scenario.confirmAgainProbe));
+}
+
+// ── Partial refund (issue #218) ─────────────────────────────────────
+// Two orthogonal scope axes: by leg (subset of admissions/reservations)
+// and by passenger (subset of pax). The wizard blocks save in the
+// OBVIOUSLY-impossible cases (per-pax with only 1 passenger; per-leg
+// with a SPECIFICATION trip that's already single-leg); the SEARCH-mode
+// per-leg case is validated at offer-runtime in 10. POST Refund Offers'
+// before-request and degrades to full refund with a [WARNING].
+function setPartialRefund(scenario, jsonData) {
+  const _prByLeg = flagOn(scenario.partialRefundByLeg);
+  const _prByPax = flagOn(scenario.partialRefundByPax);
+  bru.setEnvVar("partialRefundByLeg", _prByLeg ? "true" : "false");
+  bru.setEnvVar("partialRefundByPax", _prByPax ? "true" : "false");
+  const _legDefault = _prByLeg ? "first" : "";  // default to first when armed
+  const _paxDefault = _prByPax ? "first" : "";
+  bru.setEnvVar("partialRefundLegSelection", wordOr(scenario.partialRefundLegSelection, _legDefault));
+  bru.setEnvVar("partialRefundPaxSelection", wordOr(scenario.partialRefundPaxSelection, _paxDefault));
+  // #595: the refund of one whole fulfillment (first, last, outbound,
+  // inbound), for providers that refund per fulfillment only.
+  const _prByFf = flagOn(scenario.partialRefundByFulfillment);
+  bru.setEnvVar("partialRefundByFulfillment", _prByFf ? "true" : "false");
+  const _prFfDefault = _prByFf ? "first" : "";
+  bru.setEnvVar("partialRefundFulfillmentSelection", wordOr(scenario.partialRefundFulfillmentSelection, _prFfDefault));
+
+  // Setup-time consistency checks. The wizard does these proactively too;
+  // re-check here so a hand-edited data file can't bypass the wizard.
+  if (_prByPax) checkPartialRefundByPax(scenario, jsonData);
+  if (_prByLeg) checkPartialRefundByLeg(scenario, jsonData);
+}
+
+// Per-pax requires >=2 passengers in the resolved passenger list.
+function checkPartialRefundByPax(scenario, jsonData) {
+  // Log-audit round 2: the root property in the data file is
+  // `passengersList` (an ARRAY of lists — the schema's required root
+  // field), not `passengersLists`. The old plural lookup was always
+  // undefined, so _paxCount was 0 for EVERY per-pax scenario and this
+  // warning fired even with 3 passengers correctly linked (list #62
+  // false-positive, 2026-06-10). Keep the plural as a fallback for
+  // hand-edited files, and compare ids loosely ("62" vs 62) since
+  // hand-edited files are exactly what this re-check exists for.
+  const _plRoot = jsonData.passengersList || jsonData.passengersLists;
+  const _passengersList = Array.isArray(_plRoot)
+    ? _plRoot.find((pl) => pl && String(pl.id) === String(scenario.passengersListId))
+    : undefined;
+  const _paxCount = Array.isArray(_passengersList?.passengers)
+    ? _passengersList.passengers.length : 0;
+  if (_paxCount < 2) {
+    const _listState = _passengersList ? `has only ${_paxCount} passenger(s)` : `was not found in the data file's passengersList[]`;
+    validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByPax is on but passengersList #${scenario.passengersListId} ${_listState} — per-pax partial refund cannot fire. ${_passengersList ? 'Add a passenger or turn partialRefundByPax off.' : 'Check the scenario’s passengersListId linkage in Test Config.'}`);
+  }
+}
+
+// Per-leg with SPECIFICATION trip can be statically validated.
+// (SEARCH mode is checked at offer time in 10.yml.)
+function checkPartialRefundByLeg(scenario, jsonData) {
+  const _tripReq = jsonData.tripRequirements?.find(
+    (tr) => tr && tr.id === scenario.tripRequirementId);
+  if (_tripReq?.tripType === "SPECIFICATION") {
+    const _legCount = Array.isArray(_tripReq.legs) ? _tripReq.legs.length : 0;
+    if (_legCount < 2) {
+      validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundByLeg is on but the SPECIFICATION trip has ${_legCount} leg(s) — per-leg partial refund cannot fire. Either turn partialRefundByLeg off, or use a multi-leg trip.`);
+    }
+    const _hasReturn = !!(_tripReq.returnSearchParameters || _tripReq.tripType === "RETURN");
+    const _legSel = String(scenario.partialRefundLegSelection || "first");
+    if ((_legSel === "outbound" || _legSel === "inbound") && !_hasReturn) {
+      validationLogger(`[WARNING] Scenario "${scenario.code}": partialRefundLegSelection='${_legSel}' is only valid for return-trips; this trip is one-way. OSCAR will fall back to 'first'.`);
+      bru.setEnvVar("partialRefundLegSelection", "first");
+    }
+  }
+}
+
+function setBookingFlowActions(scenario) {
+  // Optional intermediate booking-flow actions. The scenario may carry a
+  // `salesFlowActions` map { patchPassengers, placeSelection, addAncillary,
+  // getBooking, deleteAncillary } indicating which steps to exercise
+  // between POST /bookings and POST /fulfillments. Resolution + defaults are
+  // centralised in resolveSalesFlowActions() (issue #107): the optional
+  // features default OFF, patchPassengers/getBooking default ON. Each flag
+  // is exported as `salesFlow_<key>` = "true"/"false" so individual .bru
+  // files can branch on it with a simple getEnvVar.
+  const _salesActions = resolveSalesFlowActions(scenario.salesFlowActions);
+  Object.keys(_salesActions).forEach(function (k) {
+    bru.setEnvVar("salesFlow_" + k, _salesActions[k] ? "true" : "false");
+  });
+  validationLogger("[INFO] 🛒 Sales-flow actions: " +
+    Object.keys(_salesActions).map(function (k) {
+      return k + "=" + bru.getEnvVar("salesFlow_" + k);
+    }).join(", "));
+
+  // Place-selection mode (issue #107): SEATMAP_AT_OFFER (seat map → booking)
+  // or ADD_TO_BOOKING (reservation added to an existing booking). Chosen per
+  // scenario from the framework-authorised set; null when not applicable.
+  bru.setEnvVar("placeSelectionMode", filledOrNull(scenario.placeSelectionMode));
+
+  // #1117: the run filter skips 01/02 GET Coach (the coach layouts, read
+  // after this, at the scenario's start) where the framework declares no
+  // seat map.
+  bru.setEnvVar("__coachLayoutsSkip", coachLayoutsSkipped(scenario) ? "true" : "false");
+}
+
+// ── Expired-flow auto-expansion: build the per-scenario queue (PR B) ──
+// When 2+ expired-X timers are armed on this scenario, OSCAR runs the
+// scenario N times — one pass per armed timer. The queue builder reads
+// the timer flags + the gating env vars set above (scenarioType,
+// salesFlow_*, placeSelectionMode) so we MUST call it after those are
+// resolved. Single-timer scenarios behave identically to today — the
+// queue has length 1 and the existing after-response short-circuit
+// routes straight to the next scenario.
+function armExpiredFlowQueue() {
+  try {
+    // Log-audit round 2: sibling-relative require. This file lives IN
+    // library-bruno/, so the YML-style library_base prefix
+    // ("./library-bruno/") double-nested to
+    // library-bruno/library-bruno/expiredFlow.js and FAILED ON EVERY RUN
+    // ("Cannot find module ..."), emitting a confusing [WARNING] even
+    // with zero timers armed — and silently disabling the multi-timer
+    // auto-expansion for scenarios that DID arm 2+ timers. Same sibling
+    // pattern as loopback.js → envUtils.js; reportGenerator.js documents
+    // the identical trap.
+    const { buildAndArmExpiredFlowQueue } = require("./expiredFlow.js");
+    buildAndArmExpiredFlowQueue();
+    // With 0 timers armed the builder is silent (empty queue, no log) —
+    // so this block emits nothing on ordinary scenarios.
+  } catch (_e) {
+    // With the path fixed, a throw here is a genuine feature failure:
+    // armed expiry timers would not run their extra passes.
+    validationLogger(`[ERROR] expiredFlow queue build failed: ${_e?.message} — armed expiry-timer tests will NOT run their extra passes this scenario.`);
+  }
+}
+
+// Trip requirements — verify the scenario's reference resolves BEFORE
+// walking the list. #328 (v1.11.109): when a new user authors a
+// datafile in the wizard and the scenario's tripRequirementId doesn't
+// match any tripRequirements[].id, every downstream variable
+// (offerTripSearchCriteria, offerTripSpecifications, leg*StopPlaceRef,
+// …) stays unset and the user only sees the downstream symptom:
+// "Required scenario variable 'offerTripSearchCriteria' is empty or
+// not set." That message points at data_base but doesn't tell them
+// the cause is the unresolved tripRequirementId. Emit a precise
+// ERROR up front so the next reader sees the linkage gap directly.
+function reportUnknownTrip(scenario, jsonData) {
+  const _tripList    = Array.isArray(jsonData.tripRequirements) ? jsonData.tripRequirements : [];
+  const _tripWantId  = scenario.tripRequirementId;
+  const _tripFound   = _tripList.some(function (tr) { return tr && tr.id === _tripWantId; });
+  if (!_tripFound) {
+    const _availIds = _tripList.map(function (tr) { return tr?.id; }).filter(function (id) { return id != null; });
+    validationLogger(
+      '[ERROR] Scenario "' + scenario.code + '" references tripRequirementId=' +
+      JSON.stringify(_tripWantId) + ' but no matching entry exists in datafile.tripRequirements[]. ' +
+      'Available ids: [' + _availIds.join(', ') + ']. ' +
+      'Fix in the wizard: open the Test Data → Trip Requirements section, ' +
+      'confirm at least one entry exists and that the scenario\'s tripRequirementId points at one of them. ' +
+      'When tripRequirementId is unresolved, every downstream variable ' +
+      '(offerTripSearchCriteria, offerTripSpecifications, leg*StopPlaceRef, …) stays unset and the request body cannot be built.'
+    );
+  }
+}
+
+// The trip the scenario sells: the trip requirement it names, into the
+// variables of the offer request.
+function setSaleTrip(scenario, jsonData, nextWeekdayString) {
+  reportUnknownTrip(scenario, jsonData);
+  jsonData.tripRequirements?.some(function (tripRequirement) {
+    if (tripRequirement.id === scenario.tripRequirementId) {
+      loadSaleTrip(tripRequirement, scenario, nextWeekdayString);
+      return true;
+    }
+  });
+}
+
+function loadSaleTrip(tripRequirement, scenario, nextWeekdayString) {
+  bru.setEnvVar("TripType", tripRequirement.tripType);
+
+  // #330 (v1.11.110): the SEARCH branch reads tripRequirement.trip.*
+  // and the SPECIFICATION branch reads tripRequirement.legs[*].* —
+  // without these the silent failure mode is that osdmTripSearchCriteria
+  // / osdmTripSpecification never get called and the downstream symptom
+  // is "Required scenario variable offerTripSearchCriteria is empty".
+  // Validate the shape BEFORE entering the branch so the user sees the
+  // precise data-shape gap instead of the downstream consequence.
+  // [DEBUG] dump of the actual structure is included for deeper
+  // investigation but stays invisible at default INFO logging level.
+  const _trCtx = 'tripRequirement #' + JSON.stringify(tripRequirement.id);
+  // The downstream parseEnvJson error will name the same problem.
+  if (tripLacksItsData(tripRequirement, scenario, _trCtx)) return;
+
+  // #330: wrap the switch so any unexpected throw inside the SEARCH /
+  // SPECIFICATION branches (e.g. subTripDate refusing the format, a
+  // deeper malformed sub-field the validators above didn't catch)
+  // surfaces with the tripRequirement context rather than propagating
+  // as an opaque "Cannot read property X of undefined" or
+  // "Invalid date format".
+  try {
+    buildSaleTrip(tripRequirement, scenario, nextWeekdayString);
+  } catch (_branchErr) {
+    // #330 (v1.11.110): name the context so the user sees which
+    // tripRequirement and which branch failed instead of a bare
+    // "Cannot read property X of undefined" propagating up.
+    validationLogger(
+      '[ERROR] Scenario "' + scenario.code + '": building TripType=' +
+      tripRequirement.tripType + ' criteria for ' + _trCtx +
+      ' threw: ' + (_branchErr?.message ? _branchErr.message : String(_branchErr)) +
+      '. offerTripSearchCriteria / offerTripSpecifications stays unset and the request body cannot be built. ' +
+      'Fix in the wizard: open Test Data → Trip Requirements, open this entry and verify the trip data is complete and dates parse correctly.'
+    );
+    validationLogger('[DEBUG] ' + _trCtx + ' dump = ' + JSON.stringify(tripRequirement));
+    // Don't rethrow — the downstream parseEnvJson error (with the
+    // v1.11.109 hint) is the actionable signal the user follows. We
+    // just want the named [ERROR] above to appear FIRST so the report
+    // surfaces the root cause before the consequence.
+  }
+}
+
+// Whether the trip requirement lacks what its type needs to be built. When it
+// does, the gap is logged.
+function tripLacksItsData(tripRequirement, scenario, _trCtx) {
+  if (tripRequirement.tripType === "SEARCH") return searchTripLacksData(tripRequirement, scenario, _trCtx);
+  if (tripRequirement.tripType === "NON_TRIP") return nonTripLacksData(tripRequirement, scenario, _trCtx);
+  if (tripRequirement.tripType === "SPECIFICATION") return specificationTripLacksData(tripRequirement, scenario, _trCtx);
+  return false;
+}
+
+function searchTripLacksData(tripRequirement, scenario, _trCtx) {
+  const _missing = [];
+  if (!tripRequirement.trip || typeof tripRequirement.trip !== 'object') {
+    _missing.push('trip (sub-object missing)');
+  } else {
+    if (!tripRequirement.trip.origin)        _missing.push('trip.origin');
+    if (!tripRequirement.trip.destination)   _missing.push('trip.destination');
+    if (!tripRequirement.trip.startDatetime) _missing.push('trip.startDatetime');
+  }
+  if (_missing.length > 0) {
+    validationLogger(
+      '[ERROR] Scenario "' + scenario.code + '": ' + _trCtx +
+      ' has tripType=SEARCH but the .trip sub-object is missing required field(s): [' +
+      _missing.join(', ') + ']. The SEARCH branch needs origin / destination / startDatetime to build a TripSearchCriteria; offerTripSearchCriteria stays unset and the request body cannot be built. ' +
+      'Fix in the wizard: open Test Data → Trip Requirements, open this entry and complete the SEARCH trip\'s origin, destination, and start datetime.'
+    );
+    validationLogger('[DEBUG] ' + _trCtx + '.trip dump = ' + JSON.stringify(tripRequirement.trip));
+    return true;
+  }
+  return false;
+}
+
+function nonTripLacksData(tripRequirement, scenario, _trCtx) {
+  // #1258: offers without a trip, by stop places or zones.
+  const _nonTrip = require("./nonTrip.js").nonTripRequirementOf(tripRequirement);
+  if (_nonTrip.problem) {
+    validationLogger(
+      '[ERROR] Scenario "' + scenario.code + '": ' + _trCtx + ' ' + _nonTrip.problem + '. ' +
+      'Fix in the wizard: open Test Data → Trip Requirements, open this entry and name the stop places (or a name to look them up) or the zones.'
+    );
+    validationLogger('[DEBUG] ' + _trCtx + ' dump = ' + JSON.stringify(tripRequirement));
+    return true;
+  }
+  return false;
+}
+
+function specificationTripLacksData(tripRequirement, scenario, _trCtx) {
+  if (!Array.isArray(tripRequirement.legs) || tripRequirement.legs.length === 0) {
+    validationLogger(
+      '[ERROR] Scenario "' + scenario.code + '": ' + _trCtx +
+      ' has tripType=SPECIFICATION but .legs[] is empty or missing. The SPECIFICATION branch needs at least one leg with origin / destination / startDatetime / endDatetime to build a TripSpecification; offerTripSpecifications stays unset and the request body cannot be built. ' +
+      'Fix in the wizard: open Test Data → Trip Requirements, open this entry and add at least one leg.'
+    );
+    validationLogger('[DEBUG] ' + _trCtx + ' dump = ' + JSON.stringify(tripRequirement));
+    return true;
+  }
+  const _badLegs = [];
+  tripRequirement.legs.forEach(function (leg, i) {
+    const _m = [];
+    if (!leg || typeof leg !== 'object') { _badLegs.push({ index: i, missing: ['leg (not an object)'] }); return; }
+    if (!leg.origin)        _m.push('origin');
+    if (!leg.destination)   _m.push('destination');
+    if (!leg.startDatetime) _m.push('startDatetime');
+    if (!leg.endDatetime)   _m.push('endDatetime');
+    if (_m.length > 0) _badLegs.push({ index: i, missing: _m });
+  });
+  if (_badLegs.length > 0) {
+    const _summary = _badLegs.map(function (b) { return 'legs[' + b.index + '] missing [' + b.missing.join(', ') + ']'; }).join('; ');
+    validationLogger(
+      '[ERROR] Scenario "' + scenario.code + '": ' + _trCtx +
+      ' has tripType=SPECIFICATION but ' + _badLegs.length + ' leg(s) are incomplete: ' + _summary + '. ' +
+      'Fix in the wizard: open Test Data → Trip Requirements, open this entry and complete each leg\'s origin / destination / start+end datetimes.'
+    );
+    validationLogger('[DEBUG] ' + _trCtx + '.legs dump = ' + JSON.stringify(tripRequirement.legs));
+    return true;
+  }
+  return false;
+}
+
+function buildSaleTrip(tripRequirement, scenario, nextWeekdayString) {
+  switch (tripRequirement.tripType) {
+    case "SPECIFICATION": {
+      validationLogger('[INFO] ⏳ processing a specification');
+      // #363: per-trip departure day (Auto when unset).
+      const _specTripDate = tripDateFor(scenario, nextWeekdayString, tripRequirement);
+      // #705: the day ages are counted on.
+      bru.setEnvVar("__travelDay", _specTripDate);
+      specificationTrip(tripRequirement, _specTripDate, scenario, saleEnv);
+      break;
+    }
+
+    case "NON_TRIP": {
+      validationLogger('[INFO] ⏳ processing a non-trip request');
+      const _nonTripDate = tripDateFor(scenario, nextWeekdayString, tripRequirement);
+      bru.setEnvVar("__travelDay", _nonTripDate);
+      nonTripRequest(tripRequirement, _nonTripDate);
+      break;
+    }
+
+    case "SEARCH": {
+      validationLogger('[INFO] ⏳ processing a search');
+      // #363: per-trip departure day (Auto when unset).
+      const _searchTripDate = tripDateFor(scenario, nextWeekdayString, tripRequirement);
+      // #705: the day ages are counted on.
+      bru.setEnvVar("__travelDay", _searchTripDate);
+      searchTrip(tripRequirement, _searchTripDate, scenario, saleEnv);
+      break;
+    }
+  }
+}
+
+// Purchaser details
+function setPurchaser(jsonData) {
+  jsonData.purchaserList?.some(function (purchaserList) {
+    validationLogger('[INFO] Found number of purchaser: ' + purchaserList.purchaser.length);
+    const purchaserSpecs = [];
+    purchaserList.purchaser.forEach(function (purchaser) {
+      const osdmVersion = bru.getEnvVar("osdmVersion");
+      if (require("./personContact.js").usesContactDetail(osdmVersion)) {
+        purchaserSpecs.push(new PurchaserContact(
+          new DetailContact(
+            purchaser.purchaserFirstName,
+            purchaser.purchaserLastName,
+            new Contact(
+              purchaser.purchaserEmail,
+              purchaser.purchaserPhoneNumber
+            )
+          )
+        ));
+      } else {
+        purchaserSpecs.push(new Purchaser(
+          new Detail(
+            purchaser.purchaserFirstName,
+            purchaser.purchaserLastName,
+            purchaser.purchaserEmail,
+            purchaser.purchaserPhoneNumber
+          )
+        ));
+      }
+    });
+
+    validationLogger('[DEBUG] Pushed purchaserSpec to environment: ' + JSON.stringify(purchaserSpecs));
+    bru.setEnvVar("bookingPurchaserSpecifications", JSON.stringify(purchaserSpecs[0]));
+    return true;
+  });
+}
+
+// Passengers — same upfront check as tripRequirements above. #328
+// (v1.11.109): when scenario.passengersListId doesn't resolve, the
+// downstream symptom is a missing `offerPassengerSpecifications` env
+// var. Emit a precise [ERROR] naming the linkage gap.
+function reportUnknownPassengersList(scenario, jsonData) {
+  const _paxLists    = Array.isArray(jsonData.passengersList) ? jsonData.passengersList : [];
+  const _paxWantId   = scenario.passengersListId;
+  const _paxFound    = _paxLists.some(function (pl) { return pl && pl.id === _paxWantId; });
+  if (!_paxFound) {
+    const _availIds = _paxLists.map(function (pl) { return pl?.id; }).filter(function (id) { return id != null; });
+    validationLogger(
+      '[ERROR] Scenario "' + scenario.code + '" references passengersListId=' +
+      JSON.stringify(_paxWantId) + ' but no matching entry exists in datafile.passengersList[]. ' +
+      'Available ids: [' + _availIds.join(', ') + ']. ' +
+      'Fix in the wizard: open the Test Data → Passengers section, ' +
+      'confirm at least one entry exists and that the scenario\'s passengersListId points at one of them.'
+    );
+  }
+}
+
+// The passengers the scenario sells to: the passengers list it names, into
+// the variables of the offer, booking and passenger requests.
+function setPassengers(scenario, jsonData) {
+  reportUnknownPassengersList(scenario, jsonData);
+  jsonData.passengersList?.some(function (passengersList) {
+    if (passengersList.id === scenario.passengersListId) {
+      loadPassengers(passengersList, scenario);
+      return true;
+    }
+  });
+}
+
+function loadPassengers(passengersList, scenario) {
+  validationLogger('[INFO] Found number of passengers: ' + passengersList.passengers.length);
+  bru.setEnvVar("offerPassengerNumber", passengersList.passengers.length);
+  const offerPassengerSpecs = [];
+  const passengerSpecs = [];
+  const passengerReferences = [];
+  const passengerAdditionalData = [];
+  let passengerIndex = 0;
+
+  rewritePassengerReferences(passengersList, scenario);
+
+  passengersList.passengers.forEach(function (passenger) {
+    setBirthDateFromAge(passenger);
+    // #597: the passenger's reduction cards, sent with the offer and
+    // the booking requests. #1045: a transportable without a person's data.
+    const cards = cardsOfPassenger(passenger);
+    const specs = passengerSpecsOf(passenger, cards, bru.getEnvVar("osdmVersion"));
+    offerPassengerSpecs.push(specs.offer);
+    passengerSpecs.push(specs.booking);
+    passengerReferences.push(passenger.reference);
+
+    passengerAdditionalData.push(passengerDataToReadBack(passenger, scenario, passengerIndex));
+    passengerIndex++;
+
+    if (hasNoUpdate(passenger)) {
+      bru.setEnvVar("skipPatchPassengerRequest", "true");
+    }
+  });
+
+  validationLogger('[DEBUG] Pushed passengerSpec to environment: ' + JSON.stringify(passengerSpecs));
+  bru.setEnvVar("__expectedPassengerTypes", JSON.stringify(expectedTypesOf(passengersList.passengers)));
+  bru.setEnvVar("offerPassengerSpecifications", JSON.stringify(offerPassengerSpecs));
+  // #889: the reduction rate a card holder's card declares, checked at 01c.
+  bru.setEnvVar("__cardRates", JSON.stringify(ratesOfPassengers(passengersList.passengers)));
+  bru.setEnvVar("bookingPassengerSpecifications", JSON.stringify(passengerSpecs));
+  bru.setEnvVar("bookingPassengerReferences", JSON.stringify(passengerReferences));
+  bru.setEnvVar("passengerAdditionalData", JSON.stringify(passengerAdditionalData));
+
+  spreadPassengerData();
+}
+
+// ── Passenger external-ref format probe ────────────────────────────
+// NHF parameter: when scenario.passengerExternalRefFormat is set to
+// a printf-style pattern (e.g. "PAX%04d"), rewrite every passenger
+// reference in-place BEFORE the loop below uses it. The rewrite
+// propagates through every downstream env var (offerPassengerSpecs,
+// bookingPassengerSpecifications, bookingPassengerReferences,
+// updateFirstName_<i> etc.) because they all read passenger.reference.
+// Empty / missing pattern → no rewrite, default 00001-style is kept.
+//
+// Mutating the loaded data is safe: jsonData is parsed fresh from the
+// data file on each scenario load (see getScenarioData()), so the
+// rewrite doesn't leak across runs.
+function rewritePassengerReferences(passengersList, scenario) {
+  const _refFormatProbe = scenario.passengerExternalRefFormat;
+  if (_refFormatProbe && /%0?\d*d/.test(String(_refFormatProbe))) {
+    passengersList.passengers.forEach(function (p, i) {
+      p.reference = applyExternalRefFormat(_refFormatProbe, i + 1);
+    });
+    validationLogger('[INFO] 🪪 passengerExternalRefFormat probe armed (pattern: "' + _refFormatProbe + '") — refs rewritten to: ' + passengersList.passengers.map(function (p) { return p.reference; }).join(', '));
+  } else if (_refFormatProbe) {
+    validationLogger('[WARNING] passengerExternalRefFormat set ("' + _refFormatProbe + '") but missing a %d / %0Nd placeholder — probe ignored, default refs kept.');
+  }
+}
+
+function setBirthDateFromAge(passenger) {
+  // #705: an age on the day of travel gives the date of birth.
+  const _born = birthDateFor(passenger, bru.getEnvVar("__travelDay"));
+  if (_born) {
+    passenger.dateOfBirth = _born;
+    validationLogger('[INFO] 🎂 Passenger ' + passenger.reference + ': born ' + _born + ', ' + passenger.bornYearsBeforeTravel + ' years before the day of travel' + (passenger.bornDaysAfter ? ' plus ' + passenger.bornDaysAfter + ' day(s)' : '') + (passenger.expectedPassengerType ? '; expected to be priced as ' + passenger.expectedPassengerType : ''));
+  }
+}
+
+// What step 04 reads a passenger back against: the values the booking sent,
+// or those step 03 updates them to.
+function passengerDataToReadBack(passenger, scenario, passengerIndex) {
+  const passengerDataStruct = {
+    updateFirstName: passenger.firstName,
+    updateLastName: passenger.lastName,
+    updateDateOfBirth: passenger.dateOfBirth,
+    updateEmail: passenger.email,
+    updatePhoneNumber: passenger.phoneNumber,
+    updateGender: passenger.gender ?? "X",
+  };
+
+  const passengerAdditionalDataStruct = {
+    updateFirstName: passenger.updateFirstName ?? passengerDataStruct.updateFirstName,
+    updateLastName: passenger.updateLastName ?? passengerDataStruct.updateLastName,
+    updateDateOfBirth: passenger.updateDateOfBirth ?? passengerDataStruct.updateDateOfBirth,
+    updateEmail: passenger.updateEmail ?? passengerDataStruct.updateEmail,
+    updatePhoneNumber: passenger.updatePhoneNumber ?? passengerDataStruct.updatePhoneNumber,
+    updateGender: passenger.updateGender ?? passengerDataStruct.updateGender,
+  };
+
+  // A passenger step 03 does not update is read back at step 04
+  // against the values the booking sent: every passenger when the
+  // scenario turns the PATCH off, the others than the first when
+  // only the main passenger is updated.
+  const _updated = resolveSalesFlowActions(scenario.salesFlowActions).patchPassengers
+    && (passengerUpdateScope(scenario) === "ALL" || passengerIndex === 0);
+  return _updated ? passengerAdditionalDataStruct : passengerDataStruct;
+}
+
+// A passenger the scenario gives no value to update.
+function hasNoUpdate(passenger) {
+  return (
+    passenger.updateFirstName == null &&
+    passenger.updateLastName == null &&
+    passenger.updateDateOfBirth == null &&
+    passenger.updateEmail == null &&
+    passenger.updatePhoneNumber == null &&
+    passenger.updateGender == null
+  );
+}
+
+// Each passenger's values to read back, as variables of their own
+// (updateFirstName_0, updateLastName_0, …).
+function spreadPassengerData() {
+  let passengerData = bru.getEnvVar("passengerAdditionalData");
+  passengerData = typeof passengerData === 'string' ? JSON.parse(passengerData) : passengerData;
+  passengerData.forEach((data, index) => {
+    Object.entries(data).forEach(([key, value]) => {
+      bru.setEnvVar(`${key}_${index}`, value);
+    });
+  });
+}
+
+// Offer search criteria
+// Priority: inline offerSearchCriteria > offerSearchCriteriaListId reference > legacy defaults
+function offerCriteriaOf(scenario, jsonData) {
+  let criteria = scenario.offerSearchCriteria || null;
+
+  // Resolve offerSearchCriteriaListId reference when no inline criteria
+  if (!criteria && scenario.offerSearchCriteriaListId != null && Array.isArray(jsonData.offerSearchCriteriaList)) {
+    const listEntry = jsonData.offerSearchCriteriaList.find(e => e.id === scenario.offerSearchCriteriaListId);
+    if (listEntry && Array.isArray(listEntry.offerSearchCriteria) && listEntry.offerSearchCriteria.length > 0) {
+      criteria = listEntry.offerSearchCriteria[0];
+      validationLogger(`[INFO] offerSearchCriteria resolved from offerSearchCriteriaListId=${scenario.offerSearchCriteriaListId}`);
+    }
+  }
+  return criteria;
+}
+
+function setOfferSearchCriteria(scenario, jsonData) {
+  const criteria = offerCriteriaOf(scenario, jsonData);
+
+  // #600: a class per leg asks for every class it names.
+  const _perLeg = require('./legClasses.js').normaliseLegClasses(scenario.legTravelClasses);
+  if (criteria && typeof criteria === 'object') {
+    osdmOfferSearchCriteria(
+      criteria.currency || null,
+      criteria.offerMode || null,
+      criteria.requestedOfferParts || null,
+      criteria.flexibilities || null,
+      criteria.serviceClass || null,
+      _perLeg ? require('./legClasses.js').requestedClasses(_perLeg) : (criteria.travelClass || null),
+      criteria.productTags || null,
+      criteria.productSelections || null
+    );
+  } else {
+    // Legacy scenario without any offerSearchCriteria — use safe defaults
+    validationLogger(`[WARN] No offerSearchCriteria on scenario '${scenario.code}' — using defaults.`);
+    osdmOfferSearchCriteria('EUR', 'INDIVIDUAL', ['ADMISSION', 'RESERVATION'],
+      null, null, null, null, null);
+  }
+}
+
+// Requested fulfillment options — same upfront check. #328
+// (v1.11.109): unresolved requestedFulfillmentOptionsListId leaves
+// `offerFulfillmentOptions` unset; the request goes out without a
+// requestedFulfillmentOptions[] array.
+function setFulfillmentOptions(scenario, jsonData) {
+  if (Array.isArray(jsonData.requestedFulfillmentOptionsList) && jsonData.requestedFulfillmentOptionsList.length > 0) {
+    const _ffLists   = jsonData.requestedFulfillmentOptionsList;
+    const _ffWantId  = scenario.requestedFulfillmentOptionsListId;
+    const _ffFound   = _ffLists.some(function (ff) { return ff && ff.id === _ffWantId; });
+    if (!_ffFound) {
+      const _availIds = _ffLists.map(function (ff) { return ff?.id; }).filter(function (id) { return id != null; });
+      validationLogger(
+        '[ERROR] Scenario "' + scenario.code + '" references requestedFulfillmentOptionsListId=' +
+        JSON.stringify(_ffWantId) + ' but no matching entry exists in datafile.requestedFulfillmentOptionsList[]. ' +
+        'Available ids: [' + _availIds.join(', ') + ']. ' +
+        'Fix in the wizard: open the Test Data → Requested Fulfillment Options section ' +
+        'and link this scenario to a defined entry.'
+      );
+    }
+    jsonData.requestedFulfillmentOptionsList.some(function (requestedFulfillmentOptionList) {
+      if (requestedFulfillmentOptionList.id === scenario.requestedFulfillmentOptionsListId) {
+        const requestedFulfillmentOptions = [];
+        requestedFulfillmentOptionList.requestedFulfillmentOptions.forEach(function (requestedFulfillmentOption) {
+          const fulfillmentType = requestedFulfillmentOption.fulfillmentType ?? null;
+          const fulfillmentMedia = requestedFulfillmentOption.fulfillmentMedia ?? null;
+          if (fulfillmentType != null && fulfillmentMedia != null) {
+            requestedFulfillmentOptions.push(new FulfillmentOption(fulfillmentType, fulfillmentMedia));
+          }
+        });
+
+        osdmFulfillmentOptions(requestedFulfillmentOptions);
+        return true;
+      }
+    });
+  } else {
+    validationLogger("[INFO] requestedFulfillmentOptionsList is empty");
   }
 }
 

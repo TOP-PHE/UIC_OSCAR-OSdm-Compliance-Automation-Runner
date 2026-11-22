@@ -4,6 +4,17 @@
   "current_release": "2026.610",
   "releases": [
     {
+      "release": "2026.611",
+      "date": "2026-11-22",
+      "server": "1.11.571",
+      "collection": "OTST_V2.0.269",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Collection OTST_V2.0.269 (#1388): parseScenarioData() of scenarioParser.js, through which every run loads its scenario, is split by stage into 50 functions (which scenario to run, the scenario's own settings, the trip, the purchaser, the passengers, the offer search criteria, the fulfilment options). Behaviour unchanged: what the function reads, sets, removes, logs and returns is the same in 42,390 cases compared before and after (every scenario of every data file of the collection, the ways of choosing a scenario, drawn variants), and the simulator replay of the 212 gamma scenarios and 25 of the other versions gives the same recording. Not released on its own: current_release is not moved. Server unchanged."
+      ]
+    },
+    {
       "release": "2026.610",
       "date": "2026-11-22",
       "server": "1.11.571",
