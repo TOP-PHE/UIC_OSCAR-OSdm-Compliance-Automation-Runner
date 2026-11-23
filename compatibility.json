@@ -4,6 +4,17 @@
   "current_release": "2026.610",
   "releases": [
     {
+      "release": "2026.613",
+      "date": "2026-11-22",
+      "server": "1.11.573",
+      "collection": "OTST_V2.0.269",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.573 (#1396): the click delegate of Test Config (public/js/scenarios.js), one function of 499 lines of code and 93 paths around a switch of 95 actions, is a table of actions (CLICK_ACTIONS) and 19 functions, one per action that does more than call another; the delegate itself is 12 lines. Behaviour unchanged: the old and the new delegate leave the same trace on 50,000 clicks drawn over every action (the calls made and their arguments, what is read and written on the page's elements, the data at the end). Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.612",
       "date": "2026-11-22",
       "server": "1.11.572",

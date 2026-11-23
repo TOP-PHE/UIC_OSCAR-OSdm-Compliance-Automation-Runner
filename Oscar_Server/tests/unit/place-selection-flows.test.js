@@ -249,7 +249,7 @@ describe('#766 — the Test Framework page', () => {
     const html = panel({ placeSelectionFlows: ['MANUAL_PLACE_SELECTION_WITH_FEE'] });
     expect((html.match(/class="pill selected"/g) || []).length).toBe(1);
     expect(html).toContain('data-action="fw-place-selection-flow" data-val="MANUAL_PLACE_SELECTION_WITH_FEE"');
-    expect(page).toContain("case 'fw-place-selection-flow':");
+    expect(page).toContain("\n  'fw-place-selection-flow': (el) => { fwTogglePlaceSelectionFlow(el, el.dataset.val); saveFrameworkDebounced(); },\n");
     expect(page).toContain('${placeSelectionFlowsPanelHtml(fw)}');
   });
 });
