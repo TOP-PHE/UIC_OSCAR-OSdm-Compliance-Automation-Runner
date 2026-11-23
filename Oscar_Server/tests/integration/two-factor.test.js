@@ -99,6 +99,7 @@ describe('an administrator without a second factor', () => {
     expect(setup.body.secret).toMatch(/^[A-Z2-7]{32}$/);
     expect(setup.body.otpauth_uri).toContain(`secret=${setup.body.secret}`);
     expect(setup.body.otpauth_uri).toContain(encodeURIComponent(admin.email));
+    expect(setup.body.otpauth_uri).toContain(`issuer=${encodeURIComponent(T.issuerFor(process.env.APP_URL))}&`);
     expect(setup.body.qr).toMatch(/^data:image\/svg\+xml;base64,/);
     // Kept pending and encrypted, not on yet.
     const pending = row(admin.id);
@@ -120,6 +121,23 @@ describe('an administrator without a second factor', () => {
     expect(on.mfa_secret_enc).not.toContain(setup.body.secret);
     expect(events(admin.id, 'mfa_enabled')).toBe(1);
     expect((await meMfa(done.body.token)).body).toMatchObject({ enabled: true, required: true });
+  });
+
+  test('the authenticator entry names the server of APP_URL (#1418)', async () => {
+    const saved = process.env.APP_URL;
+    process.env.APP_URL = 'https://oscartest.example.org/';
+    try {
+      const admin = addUser('administrator');
+      const { body: { mfa_token } } = await signIn(admin);
+      const setup = await request(app).post('/v1/auth/mfa/setup').send({ mfa_token });
+      expect(setup.status).toBe(200);
+      const uri = new URL(setup.body.otpauth_uri);
+      expect(uri.searchParams.get('issuer')).toBe('OSCAR (oscartest.example.org)');
+      expect(decodeURIComponent(uri.pathname.slice(1))).toBe(`OSCAR (oscartest.example.org):${admin.email}`);
+    } finally {
+      if (saved === undefined) delete process.env.APP_URL;
+      else process.env.APP_URL = saved;
+    }
   });
 
   test('an administrator cannot turn the factor off; another administrator resets it', async () => {

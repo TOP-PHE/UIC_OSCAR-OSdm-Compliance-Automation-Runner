@@ -150,11 +150,12 @@ function checkCode(userId, code, nowMs = Date.now()) {
  * Starts setting up a factor: a new secret kept pending (encrypted) until a
  * first code proves the app holds it. Answers { secret, otpauth_uri, qr },
  * the QR code as an SVG data: URL; the only time the secret is answered.
+ * The app's entry names this server (`issuerFor()`, #1418).
  */
 function startSetup(row) {
   const secret = T.base32Encode(T.newSecret());
   run('UPDATE users SET mfa_pending_enc = ? WHERE id = ?', [encrypt(secret), row.id]);
-  const uri = T.otpauthUri(secret, row.email);
+  const uri = T.otpauthUri(secret, row.email, T.issuerFor(process.env.APP_URL));
   return { secret, otpauth_uri: uri, qr: qrDataUrl(uri) };
 }
 

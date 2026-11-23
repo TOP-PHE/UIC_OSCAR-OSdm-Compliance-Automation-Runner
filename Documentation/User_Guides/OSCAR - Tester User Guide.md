@@ -369,7 +369,9 @@ account.
 - **Turn it on:** click your e-mail at the right of the menu bar (*My
   account*), type your password, scan the QR code with the app (or type the
   key shown under it), then type the first code the app shows. Your other
-  sessions are signed out.
+  sessions are signed out. The app names the entry after the server, for
+  example *OSCAR (oscar.uic.org)*, so that a test server's entry is not
+  taken for it.
 - **Sign in:** your password, then the code the app shows at that moment.
 - **Turn it off:** on *My account*, your password and a code.
 - **Lost your phone:** ask an OSCAR administrator to reset it; you then sign

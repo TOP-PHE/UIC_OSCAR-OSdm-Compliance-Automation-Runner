@@ -29,6 +29,7 @@ const DIGITS = 6;
 const WINDOW_STEPS = 1;
 const SECRET_BYTES = 20;          // 160 bits, the size RFC 4226 recommends
 const ISSUER = 'OSCAR';
+const HOST_NAME = /^[a-z0-9.-]{1,253}$/;   // a host as URL gives it: lower case, IDN in punycode
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
@@ -129,23 +130,43 @@ function verifyCode(secret, code, timeMs, lastStep = null) {
 }
 
 /**
+ * The issuer an authenticator app shows for the entry: `OSCAR (<host>)`, the
+ * host of the server's own address (APP_URL), so that the entries of two
+ * servers (production and a test server) are told apart. `OSCAR` alone when
+ * there is no address or its host is not a plain name (an IPv6 address holds
+ * colons, which separate the issuer from the account in the label).
+ */
+function issuerFor(appUrl) {
+  let host;
+  try {
+    host = new URL(String(appUrl ?? '')).hostname;
+  } catch {
+    return ISSUER;
+  }
+  return HOST_NAME.test(host) ? `${ISSUER} (${host})` : ISSUER;
+}
+
+/**
  * The otpauth:// address an authenticator app reads (Google's "Key Uri
- * Format"): the label is `OSCAR:<account>`, the parameters say the defaults
- * out loud for the apps that do not assume them.
+ * Format"): the label is `<issuer>:<account>`, the parameters say the
+ * defaults out loud for the apps that do not assume them. Every value is
+ * percent-encoded, a space as %20 as in the format's own example
+ * (`ACME%20Co`), never `+`, which means a space in HTML forms only.
  */
 function otpauthUri(secretBase32, account, issuer = ISSUER) {
   const label = `${encodeURIComponent(issuer)}:${encodeURIComponent(account)}`;
-  const params = new URLSearchParams({
-    secret: secretBase32,
-    issuer,
-    algorithm: 'SHA1',
-    digits: String(DIGITS),
-    period: String(PERIOD_SECONDS),
-  });
-  return `otpauth://totp/${label}?${params.toString()}`;
+  const params = [
+    ['secret', secretBase32],
+    ['issuer', issuer],
+    ['algorithm', 'SHA1'],
+    ['digits', String(DIGITS)],
+    ['period', String(PERIOD_SECONDS)],
+  ].map(([name, value]) => `${name}=${encodeURIComponent(value)}`).join('&');
+  return `otpauth://totp/${label}?${params}`;
 }
 
 module.exports = {
-  base32Encode, base32Decode, newSecret, hotp, stepAt, totpAt, cleanCode, verifyCode, otpauthUri,
+  base32Encode, base32Decode, newSecret, hotp, stepAt, totpAt, cleanCode, verifyCode,
+  issuerFor, otpauthUri,
   PERIOD_SECONDS, DIGITS, WINDOW_STEPS, SECRET_BYTES, ISSUER,
 };
