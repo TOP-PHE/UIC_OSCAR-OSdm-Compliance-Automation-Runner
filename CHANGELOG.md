@@ -46,6 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SonarCloud no longer warns of a file encoding problem** (#1412). Tests and the scanner's settings, no version.
+  - **Seen:** an analysis warning on `main`, "There are problems with file encoding in the source code". The scan job's log names the file: `Invalid character encountered in file …/Oscar_Server/tests/unit/output-sender.test.js at line 78 for encoding UTF-8`.
+  - **Why:** the line held the replacement character (U+FFFD) written as it is. The file was valid UTF-8 (the test checks that a character cut at the very end of a run's output is replaced by that one), but the scanner takes the character in a source file for a decoding problem, and warned at every analysis since the test was added (#1319).
+  - **Now:** the test writes the character by its code, `String.fromCodePoint(0xFFFD)`. It was the only one: of the 1,094 text files the repository tracks, no other held it and none is invalid UTF-8.
+  - **In a pull request's analysis, three more lines:** the scanner read the three logos of `Oscar_Server/public` (a source folder) as text and warned of each, at every pull request; `main`'s analysis did not. `sonar-project.properties` leaves `**/*.png` out of the analysis. They were the only binary files among its sources.
+  - **So that it does not come back:** the test that refuses a NUL in a source file (`credential-fingerprint.test.js`) refuses a raw replacement character too, and with it a file whose bytes are not UTF-8. It fails on the file as it was and passes on the fixed one.
+
 - **The guides say how to create the server again when the monitoring stack is installed** (#1397). Documentation only. For a changed `.env` the installation guide gave `docker compose up -d oscar`; a server started with the monitoring file too and created again that way comes back without the volume it shares with Alertmanager. The guide now gives two lines that read, from the running container, the compose files that made it, and name the same ones. Used on production on 2026-11-22, where two files made the server.
 
 - **The guide's way to turn compression on, for an nginx already installed, is a file of its own** (#1393). Documentation only. The guide said to add the `gzip` lines to the site's file; on production that file was not shaped as the guide assumed. A file in `/etc/nginx/conf.d/` with the `gzip_*` lines, checked by `nginx -t` and removed when refused, did it: the Test Config script went from 555,602 to 150,043 bytes on the wire.

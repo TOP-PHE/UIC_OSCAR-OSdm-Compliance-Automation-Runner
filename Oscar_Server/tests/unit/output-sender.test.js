@@ -75,7 +75,7 @@ describe('the run\'s output', () => {
     sender.push('err', err.subarray(0, 1));
     await sender.end();
     expect(textOf(server.calls, 'out')).toBe('é€😀');
-    expect(textOf(server.calls, 'err')).toBe('�');   // a cut character at the very end is replaced
+    expect(textOf(server.calls, 'err')).toBe(String.fromCodePoint(0xFFFD));   // a cut character at the very end is replaced (written by its code: #1412)
   });
 
   test('much output goes in batches of at most 64 KB, numbered, in order', async () => {
