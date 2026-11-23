@@ -26,10 +26,10 @@
   },
   "public/js/scenarios.js": {
     "complexity": {
-      "count": 27
+      "count": 26
     },
     "max-lines-per-function": {
-      "count": 12
+      "count": 11
     }
   },
   "public/js/trace-context.js": {

@@ -415,9 +415,9 @@ describe('the Test Config fields (#903)', () => {
     expect(requestedSectionOf({ requestedSections: null })).toEqual({ startPlace: '', endPlace: '' });
   });
 
-  test('the fields are drawn, the input handled before the switch, the flag shown when stored as a boolean', () => {
+  test('the fields are drawn, the input handled by the list tried first, the flag shown when stored as a boolean', () => {
     expect(src).toContain('${buildFareFields(idx)}');
-    expect(src).toContain("if (inputRequestedSection(action, el)) return;\n  if (inputFareRefundFee(action, el)) return;\n\n  switch (action) {");
+    expect(src).toContain('\n  inputRequestedSection,\n  inputFareRefundFee,\n];\n');
     expect(src).toContain('String(optionValue(val)) === String(optionValue(o))');
     const access = require(path.join(ROOT, 'Oscar_Server/public/js/scenario-access.js'));
     expect(access.READ_ONLY_CARD_ACTIONS).not.toContain('set-scenario-section');

@@ -270,9 +270,9 @@ describe('the Test Config page', () => {
   test('the editor is wired: the trip section, both delegates, a Test Data train never made from a non-trip request', () => {
     expect(page).toContain("if (trip.tripType === 'NON_TRIP') {");
     expect(page).toContain('${buildNonTripFields(tIdx, trip, depDayField)}');
-    // In the list a change tries first (#1403), and once in the input listener.
+    // In the lists a change (#1403) and an input (#1405) try first.
     expect(page).toMatch(/const CHANGE_GROUPS = \[[^\]]*\n {2}changeNonTrip,\n/);
-    expect(page.match(/^ {2}if \(changeNonTrip\(action, el\)\) return;$/gm)).toHaveLength(1);
+    expect(page).toMatch(/const INPUT_GROUPS = \[[^\]]*\n {2}changeNonTrip,\n/);
     expect(page).toContain("if (trip?.tripType === 'NON_TRIP') return;");
   });
 });

@@ -1233,14 +1233,14 @@ describe('Test Config return model and fulfillments (#594)', () => {
 
   test('#619: the framework editor stores the declaration and keeps the note current', () => {
     expect(source).toContain("\n  'fw-return-model': (el) => { fwToggleSimplePill(el, 'returnModels', el.dataset.val); refreshReturnVersionNote(); saveFrameworkDebounced(); },\n");
-    expect(source).toContain("wizData.framework.osdmVersion = v;\n      refreshReturnVersionNote();");
+    expect(source).toContain("wizData.framework.osdmVersion = v;\n  refreshReturnVersionNote();");
     const fwModels = vm.runInNewContext(`(${/^const FW_RETURN_MODELS = (\[[\s\S]*?\]);$/m.exec(source)[1]})`);
     expect(fwModels.map(([v]) => v)).toEqual(context.RETURN_MODEL_OPTIONS.map(([v]) => v));
   });
 
   test('the input delegate stores both fields on the offer criteria', () => {
-    expect(source).toContain("case 'set-offer-return-model':\n      setOfferField(Number.parseInt(el.dataset.idx), 'returnModel', el.value || null); break;");
-    expect(source).toContain("case 'set-offer-return-fulfillments':\n      setOfferField(Number.parseInt(el.dataset.idx), 'returnFulfillments', el.value || null); break;");
+    expect(source).toContain("\n  'set-offer-return-model': (el) => { setOfferField(Number.parseInt(el.dataset.idx), 'returnModel', el.value || null); },\n");
+    expect(source).toContain("\n  'set-offer-return-fulfillments': (el) => { setOfferField(Number.parseInt(el.dataset.idx), 'returnFulfillments', el.value || null); },\n");
   });
 });
 
@@ -1314,7 +1314,8 @@ describe('#704 the sales horizon in the Test Framework, and the departure date o
     expect(src).toContain("\n  'fw-sales-horizon': changeFwSalesHorizon,\n");
     expect(src).toMatch(/\nfunction changeFwSalesHorizon\(el\) \{\n {2}\/\/[^\n]*\n {2}const value = fwSalesHorizonDays\(el\.value\);/);
     expect(src).toContain('data-action="set-scenario-departure-days"');
-    expect(src).toMatch(/case 'set-scenario-departure-days': \{[\s\S]{0,400}n >= -366 && n <= 1000/);
+    expect(src).toContain("\n  'set-scenario-departure-days': inputSetScenarioDepartureDays,\n");
+    expect(src).toMatch(/\nfunction inputSetScenarioDepartureDays\(el\) \{[\s\S]{0,400}n >= -366 && n <= 1000/);
     expect(src).toContain("departureExpectRejection:          ['off', 'on']");
   });
 });
@@ -2403,7 +2404,7 @@ describe('scenarios.js — what an exchange is for (#959)', () => {
   test('the wiring: drawn after the trip, handled by the change and input listeners, trips in use follow it', () => {
     const source = read(S);
     expect(source).toContain('${buildTripSection(idx, sc, trip)}\n\n  <!-- #959: what an exchange is for -->\n  ${buildExchangeSection(idx, sc)}');
-    expect(source).toContain('  if (changeExchange(action, el)) return;\n');
+    expect(source).toContain('\nconst INPUT_GROUPS = [\n  changeExchange,\n');
     expect(source).toContain('\n  changeExchange,\n  changeTraceContext,\n');
     expect(source).toContain('scenarioTripIds(sc).includes(trip.id) && isReadOnlyForMe(sc)');
     expect(source).toContain('...scenarioTripIds(s), s.passengersListId');
@@ -2604,7 +2605,7 @@ describe('scenarios.js — searching the scenario list (#1314)', () => {
     expect(calls).toEqual(['renderAll', 'markDirty', 'renderAll', 'markDirty']);
   });
 
-  test('the search controls never mark the page as changed, and are handled before the tables and the switch', () => {
+  test('the search controls never mark the page as changed, and are handled before the three tables of actions', () => {
     const src = read(page);
     for (const name of ['scenarioSearchHtml', 'applyScenarioSearch', 'showRunListCounts', 'inputScenarioSearch', 'changeScenarioSearch', 'clickScenarioSearch']) {
       const body = loadFunction(page, name, {}).toString();
@@ -2614,7 +2615,7 @@ describe('scenarios.js — searching the scenario list (#1314)', () => {
     }
     expect(src).toContain('if (clickScenarioSearch(action)) return;   // #1314');
     expect(src).toContain('\n  changeScenarioSearch,   // #1314\n];');
-    expect(src).toContain('if (inputScenarioSearch(action, el)) return;   // #1314');
+    expect(src).toContain('\n  inputScenarioSearch,   // #1314\n');
     // renderAll() draws every row, then the search hides the ones it does not keep.
     const renderAll = loadFunction(page, 'renderAll', {}).toString();
     expect(renderAll.match(/applyScenarioSearch\(\);/g)).toHaveLength(2);
@@ -2954,5 +2955,237 @@ describe('scenarios.js — a change is looked up in a table of actions (#1403)',
       expect(text).toMatch(/return true;\n\}$/);
     }
     expect(src).toContain('  const action = el.dataset.action;\n  if (CHANGE_GROUPS.some((group) => group(action, el))) return;\n');
+  });
+});
+
+describe('scenarios.js — an input is looked up in a table of actions (#1405)', () => {
+  const src = read('js/scenarios.js');
+  const from = src.indexOf('\nfunction findAction(target) {');
+  const own = src.indexOf('\n// ── Input event delegation');
+  const to = src.indexOf('\n// ── Init ');
+  // The handlers tried before the table, in the order they are tried: one
+  // that takes the action ends the input, so the order is part of what the
+  // page does.
+  const GROUPS = ['changeExchange', 'changeNonTrip', 'inputTraceState', 'inputLostCard', 'inputScenarioSearch',
+    'inputRequestedSection', 'inputFareRefundFee'];
+  const HEAD = ['isLockedControl', ...GROUPS];
+  const EXPIRY_WAITS = {
+    'set-scenario-max-wait-addres-minutes': 'expiredAddReservationOfferMaxWaitMinutes',
+    'set-scenario-max-wait-addanc-minutes': 'expiredAddAncillaryOfferMaxWaitMinutes',
+    'set-scenario-max-wait-refund-offer-minutes': 'expiredRefundOfferMaxWaitMinutes',
+    'set-scenario-max-wait-exchange-offer-minutes': 'expiredExchangeOfferMaxWaitMinutes',
+  };
+
+  // The page's own text from findAction() to the end of the input delegate,
+  // run as it is. Every name it does not declare is a recorder (the call is
+  // written down and the answer is the one given for that name, if any),
+  // but for the names given as data.
+  function delegate(answers = {}, data = {}) {
+    const calls = [];
+    let listener = null;
+    const document = {
+      body: { addEventListener(type, fn) { if (type === 'input') listener = fn; } },
+      getElementById: () => null,
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    };
+    const scope = new Proxy({}, {
+      has: (_, name) => typeof name === 'string' && !['Object', 'Number', 'String', 'Array', 'Math', 'Set', 'JSON', 'structuredClone', 'undefined'].includes(name),
+      get(_, name) {
+        if (typeof name === 'symbol') return undefined;
+        if (name === 'document') return document;
+        if (Object.hasOwn(data, name)) return data[name];
+        return (...args) => { calls.push([name, ...args]); return answers[name]; };
+      },
+    });
+    vm.runInNewContext(`(function (scope) { with (scope) {${src.slice(from, to)}\n} })`)(scope);
+    const input = (target) => { listener({ target }); return target; };
+    return { calls, input, names: () => calls.map((c) => c[0]), after: () => calls.slice(HEAD.length) };
+  }
+
+  test('the text run ends with the input delegate, a table and a list; no delegate of the page is a switch any more', () => {
+    expect(from).toBeGreaterThan(-1);
+    expect(own).toBeGreaterThan(from);
+    expect(to).toBeGreaterThan(own);
+    expect(src.slice(from, to).split('document.body.addEventListener(')).toHaveLength(4);   // click, change, input
+    const text = src.slice(own, to);
+    expect(text.split('document.body.addEventListener(')).toHaveLength(2);
+    expect(text).toContain("document.body.addEventListener('input', function(e) {");
+    expect(text).toContain('\nconst INPUT_ACTIONS = {\n');
+    expect(text).toContain('\nconst INPUT_GROUPS = [\n');
+    expect(src).not.toContain('switch (action)');
+  });
+
+  test('an action of the table runs with the values of its element, after the refusal and every handler tried first, in their order', () => {
+    const page = delegate();
+    const el = { dataset: { action: 'set-trip-time', tidx: '2', path: 'departureTime' }, value: '08:15' };
+    page.input(el);
+    expect(page.calls).toEqual([
+      ['isLockedControl', el],
+      ...GROUPS.map((name) => [name, 'set-trip-time', el]),
+      ['setTripTimeFieldByPath', 2, 'departureTime', '08:15'],
+    ]);
+  });
+
+  test('an input inside a control is the control\'s; one outside any control does nothing', () => {
+    const page = delegate();
+    const el = { dataset: { action: 'set-purchaser', purchIdx: '1', field: 'email' }, value: 'a@b.c' };
+    page.input({ dataset: {}, parentElement: { parentElement: el } });
+    expect(page.calls.at(-1)).toEqual(['setPurchaserField', 1, 'email', 'a@b.c']);
+    const none = delegate();
+    none.input({ dataset: {}, parentElement: { dataset: {}, parentElement: null } });
+    expect(none.calls).toEqual([]);
+  });
+
+  // Four actions share one function, which reads which of them it is run for:
+  // the delegate hands it the action.
+  test.each(Object.entries(EXPIRY_WAITS))('the maximum wait %s stores %s: a number from 1 to 60, nothing for another, null when emptied', (action, field) => {
+    const stored = (value) => delegate().input({ dataset: { action, idx: '3' }, value });
+    const page = delegate();
+    page.input({ dataset: { action, idx: '3' }, value: ' 12 ' });
+    expect(page.after()).toEqual([['setScenarioField', 3, field, 12]]);
+    const emptied = delegate();
+    emptied.input({ dataset: { action, idx: '3' }, value: '  ' });
+    expect(emptied.after()).toEqual([['setScenarioField', 3, field, null]]);
+    for (const value of ['0', '61', 'x', '-5']) {
+      const refused = delegate();
+      refused.input({ dataset: { action, idx: '3' }, value });
+      expect([value, refused.after()]).toEqual([value, []]);
+    }
+    for (const value of ['1', '60']) {
+      const edge = delegate();
+      edge.input({ dataset: { action, idx: '3' }, value });
+      expect(edge.after()).toEqual([['setScenarioField', 3, field, Number(value)]]);
+    }
+    expect(stored('5').value).toBe('5');
+  });
+
+  test('an action that has a function of its own gets the element: a version, a currency, selections, the session limit, a loyalty card', () => {
+    // A version being typed is not stored; one that is a version is.
+    const typing = delegate({ isOsdmVersionText: false });
+    typing.input({ dataset: { action: 'set-scenario-text', field: 'osdmVersion', idx: '0' }, value: '3.' });
+    expect(typing.after()).toEqual([['isOsdmVersionText', '3.']]);
+    const typed = delegate({ isOsdmVersionText: true });
+    typed.input({ dataset: { action: 'set-scenario-text', field: 'osdmVersion', idx: '0' }, value: '3.8' });
+    expect(typed.after()).toEqual([['isOsdmVersionText', '3.8'], ['setScenarioField', 0, 'osdmVersion', '3.8']]);
+    const other = delegate();
+    other.input({ dataset: { action: 'set-scenario-text', field: 'description', idx: '4' }, value: 'x' });
+    expect(other.after()).toEqual([['setScenarioField', 4, 'description', 'x']]);
+
+    // A currency is put in capitals in its field too.
+    const money = delegate();
+    const field = money.input({ dataset: { action: 'set-offer-currency', idx: '1' }, value: 'chf' });
+    expect(field.value).toBe('CHF');
+    expect(money.after()).toEqual([['setOfferField', 1, 'currency', 'CHF']]);
+
+    // Selections: JSON that reads is stored, JSON that does not is left unsaved, an emptied field is null.
+    const reads = delegate();
+    reads.input({ dataset: { action: 'set-offer-selections', idx: '2' }, value: ' [{"productCode":"P"}] ' });
+    expect(reads.after()).toEqual([['setOfferField', 2, 'productSelections', [{ productCode: 'P' }]]]);
+    const broken = delegate();
+    broken.input({ dataset: { action: 'set-offer-selections', idx: '2' }, value: '[{' });
+    expect(broken.after()).toEqual([]);
+    const emptied = delegate();
+    emptied.input({ dataset: { action: 'set-offer-selections', idx: '2' }, value: ' ' });
+    expect(emptied.after()).toEqual([['setOfferField', 2, 'productSelections', null]]);
+
+    // The session limit: 1 to 10 is stored and saved, anything else waits.
+    const wizData = { framework: { concurrentSessionLimit: 2 } };
+    for (const value of ['', '0', '11', '3.5', 'x']) {
+      const waits = delegate({}, { wizData });
+      waits.input({ dataset: { action: 'fw-concurrent-limit' }, value });
+      expect([value, wizData.framework.concurrentSessionLimit, waits.after()]).toEqual([value, 2, []]);
+    }
+    const taken = delegate({}, { wizData });
+    taken.input({ dataset: { action: 'fw-concurrent-limit' }, value: '10' });
+    expect([wizData.framework.concurrentSessionLimit, taken.after()]).toEqual([10, [['saveFrameworkDebounced']]]);
+
+    // A loyalty card is made where there is none, in a list made when it is not one.
+    const state = { passengersList: [{ passengers: [{ loyaltyCards: 'not a list' }] }] };
+    const card = delegate({}, { state });
+    card.input({ dataset: { action: 'set-pax-loyalty', pidx: '0', pi: '0', cidx: '1', field: 'cardReference' }, value: '77' });
+    expect(state.passengersList[0].passengers[0].loyaltyCards[1]).toEqual({ carrierCode: '', cardReference: '77' });
+    expect(card.after()).toEqual([['markDirty']]);
+    const nobody = delegate({}, { state });
+    nobody.input({ dataset: { action: 'set-pax-loyalty', pidx: '0', pi: '5', cidx: '0', field: 'cardReference' }, value: '1' });
+    expect(nobody.after()).toEqual([]);
+  });
+
+  // A table is an object, and every object answers to these names: none of
+  // them is an action. `__proto__` would be called as a function and throw.
+  test.each(['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf', 'no-such-action'])(
+    'an input named %s does nothing', (action) => {
+      const page = delegate();
+      const el = page.input({ dataset: { action }, value: 'x' });
+      expect(page.names()).toEqual(HEAD);
+      expect(el.value).toBe('x');
+    });
+
+  test('a locked control is refused and its card drawn again; a handler that takes the action ends the input', () => {
+    const locked = delegate({ isLockedControl: true, cardScenarioIndex: 4 });
+    const el = locked.input({ dataset: { action: 'set-trip-time', tidx: '0', path: 'p' }, value: 'x' });
+    expect(locked.calls).toEqual([['isLockedControl', el], ['cardScenarioIndex', el], ['reRenderScenarioDetail', 4]]);
+    for (const [n, name] of GROUPS.entries()) {
+      const page = delegate({ [name]: true });
+      page.input({ dataset: { action: 'set-trip-time', tidx: '0', path: 'p' }, value: 'x' });
+      expect(page.names()).toEqual(HEAD.slice(0, n + 2));
+    }
+  });
+
+  test('each entry is one line that calls, or the name of a function laid out as the others; only the four waits share one', () => {
+    const start = src.indexOf('\nconst INPUT_ACTIONS = {\n');
+    const lines = src.slice(start + '\nconst INPUT_ACTIONS = {\n'.length, src.indexOf('\n};\n', start)).split('\n');
+    const actions = [];
+    const named = {};
+    for (const line of lines) {
+      if (line.startsWith('  //')) continue;
+      const entry = /^ {2}'([a-z0-9-]+)': (?:(\(\)|\(el\)|\(el, e\)) => \{ \S.* \}|(input[A-Za-z0-9]+)),$/.exec(line);
+      expect([line, entry === null]).toEqual([line, false]);
+      actions.push(entry[1]);
+      if (entry[2] === '()') expect(line).not.toMatch(/\bel\b|\be\./);
+      if (entry[2] === '(el)') expect(line).not.toMatch(/\be\./);
+      if (entry[3]) {
+        (named[entry[3]] ||= []).push(entry[1]);
+        expect(loadFunction('js/scenarios.js', entry[3], {}).toString()).toMatch(/^function input[A-Za-z0-9]+\((?:el|el, e|el, e, action)?\) \{\n/);
+      }
+    }
+    expect(new Set(actions).size).toBe(actions.length);
+    expect(actions.length).toBeGreaterThanOrEqual(29);
+    // One function for several actions: the four waits, and no other.
+    expect(Object.entries(named).filter(([, of]) => of.length > 1)).toEqual([['inputSetScenarioExpiryMaxWait', Object.keys(EXPIRY_WAITS)]]);
+    // A function of an action is not one of the handlers tried first.
+    expect(Object.keys(named).filter((name) => GROUPS.includes(name))).toEqual([]);
+    // The table holds no action the page never draws: as a data-action in its
+    // script or its HTML, or by name in the code that draws the fields. One
+    // was a case of the switch before the table and is drawn nowhere: it is
+    // kept as it was, and named here so that a second one shows.
+    const NEVER_DRAWN = ['set-pax-input'];
+    const html = read('scenarios.html');
+    const drawing = src.slice(0, from);
+    const drawn = (action) => src.includes(`data-action="${action}"`) || html.includes(`data-action="${action}"`) || drawing.includes(`'${action}'`);
+    expect(actions.filter((action) => !drawn(action))).toEqual(NEVER_DRAWN);
+  });
+
+  test('the list names functions of the page that say whether the action was theirs, each once, in the order pinned here', () => {
+    const start = src.indexOf('\nconst INPUT_GROUPS = [\n');
+    const lines = src.slice(start + '\nconst INPUT_GROUPS = [\n'.length, src.indexOf('\n];\n', start)).split('\n');
+    const names = [];
+    for (const line of lines) {
+      if (line.startsWith('  //')) continue;
+      const entry = /^ {2}((?:change|input)[A-Za-z0-9]+),(?: {3}\/\/ .*)?$/.exec(line);
+      expect([line, entry === null]).toEqual([line, false]);
+      names.push(entry[1]);
+    }
+    expect(names).toEqual(GROUPS);
+    for (const name of names) {
+      const text = loadFunction('js/scenarios.js', name, {}).toString();
+      expect(text.startsWith(`function ${name}(action, el) {\n`)).toBe(true);
+      // It answers false for an action that is not its own, and true for its own.
+      expect(text).toMatch(/return false;/);
+      expect(text).toMatch(/return true;\n\}$/);
+    }
+    expect(src).toContain('  const action = el.dataset.action;\n  if (INPUT_GROUPS.some((group) => group(action, el))) return;\n');
+    // The action is handed to the function called: one function serves four.
+    expect(src).toContain('  const act = Object.hasOwn(INPUT_ACTIONS, action) ? INPUT_ACTIONS[action] : null;\n  if (act) act(el, e, action);\n});');
   });
 });

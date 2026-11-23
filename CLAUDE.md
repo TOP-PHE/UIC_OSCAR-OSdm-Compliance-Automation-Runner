@@ -2397,7 +2397,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   comments out; the function's own first and last lines count), in the `src`,
   `public` and library blocks, not the tests. What was over them is ESLint's
   own baseline (bulk suppressions, ESLint 9.24+): `eslint-suppressions.json`
-  (found by itself in the folder ESLint starts in: 103 + 18 since #1403) and
+  (found by itself in the folder ESLint starts in: 102 + 17 since #1405) and
   `eslint-library-suppressions.json` (`--suppressions-location`, 79 + 21
   since #1388),
   paths with forward slashes from that folder. **One more function over a
@@ -2471,8 +2471,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   Sonar's limit of cases and stay as they are. The delegate asks
   `Object.hasOwn(CLICK_ACTIONS, action)`, **never `CLICK_ACTIONS[action]`
   alone**: every object answers to `constructor` and `__proto__`. The change
-  delegate followed (#1403, next bullet); the input delegate is still a
-  switch. Tests that pinned `case 'x':` of a
+  (#1403) and input (#1405) delegates followed, next bullets. Tests that
+  pinned `case 'x':` of a
   click pin the table's line; `ui-scripts.test.js` runs the real delegate
   (its text inside `with (scope)`, every name it does not declare a
   recorder). `refresh-sections` is in the table and drawn nowhere, as before.
@@ -2515,6 +2515,27 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   **A `change` event sent by hand shows nothing in the page's HTML when the
   handler only puts a value back in its field**: the browser pass hashes the
   live `value` / `checked` of every field beside the HTML.
+- **An input in Test Config is looked up in a table too: no delegate of the
+  page is a switch any more** (#1405, 1.11.575; M2, fifth function).
+  `INPUT_ACTIONS` (29 actions), 17 functions `input<Action>`, and
+  `INPUT_GROUPS`, the 7 handlers tried first, two of them the change's own
+  (`changeExchange`, `changeNonTrip`). **Four actions share one function**
+  (`inputSetScenarioExpiryMaxWait`, the maximum waits of four expiry tests),
+  which reads which action it is run for: **the input delegate calls
+  `act(el, e, action)`**, the two others `act(el, e)`. `set-pax-input` is in
+  the table and drawn nowhere, as before. The maximum-wait fields are drawn by
+  `timerRow()` from an action's name given as a string, not a literal
+  `data-action="…"`: a test that asks whether an action is drawn looks for
+  the quoted name in the drawing code too. What the builder learnt: cases
+  that share their code need a name given to it; a case on several lines
+  whose last statement shares its line with `break;` (`doIt(); break;`)
+  is moved up to the statement (the first build kept the `break`, which the
+  syntax check caught at once). **SonarCloud types `expect(field.value)
+  .toBe(6)` as a bug (S5845) when the field was made with a text value**:
+  one such assertion failed the gate of #1404; compare as text. **Sonar's
+  cognitive complexity (S3776, 15) is not the lint's count of paths**:
+  `changeSetPax()` is 14 for the lint and 19 for Sonar, a code smell on
+  #1404 (the delegate it came out of was 172).
 - **CI required checks:** Lint/audit/test, CodeQL, Trivy (image scan), Docker
   build, Gitleaks, SonarCloud scan, Bruno-collection validation, PR labeler,
   **`SonarQube Quality Gate check`** (added to required list 2026-07-02 via
@@ -3131,8 +3152,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   variants by the section's start station (`0000080`–`0000085`); the
   data-file scenarios are gamma's only (`SIM_FARE_`, `SIM_WRONG_FARE_`).
   `routeSummary` (3.7) and `isProviderFee` (3.8) are in `ABSENT_BELOW`. Test
-  Config: `buildFareFields()`; the section input is handled before the input
-  switch (`inputRequestedSection()`), and `buildSelect` compares as text so a
+  Config: `buildFareFields()`; the section input is handled by
+  `inputRequestedSection()`, in the input's list (`INPUT_GROUPS`), and
+  `buildSelect` compares as text so a
   boolean stored flag shows.
   **Search criteria and trip ids** (#904, fares 1b, 1.11.373 / OTST_V2.0.206):
   the same request member goes with a SEARCH trip and with `offersByTripIds`
@@ -3529,8 +3551,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   Simulator: the exchange answer names its `trips`; variant
   `wrong-exchange-keeps-trip`. PR 3 is the catalogue entry.
   **PR 2 (1.11.400): "Exchange to" in Test Config** (`buildExchangeSection()`,
-  EXCHANGE scenarios only; `changeExchange()` in the change's list and before
-  the input switch). An emptied field leaves the block, an empty block leaves the
+  EXCHANGE scenarios only; `changeExchange()` in the change's and the input's
+  lists). An emptied field leaves the block, an empty block leaves the
   scenario; an invalid value keeps the stored one. **The editor's "trips a
   scenario uses" is `scenarioTripIds()`** (own + exchange): a new place that
   asks which scenarios use a trip goes through it. The criteria are pinned
