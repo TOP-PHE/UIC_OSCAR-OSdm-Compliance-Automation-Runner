@@ -1,8 +1,20 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.617",
+  "current_release": "2026.620",
   "releases": [
+    {
+      "release": "2026.620",
+      "date": "2026-11-23",
+      "server": "1.11.579",
+      "collection": "OTST_V2.0.270",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Release 2026.620 (current_release): two-factor authentication (#1414) and the dependency updates of 23 November. Server 1.11.577 (2026.618) adds the codes of an authenticator app and a QR code encoder; server 1.11.578 (2026.619) makes administrators sign in with a second factor, the six-digit code of an authenticator app, and lets every other account turn one on from My account. Server 1.11.579 is this entry: nodemailer 10.6.1 and express-rate-limit 8.7.5 (#1400), and in OSCAR_Deploy Watchtower 1.24.1 (#1401) and Loki 3.7.10 (#1402, the Kubernetes monitoring stack too, which must use the VPS image). Collection unchanged.",
+        "What to do with this release. Before approving the promotion: each administrator has an authenticator app on a phone at hand, and the server clock is synchronised (timedatectl: System clock synchronized: yes); a code is taken one 30-second step either side of it. Migration 62 ends the administrators' sessions opened before the update, so each administrator sets the factor up at the next sign-in (a QR code, then its first code). A lost phone: another administrator clicks Reset 2FA on Manage Users; for the last one, node src/cli/reset-mfa.js <e-mail> in the server container (Server Admin Guide, 13.5). Testers, Test Managers, certifiers and Company API accounts are not affected. On the VPS, Watchtower and Loki change only when their stacks are started again."
+      ]
+    },
     {
       "release": "2026.619",
       "date": "2026-11-23",
