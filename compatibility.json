@@ -4,6 +4,17 @@
   "current_release": "2026.610",
   "releases": [
     {
+      "release": "2026.615",
+      "date": "2026-11-23",
+      "server": "1.11.575",
+      "collection": "OTST_V2.0.269",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.575 (#1405): the input delegate of Test Config (public/js/scenarios.js), one function of 182 lines of code and 69 paths around a switch of 29 actions, is a table of actions (INPUT_ACTIONS), 17 functions, one per action that does more than call another, and the list of the 7 handlers tried first (INPUT_GROUPS), in the order they were tried; the delegate itself is 9 lines. With it none of the page's three delegates is a switch. Behaviour unchanged: the old and the new delegate leave the same trace on 17,000 inputs drawn over every action (the calls made and their arguments, what is read and written on the page's elements, the data at the end). Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.614",
       "date": "2026-11-23",
       "server": "1.11.574",

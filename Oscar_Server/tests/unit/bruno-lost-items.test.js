@@ -223,7 +223,7 @@ describe('the Test Config fields', () => {
     expect(fields(1)).toContain('value=""');
     expect(select[0]).toEqual([0, 'lostCardExpectRejection', 'Unknown lost card refused']);
     expect(source).toContain('${buildLostCardFields(idx)}');
-    expect(source).toMatch(/if \(inputLostCard\(action, el\)\) return;/);
+    expect(source).toMatch(/const INPUT_GROUPS = \[[^\]]*\n {2}inputLostCard,\n/);
   });
 
   test('typing sets one part; emptying the last leaves no card', () => {

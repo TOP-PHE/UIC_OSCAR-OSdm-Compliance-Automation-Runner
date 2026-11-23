@@ -435,11 +435,11 @@ describe('the Test Framework page (scenarios.js)', () => {
     expect('traceContext' in ctx.wizData.framework).toBe(false);
   });
 
-  test('the section is drawn, and its handlers wired: in the list a change tries first, before the switch of an input', () => {
+  test('the section is drawn, and its handlers wired: in the lists a change and an input try first', () => {
     const source = lines.join('\n');
     expect(source).toContain('${traceContextPanelHtml(fw)}');
     expect(source).toMatch(/const CHANGE_GROUPS = \[[^\]]*\n {2}changeTraceContext,\n/);
-    expect(source).toContain('  if (inputTraceState(action, el)) return;');
+    expect(source).toMatch(/const INPUT_GROUPS = \[[^\]]*\n {2}inputTraceState,\n/);
     expect(source.split('\n')[0]).toContain('OscarTraceContext');
   });
 });

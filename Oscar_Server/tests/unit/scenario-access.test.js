@@ -191,14 +191,14 @@ describe('scenarios.js wiring', () => {
     expect(topLevelFunction('renderScenarioDetail')).toContain('OscarScenarioAccess.isAllowedOnReadOnlyCard(');
   });
 
-  // Where each delegate hands the action over: the table of actions of a
-  // click (#1396) and of a change (#1403), the switch of an input. The
-  // handlers tried before it count as dispatching too, so the refusal must
-  // come before the first of them.
+  // Where each delegate hands the action over: its table of actions (#1396
+  // for a click, #1403 for a change, #1405 for an input). The handlers tried
+  // before it count as dispatching too, so the refusal must come before the
+  // first of them.
   test.each([
     ['click', 'CLICK_ACTIONS[action]', 'if (clickFwList(action, el)) return;'],
     ['change', 'CHANGE_ACTIONS[action]', 'if (CHANGE_GROUPS.some((group) => group(action, el))) return;'],
-    ['input', 'switch (action)', null],
+    ['input', 'INPUT_ACTIONS[action]', 'if (INPUT_GROUPS.some((group) => group(action, el))) return;'],
   ])('the %s delegate refuses a locked control before dispatching', (type, dispatch, firstHandler) => {
     const start = SCENARIOS_JS.indexOf(`document.body.addEventListener('${type}', function(e) {`);
     expect(start).toBeGreaterThan(-1);

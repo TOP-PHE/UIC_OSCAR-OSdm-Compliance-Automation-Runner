@@ -2724,8 +2724,8 @@ function buildNonHappyFlowSection(idx, sc) {
   const showExchange = (scType === 'EXCHANGE');
 
   // One timer row = the test-on/off select + the Max wait number input.
-  // `action` is the dataset.action of the Max-wait input (must be registered
-  // in the input event-delegation switch below).
+  // `action` is the dataset.action of the Max-wait input (must be an entry of
+  // INPUT_ACTIONS, the table of what an input does, below).
   function timerRow(testField, testLabel, testHint, waitField, waitHint, action) {
     const val = state.scenarios[idx]?.[waitField];
     return `
@@ -3270,7 +3270,8 @@ function withRequestedSection(sc, end, value) {
 }
 
 // #907: the fare refund fee, a whole number of cents; empty clears it,
-// anything else is ignored mid-edit. Outside the input switch, like the next one.
+// anything else is ignored mid-edit. One of the handlers an input tries
+// first (INPUT_GROUPS), like the next one.
 function inputFareRefundFee(action, el) {
   if (action !== 'set-scenario-fare-refund-fee') return false;
   const v = el.value.trim();
@@ -3281,7 +3282,7 @@ function inputFareRefundFee(action, el) {
   return true;
 }
 
-// #903: typing in a fare section field. Outside the input switch, which is long enough.
+// #903: typing in a fare section field. One of the handlers an input tries first (INPUT_GROUPS).
 function inputRequestedSection(action, el) {
   if (action !== 'set-scenario-section') return false;
   const end = el.dataset.end === 'endPlace' ? 'endPlace' : 'startPlace';
@@ -4187,7 +4188,7 @@ function buildExchangeSection(idx, sc) {
 }
 
 // A field or tick of the "Exchange to" section: tried first by a change
-// (CHANGE_GROUPS), and before the switch of an input.
+// (CHANGE_GROUPS) and by an input (INPUT_GROUPS).
 function changeExchange(action, el) {
   if (action !== 'set-exchange-field' && action !== 'toggle-exchange-criterion') return false;
   const idx = Number.parseInt(el.dataset.idx);
@@ -9772,234 +9773,266 @@ document.body.addEventListener('change', function(e) {
 });
 
 // ── Input event delegation (text inputs) ─────────────────────────────────────
+// What an input on an element does, by the element's data-action (#1405).
+// One function per action that does more than call another; the others are
+// written in the table below, INPUT_ACTIONS. Each takes the element that
+// carries the action, and the event when it uses it.
+// One that serves several actions takes the action as well.
+function inputSetScenarioText(el) {
+  // #785: a version mid-typing ("3.") is not stored; the field is checked when left.
+  if (el.dataset.field === 'osdmVersion' && el.value.trim() && !isOsdmVersionText(el.value)) return;
+  setScenarioField(Number.parseInt(el.dataset.idx), el.dataset.field, el.value);
+}
+
+function inputSetScenarioMaxWaitMinutes(el) {
+  // Per-scenario max wait budget for #204 expiredBookingTest, in minutes.
+  // Empty input clears (null = use server default RUN_TIMEOUT_MS).
+  // Non-empty must be an integer in [1, 60] — anything else is ignored
+  // until the user types a valid value (no spurious saves mid-edit).
+  const v = el.value.trim();
+  if (v === '') {
+    setScenarioField(Number.parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', null);
+  } else {
+    const n = Number.parseInt(v, 10);
+    if (Number.isInteger(n) && n >= 1 && n <= 60) {
+      setScenarioField(Number.parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', n);
+    }
+  }
+}
+
+function inputSetScenarioDepartureDays(el) {
+  // #704: the scenario's own departure date, in days from the run. Empty
+  // clears it; otherwise an integer in [-366, 1000], anything else
+  // ignored mid-edit.
+  const v = el.value.trim();
+  const n = Number(v);
+  if (v === '') setScenarioField(Number.parseInt(el.dataset.idx), 'departureDaysFromToday', null);
+  else if (Number.isInteger(n) && n >= -366 && n <= 1000) setScenarioField(Number.parseInt(el.dataset.idx), 'departureDaysFromToday', n);
+}
+
+function inputSetScenarioReceiptWaitMinutes(el) {
+  // #603: how long to wait for the refund receipt, in minutes. Empty
+  // clears it (not awaited); otherwise an integer in [1, 60], anything
+  // else ignored mid-edit.
+  const v = el.value.trim();
+  const n = Number.parseInt(v, 10);
+  if (v === '') setScenarioField(Number.parseInt(el.dataset.idx), 'refundReceiptMaxWaitMinutes', null);
+  else if (Number.isInteger(n) && n >= 1 && n <= 60) setScenarioField(Number.parseInt(el.dataset.idx), 'refundReceiptMaxWaitMinutes', n);
+}
+
+function inputSetScenarioMaxWaitOfferMinutes(el) {
+  // Per-scenario max wait budget for the expiredOfferTest, in minutes.
+  // Same semantics as set-scenario-max-wait-minutes above: empty = null
+  // (use server default RUN_TIMEOUT_MS); non-empty must be an integer in
+  // [1, 60] — anything else is ignored mid-edit.
+  const v = el.value.trim();
+  if (v === '') {
+    setScenarioField(Number.parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', null);
+  } else {
+    const n = Number.parseInt(v, 10);
+    if (Number.isInteger(n) && n >= 1 && n <= 60) {
+      setScenarioField(Number.parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', n);
+    }
+  }
+}
+
+function inputSetScenarioExpiryMaxWait(el, e, action) {
+  // Per-scenario Max wait inputs for Phase 3/4/5 expired-X tests. All
+  // share the empty=null / [1,60] integer semantics of the booking/offer
+  // timers above. Action → field-name map kept local so renaming a field
+  // is a one-place edit.
+  const _maxWaitFieldByAction = {
+    'set-scenario-max-wait-addres-minutes':         'expiredAddReservationOfferMaxWaitMinutes',
+    'set-scenario-max-wait-addanc-minutes':         'expiredAddAncillaryOfferMaxWaitMinutes',
+    'set-scenario-max-wait-refund-offer-minutes':   'expiredRefundOfferMaxWaitMinutes',
+    'set-scenario-max-wait-exchange-offer-minutes': 'expiredExchangeOfferMaxWaitMinutes',
+  };
+  const _field = _maxWaitFieldByAction[action];
+  const v = el.value.trim();
+  if (v === '') {
+    setScenarioField(Number.parseInt(el.dataset.idx), _field, null);
+  } else {
+    const n = Number.parseInt(v, 10);
+    if (Number.isInteger(n) && n >= 1 && n <= 60) {
+      setScenarioField(Number.parseInt(el.dataset.idx), _field, n);
+    }
+  }
+}
+
+function inputSetPaxText(el) {
+  // Free-text fields in the per-passenger editor (firstName, lastName,
+  // dateOfBirth, email, phoneNumber). Updates the model on every
+  // keystroke — no re-render, so focus/caret stay put while typing.
+  const sptIdx = Number.parseInt(el.dataset.pidx);
+  const sptPi  = Number.parseInt(el.dataset.pi);
+  const sptField = el.dataset.field;
+  setPaxField(sptIdx, sptPi, sptField, el.value);
+  // Keep the compact row-header display in sync when the user edits
+  // firstName or lastName from inside the Edit panel — no waiting for
+  // a re-render, so the change is immediately visible in the row above.
+  if (sptField === 'firstName' || sptField === 'lastName') {
+    const pxList = state.passengersList[sptIdx];
+    const pxPax  = pxList?.passengers?.[sptPi];
+    const disp = document.querySelector('[data-pax-display="' + sptIdx + '-' + sptPi + '"]');
+    if (pxPax && disp) disp.textContent = (pxPax.firstName || '') + ' ' + (pxPax.lastName || '');
+  }
+}
+
+function inputSetPaxReduction(el) {
+  const spIdx = Number.parseInt(el.dataset.pidx);
+  const spPi  = Number.parseInt(el.dataset.pi);
+  const spCi  = Number.parseInt(el.dataset.cidx);
+  const spList = state.passengersList[spIdx];
+  const spPax  = spList?.passengers?.[spPi];
+  if (!spPax) return;
+  if (!Array.isArray(spPax.reductionCards)) spPax.reductionCards = [];
+  spPax.reductionCards[spCi] = el.value;
+  markDirty();
+}
+
+function inputSetPaxLoyalty(el) {
+  const slIdx = Number.parseInt(el.dataset.pidx);
+  const slPi  = Number.parseInt(el.dataset.pi);
+  const slCi  = Number.parseInt(el.dataset.cidx);
+  const field = el.dataset.field;
+  const slList = state.passengersList[slIdx];
+  const slPax  = slList?.passengers?.[slPi];
+  if (!slPax) return;
+  if (!Array.isArray(slPax.loyaltyCards)) slPax.loyaltyCards = [];
+  if (!slPax.loyaltyCards[slCi] || typeof slPax.loyaltyCards[slCi] !== 'object') {
+    slPax.loyaltyCards[slCi] = { carrierCode: '', cardReference: '' };
+  }
+  slPax.loyaltyCards[slCi][field] = el.value;
+  markDirty();
+}
+
+function inputSetOfferCurrency(el) {
+  el.value = el.value.toUpperCase();
+  setOfferField(Number.parseInt(el.dataset.idx), 'currency', el.value);
+}
+
+function inputSetOfferTags(el) {
+  const tags = el.value.split(',').map(t => t.trim()).filter(Boolean);
+  setOfferField(Number.parseInt(el.dataset.idx), 'productTags', tags.length > 0 ? tags : null);
+}
+
+function inputSetOfferReturnOffset(el) {
+  const v = el.value.trim();
+  const n = Number.parseInt(v, 10);
+  // Empty = one-way (clear). Otherwise store a non-negative integer day offset.
+  setOfferField(Number.parseInt(el.dataset.idx), 'returnOffsetDays', (v !== '' && Number.isInteger(n) && n >= 0) ? n : null);
+}
+
+function inputSetOfferSelections(el) {
+  try {
+    const parsed = el.value.trim() ? JSON.parse(el.value.trim()) : null;
+    setOfferField(Number.parseInt(el.dataset.idx), 'productSelections', parsed);
+  } catch (_) { /* invalid JSON — don't save until valid */ }
+}
+
+function inputWizOsdmVersion(el) {
+  const v = el.value.trim();
+  // Skip empty (mid-edit): saving an empty string would then be read back
+  // as a falsy osdmVersion and replaced with the default, losing the user
+  // previous value without intent. The next re-render (any other action)
+  // will snap the displayed value back to the stored one.
+  if (!v || !isOsdmVersionText(v)) return;
+  wizData.framework.osdmVersion = v;
+  refreshReturnVersionNote();
+  saveFrameworkDebounced();
+}
+
+function inputFwConcurrentLimit(el) {
+  // Treat empty / out-of-range input as a mid-edit transient state: don't
+  // touch the model and don't trigger a save. Otherwise the user deleting
+  // "1" to type "10" would see an immediate save of 1 (clamped default),
+  // followed by a re-render that overwrites the input they were about to
+  // finish typing — an endless loop from their perspective.
+  const raw = (el.value || '').trim();
+  if (raw === '' || !/^\d+$/.test(raw)) return;
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 10) return;
+  wizData.framework.concurrentSessionLimit = n;
+  // Debounced auto-save: one PUT 500ms after the last keystroke rather
+  // than one per character. renderFrameworkSection preserves the open
+  // sub-section state AND the caret position in the focused input so
+  // the re-render is invisible to the user.
+  saveFrameworkDebounced();
+}
+
+function inputWizCurrency(el) {
+  el.value = el.value.toUpperCase();
+  wizScenario.currency = el.value;
+}
+
+function inputWizCustomCode(el) {
+  // Store the raw text so the input isn't fighting the user while they
+  // type (otherwise lowercase letters would vanish mid-stroke). The
+  // normalised form is computed in wizGenCode at render time.
+  wizScenario.customCode = el.value;
+  wizUpdateCodePreview();
+}
+
+// Each action of an input and what it does: one line that calls, or the name
+// of a function above. A new action is a line here. An action that is not
+// here does nothing.
+const INPUT_ACTIONS = {
+  'set-scenario-text': inputSetScenarioText,
+  'set-scenario-max-wait-minutes': inputSetScenarioMaxWaitMinutes,
+  'set-scenario-departure-days': inputSetScenarioDepartureDays,
+  'set-scenario-receipt-wait-minutes': inputSetScenarioReceiptWaitMinutes,
+  'set-scenario-max-wait-offer-minutes': inputSetScenarioMaxWaitOfferMinutes,
+  'set-scenario-max-wait-addres-minutes': inputSetScenarioExpiryMaxWait,
+  'set-scenario-max-wait-addanc-minutes': inputSetScenarioExpiryMaxWait,
+  'set-scenario-max-wait-refund-offer-minutes': inputSetScenarioExpiryMaxWait,
+  'set-scenario-max-wait-exchange-offer-minutes': inputSetScenarioExpiryMaxWait,
+  'set-trip-time': (el) => { setTripTimeFieldByPath(Number.parseInt(el.dataset.tidx), el.dataset.path, el.value); },
+  'set-trip-path': (el) => { setTripFieldByPath(Number.parseInt(el.dataset.tidx), el.dataset.path, el.value); },
+  'set-pax-input': (el) => { setPaxField(Number.parseInt(el.dataset.pidx), Number.parseInt(el.dataset.pi), el.dataset.field, el.value); },
+  'set-pax-text': inputSetPaxText,
+  'set-pax-reduction': inputSetPaxReduction,
+  'set-pax-loyalty': inputSetPaxLoyalty,
+  'set-offer-currency': inputSetOfferCurrency,
+  'set-offer-tags': inputSetOfferTags,
+  'set-offer-return-offset': inputSetOfferReturnOffset,
+  'set-offer-return-time': (el) => { setOfferField(Number.parseInt(el.dataset.idx), 'returnTime', el.value || null); },
+  'set-offer-return-model': (el) => { setOfferField(Number.parseInt(el.dataset.idx), 'returnModel', el.value || null); },
+  'set-offer-return-fulfillments': (el) => { setOfferField(Number.parseInt(el.dataset.idx), 'returnFulfillments', el.value || null); },
+  'set-offer-selections': inputSetOfferSelections,
+  'set-purchaser': (el) => { setPurchaserField(Number.parseInt(el.dataset.purchIdx), el.dataset.field, el.value); },
+  // ── Framework wizard input handlers ───────────────────────────────────────
+  'wiz-osdm-version': inputWizOsdmVersion,
+  'fw-concurrent-limit': inputFwConcurrentLimit,
+  // ── Step 3 input handlers ─────────────────────────────────────────────────
+  'wiz-currency': inputWizCurrency,
+  'wiz-origin-urn': (el) => { wizScenario.originURN = el.value.trim(); },
+  'wiz-dest-urn': (el) => { wizScenario.destinationURN = el.value.trim(); },
+  'wiz-custom-code': inputWizCustomCode,
+};
+
+// The groups of actions that have a handler of their own. They are tried
+// first and in this order, and each says whether the action was one of its
+// own. A new group is a line here.
+const INPUT_GROUPS = [
+  changeExchange,
+  changeNonTrip,
+  inputTraceState,
+  inputLostCard,
+  inputScenarioSearch,   // #1314
+  inputRequestedSection,
+  inputFareRefundFee,
+];
+
 document.body.addEventListener('input', function(e) {
   const el = findAction(e.target);
   if (!el) return;
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }   // #515, as above
   const action = el.dataset.action;
-  if (changeExchange(action, el)) return;
-  if (changeNonTrip(action, el)) return;
-  if (inputTraceState(action, el)) return;
-  if (inputLostCard(action, el)) return;
-  if (inputScenarioSearch(action, el)) return;   // #1314
-  if (inputRequestedSection(action, el)) return;
-  if (inputFareRefundFee(action, el)) return;
-
-  switch (action) {
-    case 'set-scenario-text':
-      // #785: a version mid-typing ("3.") is not stored; the field is checked when left.
-      if (el.dataset.field === 'osdmVersion' && el.value.trim() && !isOsdmVersionText(el.value)) break;
-      setScenarioField(Number.parseInt(el.dataset.idx), el.dataset.field, el.value); break;
-    case 'set-scenario-max-wait-minutes': {
-      // Per-scenario max wait budget for #204 expiredBookingTest, in minutes.
-      // Empty input clears (null = use server default RUN_TIMEOUT_MS).
-      // Non-empty must be an integer in [1, 60] — anything else is ignored
-      // until the user types a valid value (no spurious saves mid-edit).
-      const v = el.value.trim();
-      if (v === '') {
-        setScenarioField(Number.parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', null);
-      } else {
-        const n = Number.parseInt(v, 10);
-        if (Number.isInteger(n) && n >= 1 && n <= 60) {
-          setScenarioField(Number.parseInt(el.dataset.idx), 'expiredBookingMaxWaitMinutes', n);
-        }
-      }
-      break;
-    }
-    case 'set-scenario-departure-days': {
-      // #704: the scenario's own departure date, in days from the run. Empty
-      // clears it; otherwise an integer in [-366, 1000], anything else
-      // ignored mid-edit.
-      const v = el.value.trim();
-      const n = Number(v);
-      if (v === '') setScenarioField(Number.parseInt(el.dataset.idx), 'departureDaysFromToday', null);
-      else if (Number.isInteger(n) && n >= -366 && n <= 1000) setScenarioField(Number.parseInt(el.dataset.idx), 'departureDaysFromToday', n);
-      break;
-    }
-    case 'set-scenario-receipt-wait-minutes': {
-      // #603: how long to wait for the refund receipt, in minutes. Empty
-      // clears it (not awaited); otherwise an integer in [1, 60], anything
-      // else ignored mid-edit.
-      const v = el.value.trim();
-      const n = Number.parseInt(v, 10);
-      if (v === '') setScenarioField(Number.parseInt(el.dataset.idx), 'refundReceiptMaxWaitMinutes', null);
-      else if (Number.isInteger(n) && n >= 1 && n <= 60) setScenarioField(Number.parseInt(el.dataset.idx), 'refundReceiptMaxWaitMinutes', n);
-      break;
-    }
-    case 'set-scenario-max-wait-offer-minutes': {
-      // Per-scenario max wait budget for the expiredOfferTest, in minutes.
-      // Same semantics as set-scenario-max-wait-minutes above: empty = null
-      // (use server default RUN_TIMEOUT_MS); non-empty must be an integer in
-      // [1, 60] — anything else is ignored mid-edit.
-      const v = el.value.trim();
-      if (v === '') {
-        setScenarioField(Number.parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', null);
-      } else {
-        const n = Number.parseInt(v, 10);
-        if (Number.isInteger(n) && n >= 1 && n <= 60) {
-          setScenarioField(Number.parseInt(el.dataset.idx), 'expiredOfferMaxWaitMinutes', n);
-        }
-      }
-      break;
-    }
-    case 'set-scenario-max-wait-addres-minutes':
-    case 'set-scenario-max-wait-addanc-minutes':
-    case 'set-scenario-max-wait-refund-offer-minutes':
-    case 'set-scenario-max-wait-exchange-offer-minutes': {
-      // Per-scenario Max wait inputs for Phase 3/4/5 expired-X tests. All
-      // share the empty=null / [1,60] integer semantics of the booking/offer
-      // timers above. Action → field-name map kept local so renaming a field
-      // is a one-place edit.
-      const _maxWaitFieldByAction = {
-        'set-scenario-max-wait-addres-minutes':         'expiredAddReservationOfferMaxWaitMinutes',
-        'set-scenario-max-wait-addanc-minutes':         'expiredAddAncillaryOfferMaxWaitMinutes',
-        'set-scenario-max-wait-refund-offer-minutes':   'expiredRefundOfferMaxWaitMinutes',
-        'set-scenario-max-wait-exchange-offer-minutes': 'expiredExchangeOfferMaxWaitMinutes',
-      };
-      const _field = _maxWaitFieldByAction[action];
-      const v = el.value.trim();
-      if (v === '') {
-        setScenarioField(Number.parseInt(el.dataset.idx), _field, null);
-      } else {
-        const n = Number.parseInt(v, 10);
-        if (Number.isInteger(n) && n >= 1 && n <= 60) {
-          setScenarioField(Number.parseInt(el.dataset.idx), _field, n);
-        }
-      }
-      break;
-    }
-    case 'set-trip-time':
-      setTripTimeFieldByPath(Number.parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
-    case 'set-trip-path':
-      setTripFieldByPath(Number.parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
-    case 'set-pax-input':
-      setPaxField(Number.parseInt(el.dataset.pidx), Number.parseInt(el.dataset.pi), el.dataset.field, el.value); break;
-    case 'set-pax-text': {
-      // Free-text fields in the per-passenger editor (firstName, lastName,
-      // dateOfBirth, email, phoneNumber). Updates the model on every
-      // keystroke — no re-render, so focus/caret stay put while typing.
-      const sptIdx = Number.parseInt(el.dataset.pidx);
-      const sptPi  = Number.parseInt(el.dataset.pi);
-      const sptField = el.dataset.field;
-      setPaxField(sptIdx, sptPi, sptField, el.value);
-      // Keep the compact row-header display in sync when the user edits
-      // firstName or lastName from inside the Edit panel — no waiting for
-      // a re-render, so the change is immediately visible in the row above.
-      if (sptField === 'firstName' || sptField === 'lastName') {
-        const pxList = state.passengersList[sptIdx];
-        const pxPax  = pxList?.passengers?.[sptPi];
-        const disp = document.querySelector('[data-pax-display="' + sptIdx + '-' + sptPi + '"]');
-        if (pxPax && disp) disp.textContent = (pxPax.firstName || '') + ' ' + (pxPax.lastName || '');
-      }
-      break;
-    }
-    case 'set-pax-reduction': {
-      const spIdx = Number.parseInt(el.dataset.pidx);
-      const spPi  = Number.parseInt(el.dataset.pi);
-      const spCi  = Number.parseInt(el.dataset.cidx);
-      const spList = state.passengersList[spIdx];
-      const spPax  = spList?.passengers?.[spPi];
-      if (!spPax) break;
-      if (!Array.isArray(spPax.reductionCards)) spPax.reductionCards = [];
-      spPax.reductionCards[spCi] = el.value;
-      markDirty();
-      break;
-    }
-    case 'set-pax-loyalty': {
-      const slIdx = Number.parseInt(el.dataset.pidx);
-      const slPi  = Number.parseInt(el.dataset.pi);
-      const slCi  = Number.parseInt(el.dataset.cidx);
-      const field = el.dataset.field;
-      const slList = state.passengersList[slIdx];
-      const slPax  = slList?.passengers?.[slPi];
-      if (!slPax) break;
-      if (!Array.isArray(slPax.loyaltyCards)) slPax.loyaltyCards = [];
-      if (!slPax.loyaltyCards[slCi] || typeof slPax.loyaltyCards[slCi] !== 'object') {
-        slPax.loyaltyCards[slCi] = { carrierCode: '', cardReference: '' };
-      }
-      slPax.loyaltyCards[slCi][field] = el.value;
-      markDirty();
-      break;
-    }
-    case 'set-offer-currency':
-      el.value = el.value.toUpperCase();
-      setOfferField(Number.parseInt(el.dataset.idx), 'currency', el.value); break;
-    case 'set-offer-tags': {
-      const tags = el.value.split(',').map(t => t.trim()).filter(Boolean);
-      setOfferField(Number.parseInt(el.dataset.idx), 'productTags', tags.length > 0 ? tags : null);
-      break;
-    }
-    case 'set-offer-return-offset': {
-      const v = el.value.trim();
-      const n = Number.parseInt(v, 10);
-      // Empty = one-way (clear). Otherwise store a non-negative integer day offset.
-      setOfferField(Number.parseInt(el.dataset.idx), 'returnOffsetDays', (v !== '' && Number.isInteger(n) && n >= 0) ? n : null);
-      break;
-    }
-    case 'set-offer-return-time':
-      setOfferField(Number.parseInt(el.dataset.idx), 'returnTime', el.value || null); break;
-    case 'set-offer-return-model':
-      setOfferField(Number.parseInt(el.dataset.idx), 'returnModel', el.value || null); break;
-    case 'set-offer-return-fulfillments':
-      setOfferField(Number.parseInt(el.dataset.idx), 'returnFulfillments', el.value || null); break;
-    case 'set-offer-selections': {
-      try {
-        const parsed = el.value.trim() ? JSON.parse(el.value.trim()) : null;
-        setOfferField(Number.parseInt(el.dataset.idx), 'productSelections', parsed);
-      } catch (_) { /* invalid JSON — don't save until valid */ }
-      break;
-    }
-    case 'set-purchaser':
-      setPurchaserField(Number.parseInt(el.dataset.purchIdx), el.dataset.field, el.value); break;
-
-    // ── Framework wizard input handlers ───────────────────────────────────────
-    case 'wiz-osdm-version': {
-      const v = el.value.trim();
-      // Skip empty (mid-edit): saving an empty string would then be read back
-      // as a falsy osdmVersion and replaced with the default, losing the user
-      // previous value without intent. The next re-render (any other action)
-      // will snap the displayed value back to the stored one.
-      if (!v || !isOsdmVersionText(v)) break;
-      wizData.framework.osdmVersion = v;
-      refreshReturnVersionNote();
-      saveFrameworkDebounced();
-      break;
-    }
-    case 'fw-concurrent-limit': {
-      // Treat empty / out-of-range input as a mid-edit transient state: don't
-      // touch the model and don't trigger a save. Otherwise the user deleting
-      // "1" to type "10" would see an immediate save of 1 (clamped default),
-      // followed by a re-render that overwrites the input they were about to
-      // finish typing — an endless loop from their perspective.
-      const raw = (el.value || '').trim();
-      if (raw === '' || !/^\d+$/.test(raw)) break;
-      const n = Number.parseInt(raw, 10);
-      if (!Number.isFinite(n) || n < 1 || n > 10) break;
-      wizData.framework.concurrentSessionLimit = n;
-      // Debounced auto-save: one PUT 500ms after the last keystroke rather
-      // than one per character. renderFrameworkSection preserves the open
-      // sub-section state AND the caret position in the focused input so
-      // the re-render is invisible to the user.
-      saveFrameworkDebounced();
-      break;
-    }
-
-    // ── Step 3 input handlers ─────────────────────────────────────────────────
-    case 'wiz-currency':
-      el.value = el.value.toUpperCase();
-      wizScenario.currency = el.value; break;
-    case 'wiz-origin-urn':
-      wizScenario.originURN = el.value.trim(); break;
-    case 'wiz-dest-urn':
-      wizScenario.destinationURN = el.value.trim(); break;
-    case 'wiz-custom-code':
-      // Store the raw text so the input isn't fighting the user while they
-      // type (otherwise lowercase letters would vanish mid-stroke). The
-      // normalised form is computed in wizGenCode at render time.
-      wizScenario.customCode = el.value;
-      wizUpdateCodePreview();
-      break;
-  }
+  if (INPUT_GROUPS.some((group) => group(action, el))) return;
+  // Only what the table itself holds: every object also answers to names
+  // such as `constructor`, which are no action.
+  const act = Object.hasOwn(INPUT_ACTIONS, action) ? INPUT_ACTIONS[action] : null;
+  if (act) act(el, e, action);
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
