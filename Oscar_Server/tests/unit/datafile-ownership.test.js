@@ -580,3 +580,65 @@ describe('the trip an exchange is for (#959)', () => {
     expect(next()).toBe(55);
   });
 });
+
+// ── Details no other test held (#1408) ───────────────────────────────────────
+// mergeTesterSave() was split by stage; one fault at a time in its lines
+// showed five places the tests above let through. Each test below fails on
+// one of them.
+describe('mergeTesterSave — what the split\'s fault campaign showed untested (#1408)', () => {
+  const first = (extra = {}) => datafile([[scenario('FIRST', ANA, { base: 1 }), resources(1, 'f')]], { scenariosToRun: ['FIRST'], ...extra });
+  const add = (v, code, owner, base) => {
+    v.scenarios.push(scenario(code, owner, { base }));
+    Object.entries(resources(base, code)).forEach(([k, e]) => v[k].push(...e));
+    return v;
+  };
+
+  test('a first save stores its resource lists; a list neither side holds is not made', () => {
+    const { datafile: out } = mergeTesterSave({}, first(), ANA);
+    expect(out.tripRequirements).toEqual([{ id: 1, tag: 'f' }]);
+    expect(out.passengersList).toEqual([{ id: 2, tag: 'f' }]);
+    expect(out.purchaserList).toEqual([{ id: 3, tag: 'f' }]);
+    expect(out.requestedFulfillmentOptionsList).toEqual([{ id: 4, tag: 'f' }]);
+    const sent = first();
+    delete sent.passengersList;
+    expect(mergeTesterSave({}, sent, ANA).datafile).not.toHaveProperty('passengersList');
+  });
+
+  test('a stored list the save leaves out is merged all the same: the entry of a scenario she deleted goes', () => {
+    const stored = companyFile();
+    const sent = clone(viewForTester(stored, ANA, null));
+    sent.scenarios = sent.scenarios.filter(s => s.code !== 'ANA_1');
+    delete sent.tripRequirements;
+    const { datafile: out } = mergeTesterSave(stored, sent, ANA);
+    expect(out.tripRequirements.map(e => e.id)).toEqual([10, 20, 40, 50]);
+  });
+
+  test('A: the two skeleton keys are taken as text of 64 characters at most, and never over a stored value', () => {
+    const longest = 'v'.repeat(64);
+    expect(mergeTesterSave({}, first({ osdmVersion: longest }), ANA).datafile.osdmVersion).toBe(longest);
+    expect(mergeTesterSave({}, first({ osdmVersion: `${longest}v` }), ANA).datafile).not.toHaveProperty('osdmVersion');
+    expect(mergeTesterSave({}, first({ osdmVersion: ['3.8'] }), ANA).datafile).not.toHaveProperty('osdmVersion');
+    const stored = { ...companyFile(), osdmVersion: '3.8' };
+    const sent = clone(viewForTester(stored, ANA, null));
+    sent.osdmVersion = '3.4';
+    expect(mergeTesterSave(stored, sent, ANA).datafile.osdmVersion).toBe('3.8');
+  });
+
+  test('C: two new scenarios under one taken code each get a free code of their own', () => {
+    const stored = companyFile();
+    const sent = add(add(clone(viewForTester(stored, ANA, null)), 'SHARED_1', ANA, 60), 'SHARED_1', ANA, 70);
+    const r = mergeTesterSave(stored, sent, ANA);
+    expect(r.renamed).toEqual([{ from: 'SHARED_1', to: 'SHARED_1_2' }, { from: 'SHARED_1', to: 'SHARED_1_3' }]);
+    expect(codes(r.datafile).filter(c => c.startsWith('SHARED_1'))).toEqual(['SHARED_1', 'SHARED_1_2', 'SHARED_1_3']);
+  });
+
+  test('a scenario of hers that names no entry does not bring in an entry that has no id', () => {
+    const stored = companyFile();
+    const sent = clone(viewForTester(stored, ANA, null));
+    delete byCode(sent, 'ANA_1').passengersListId;
+    sent.passengersList.push({ tag: 'no id' });
+    const { datafile: out } = mergeTesterSave(stored, sent, ANA);
+    expect(out.passengersList.some(e => e.tag === 'no id')).toBe(false);
+    expect(out.passengersList.map(e => e.id)).toEqual([11, 21, 41, 51]);
+  });
+});

@@ -2397,7 +2397,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   comments out; the function's own first and last lines count), in the `src`,
   `public` and library blocks, not the tests. What was over them is ESLint's
   own baseline (bulk suppressions, ESLint 9.24+): `eslint-suppressions.json`
-  (found by itself in the folder ESLint starts in: 102 + 17 since #1405) and
+  (found by itself in the folder ESLint starts in: 101 + 16 since #1408) and
   `eslint-library-suppressions.json` (`--suppressions-location`, 78 + 20
   since #1407),
   paths with forward slashes from that folder. **One more function over a
@@ -2570,6 +2570,27 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   did, and failed on the split): run every test file that names the module,
   not only its own. `mutate-jest-file.js` tries the trace campaign's faults
   against a Jest file (a copy of module and test per fault, one Jest run).
+- **`mergeTesterSave()` is split by stage** (#1408, 1.11.576; M2, seventh
+  and last function). `storedByOwner()`, `sortSentScenarios()` (the tester's
+  own scenarios as they will be stored, the codes renamed, the read-only ones
+  sent changed), `placedScenarios()`, then one `mergedList()` per resource
+  list, with `ownEntries()` for the links of the tester's scenarios and
+  `shareOrFork()` for a link to an entry that is not theirs (rules J and L,
+  the copy-on-write). **A new rule of the merge goes in its stage**; the
+  lettered tests of `datafile-ownership.test.js` still name the rules.
+  **How it was proved**: a pure function needs no recorder. `trace-merge.js`
+  loads the old and the new module (they require nothing), draws a stored
+  file and a save from a case number (the tester's view echoed back and
+  edited, as the editor does it), and compares what each answers or throws
+  and the two inputs after the call: 200,000 cases, then one fault at a time
+  in the new functions. **A fault that makes a loop endless hangs a Jest
+  run** (Jest cannot stop a test that never gives the hand back, and four
+  such faults held its four workers): the trace campaign runs each fault in
+  a process it can stop and writes which did not end, and
+  `mutate-jest-file.js` leaves those out. The faults showed five places the
+  62 tests let through (a first save's resource lists among them): five
+  tests were added. **The seven functions of M2 are split**; what the
+  lint's records still hold are functions M2 did not name.
 - **CI required checks:** Lint/audit/test, CodeQL, Trivy (image scan), Docker
   build, Gitleaks, SonarCloud scan, Bruno-collection validation, PR labeler,
   **`SonarQube Quality Gate check`** (added to required list 2026-07-02 via

@@ -4,6 +4,17 @@
   "current_release": "2026.610",
   "releases": [
     {
+      "release": "2026.617",
+      "date": "2026-11-23",
+      "server": "1.11.576",
+      "collection": "OTST_V2.0.270",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.576 (#1408): mergeTesterSave() of utils/datafileOwnership.js, which merges a tester's Save & Apply into the company's data file, is split by stage into 7 functions (the stored scenarios by owner, the scenarios sent, where each goes, each resource list, the entries the tester's scenarios need, an entry that is not theirs to change). Behaviour unchanged: the old and the new function give the same answer on 200,000 drawn data files and saves, and leave what they are handed untouched. With it the seven functions of point M2 of the code quality review are split. Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.616",
       "date": "2026-11-23",
       "server": "1.11.575",
