@@ -870,6 +870,47 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     throw new Error("No booking found or 'booking' is not an object.");
   }
 
+  checkBookingIdentity(booking, expectedBookedOffersStatus);
+  keepBookingPassengerIds(booking);
+
+  checkBookingAfterOffer(booking, selectedOffer);
+  checkConfirmationDeadline(booking, expectedBookedOffersStatus);
+  feedBookingRequestedInformation(booking);
+  keepFirstBookedOffer(booking);
+  const { prov, mini } = checkBookingPrices(booking, selectedOffer, expectedBookedOffersStatus);
+
+  // #1300: OFFER_PART_PRICE_CHANGE is said by the answer of 02 and kept for
+  // the later reads of the same sale.
+  const _asOffered = require("./bookedAsOffered.js");
+  if (isCreateBookingStep()) bru.setEnvVar("__bookingPriceChangeSaid", String(_asOffered.priceChangeSaid(jsonData)));
+  const _priceChangeSaid = String(bru.getEnvVar("__bookingPriceChangeSaid")) === "true";
+
+  const requestName = (typeof req !== "undefined" && req?.getName?.()) || "";
+  if (requestName === "02. POST Create Booking" || requestName === "05. GET Booking before Fulfillments") {
+    checkProvisionalPrice(prov, mini, booking, _priceChangeSaid);
+  }
+
+  checkBookedOfferParts(selectedOffer, booking, expectedBookedOffersStatus, _asOffered, _priceChangeSaid);
+  checkBookingFulfillments(booking, expectedFulfillmentStatus, requireFulfillments);
+  checkBookingPassengerCount(booking);
+
+  // C2: fulfillmentStatus (new in OSDM 3.8, optional) is a FulfillmentSummaryStatus:
+  // an x-extensible-enum PENDING / CREATED / COMPLETE (spec 3.8, FulfillmentSummaryStatus).
+  // #613 F3: the list used to be UNISSUED/ISSUED/…, which is not the 3.8 one and
+  // failed every provider sending the 3.8 values. Extensible: FAIL only when the
+  // value is not text, WARNING when it is outside the listed values.
+  // #337: null and undefined both mean "absent".
+  checkFulfillmentSummaryStatus(booking);
+}
+
+// The stages of postCreateBookingResponse(), in the order it runs them (#1407).
+// Each takes the booking and what it needs of the call, and keeps its own
+// variables.
+
+// The booking itself: it is there, with its id (kept for the next steps); a
+// sale without a trip and the trip sold are looked at; its code is text when
+// it has one.
+function checkBookingIdentity(booking, expectedBookedOffersStatus) {
   test(`'booking' object exists`, () => {
     expect(booking, "[ERROR] 'booking' is missing or empty").to.be.an("object").that.is.not.empty;
     validationLogger(`[DEBUG] 'booking' object exists`);
@@ -894,7 +935,9 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   } else {
     validationLogger(`[DEBUG] booking.bookingCode is absent (optional per OSDM spec)`);
   }
+}
 
+function keepBookingPassengerIds(booking) {
   // Collect passenger IDs, ALIGNED to the submitted order by externalRef. OSDM
   // does not guarantee the booking returns passengers in submitted order (Turnit
   // reorders them); the per-passenger steps (03 PATCH / 04 GET Passenger) pair
@@ -921,24 +964,24 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   if (passengerIdList.length === 0) validationLogger("[ERROR] Passengers structure is invalid or empty.");
   validationLogger(`[FULL] Passenger IDs: [${passengerIdList}]`);
   bru.setEnvVar("passengerIdList", passengerIdList);
+}
 
-  checkBookingAfterOffer(booking, selectedOffer);
-
-  // B2 / #204: booking-level confirmation deadline must be a valid future datetime
-  // when present (OSDM).
-  //
-  // Field-name resolution order (most-standard → least-standard):
-  //   1. `Booking.confirmationTimeLimit` — OSDM-standard at the booking level.
-  //   2. `Booking.confirmableUntil` — Bileto sandbox sets this at the booking
-  //       level (OSDM defines this field at the *bookingPart* level only).
-  //   3. **Earliest** `bookedOffers[].{admissions|reservations|ancillaries}[].confirmableUntil`
-  //       — Paxone sandbox sets `confirmableUntil` ONLY at the bookingPart level,
-  //       not at the booking root (matching the OSDM schema's own placement of
-  //       the field). The booking effectively expires when the FIRST part
-  //       expires, so the earliest part-level deadline is the booking deadline.
-  //
-  // Each fallback emits a `[WARNING]` documenting the vendor deviation so the
-  // tester can see in the report which shape was used.
+// B2 / #204: booking-level confirmation deadline must be a valid future datetime
+// when present (OSDM).
+//
+// Field-name resolution order (most-standard → least-standard):
+//   1. `Booking.confirmationTimeLimit` — OSDM-standard at the booking level.
+//   2. `Booking.confirmableUntil` — Bileto sandbox sets this at the booking
+//       level (OSDM defines this field at the *bookingPart* level only).
+//   3. **Earliest** `bookedOffers[].{admissions|reservations|ancillaries}[].confirmableUntil`
+//       — Paxone sandbox sets `confirmableUntil` ONLY at the bookingPart level,
+//       not at the booking root (matching the OSDM schema's own placement of
+//       the field). The booking effectively expires when the FIRST part
+//       expires, so the earliest part-level deadline is the booking deadline.
+//
+// Each fallback emits a `[WARNING]` documenting the vendor deviation so the
+// tester can see in the report which shape was used.
+function confirmationDeadlineOf(booking) {
   let _confirmDeadline = booking.confirmationTimeLimit || booking.confirmableUntil || null;
   let _confirmSource   = null;
   if (booking.confirmationTimeLimit) _confirmSource = 'booking.confirmationTimeLimit (OSDM-standard)';
@@ -969,6 +1012,13 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
         `part deadline(s); the booking effectively expires when the first part expires.`;
     }
   }
+  return [_confirmDeadline, _confirmSource];
+}
+
+// The deadline is checked while the booking is pre-booked, and kept for the
+// step that waits until it has passed (#204).
+function checkConfirmationDeadline(booking, expectedBookedOffersStatus) {
+  const [_confirmDeadline, _confirmSource] = confirmationDeadlineOf(booking);
 
   // OSDM: confirmableUntil "must be provided for a booking part in PREBOOKED
   // state. For later states, the value is ignored and can be null". Once the
@@ -996,87 +1046,111 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
     bru.setEnvVar('bookingConfirmationTimeLimit', '');
     validationLogger(`[DEBUG] booking has no confirmation deadline anywhere (not at the booking root, not on any bookingPart) → deadline test skipped; if #204 expiredBookingTest=on, that test will skip with a [WARNING] too.`);
   }
+}
 
+// A variable of the run read as a list: [] when it is not set or does not read.
+const listFromEnv = (n) => {
+  const r = bru.getEnvVar(n);
+  if (r === null || r === undefined || r === '') return [];
+  try { return typeof r === 'string' ? JSON.parse(r) : r; } catch (_e) { return []; }
+};
+
+// A variable of the run read as an object: {} when it is not set, does not
+// read or is not one.
+const objectFromEnv = (n) => {
+  const r = bru.getEnvVar(n);
+  if (r === null || r === undefined || r === '') return {};
+  try { const v = typeof r === 'string' ? JSON.parse(r) : r; return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; } catch { return {}; }
+};
+
+function feedBookingRequestedInformation(booking) {
   // RI (#258): booking-level requestedInformation — static assertions, evaluate
   // against the passenger data OSCAR will PATCH, and auto-provide missing fields
   // (Phase 3a/3b). The PATCH step (03) runs after this and carries the values.
   const _bookingRi = booking.requestedInformation;
   if (_bookingRi !== undefined && _bookingRi !== null && _bookingRi !== '') {
-    const _read = (n) => {
-      const r = bru.getEnvVar(n);
-      if (r === null || r === undefined || r === '') return [];
-      try { return typeof r === 'string' ? JSON.parse(r) : r; } catch (_e) { return []; }
-    };
-    const _add = _read('passengerAdditionalData');
-    const _specs = _read('bookingPassengerSpecifications');
-    const _count = Number(bru.getEnvVar('offerPassengerNumber')) || (booking.passengers || []).length || _add.length || 0;
-    const _probe = String(bru.getEnvVar('requestedInformationProbe') || 'off').toLowerCase();
-    const _mode = (_probe === 'omit' || _probe === 'invalid') ? _probe : 'autofeed';
-
-    // Purchaser channel (#258 / #203): the purchaser is a single object. Its mode
-    // is driven by bookingPurchaserMode — inline/deferred → satisfy (autofeed),
-    // omit/invalid → negative probe. The resulting purchaserAdditionalData /
-    // requestedInfoPurchaserProbeTargets are read by the Booking Purchaser
-    // step. The scenario purchaser (bookingPurchaserSpecifications) seeds the
-    // model so an already-complete purchaser needs no auto-feed.
-    const _readObj = (n) => {
-      const r = bru.getEnvVar(n);
-      if (r === null || r === undefined || r === '') return {};
-      try { const v = typeof r === 'string' ? JSON.parse(r) : r; return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; } catch { return {}; }
-    };
-    const _purSpec = _readObj('bookingPurchaserSpecifications');
-    const _purAdd = _readObj('purchaserAdditionalData');
-    const _purModeRaw = String(bru.getEnvVar('bookingPurchaserMode') || 'inline').toLowerCase();
-    const _purMode = (_purModeRaw === 'omit' || _purModeRaw === 'invalid') ? _purModeRaw : 'autofeed';
-
-    const out = processRequestedInformation({
-      expr: _bookingRi,
-      tag: 'booking',
-      additional: _add,
-      specs: _specs,
-      passengerCount: _count,
-      mode: _mode,
-      purchaserAdditional: _purAdd,
-      purchaserSpec: _purSpec,
-      purchaserMode: _purMode,
-      assert: (name, ok, msg) => test(name, () => { expect(ok, msg).to.be.true; }),
-      log: (lvl, msg) => validationLogger(`[${lvl}] ${msg}`),
-    });
-    if (out.provided.length || (out.probeTargets?.length)) {
-      bru.setEnvVar('passengerAdditionalData', JSON.stringify(out.additional));
-      if (String(bru.getEnvVar('skipPatchPassengerRequest')) === 'true') {
-        bru.setEnvVar('skipPatchPassengerRequest', 'false');
-      }
-    }
-    if (out.probeTargets?.length) {
-      const _existing = _read('requestedInfoProbeTargets');
-      bru.setEnvVar('requestedInfoProbeTargets', JSON.stringify(_existing.concat(out.probeTargets)));
-    }
-    // Persist the purchaser channel for the Booking Purchaser step (#258/#203).
-    if ((out.purchaserProvided?.length)
-        || (out.purchaserProbeTargets?.length)) {
-      bru.setEnvVar('purchaserAdditionalData', JSON.stringify(out.purchaserAdditional || {}));
-    }
-    if (out.purchaserProbeTargets?.length) {
-      bru.setEnvVar('requestedInfoPurchaserProbeTargets', JSON.stringify(out.purchaserProbeTargets));
-    }
-
-    // P2: the provider should stop requesting what OSCAR already provided at the
-    // offer step. If it still asks, flag it (WARN — requestedInformation should
-    // shrink as data is supplied).
-    const _autoFed = _read('requestedInfoAutoFed');
-    if (_autoFed.length) {
-      const s = summariseRequestedInformation(_bookingRi);
-      if (s.parseOk) {
-        s.leaves
-          .filter(l => l.scenarioField && _autoFed.some(a => a.scenarioField === l.scenarioField && (l.index === 'ANY' || a.index === l.index)))
-          .forEach(l => validationLogger(`[WARNING] [P2] booking.requestedInformation still requests '${l.scenarioField}' for ${l.passengerRef}, which OSCAR already provided — requestedInformation should clear once satisfied.`));
-      }
-    }
+    const out = bookingRequestedInformation(booking, _bookingRi);
+    keepRequestedInformation(out);
+    warnRequestedAgain(_bookingRi);
   } else {
     validationLogger(`[DEBUG] booking.requestedInformation absent → nothing additionally required`);
   }
+}
 
+// What the booking asks for, answered from the passengers' and the
+// purchaser's data: what processRequestedInformation() gives back.
+function bookingRequestedInformation(booking, _bookingRi) {
+  const _add = listFromEnv('passengerAdditionalData');
+  const _specs = listFromEnv('bookingPassengerSpecifications');
+  const _count = Number(bru.getEnvVar('offerPassengerNumber')) || (booking.passengers || []).length || _add.length || 0;
+  const _probe = String(bru.getEnvVar('requestedInformationProbe') || 'off').toLowerCase();
+  const _mode = (_probe === 'omit' || _probe === 'invalid') ? _probe : 'autofeed';
+
+  // Purchaser channel (#258 / #203): the purchaser is a single object. Its mode
+  // is driven by bookingPurchaserMode — inline/deferred → satisfy (autofeed),
+  // omit/invalid → negative probe. The resulting purchaserAdditionalData /
+  // requestedInfoPurchaserProbeTargets are read by the Booking Purchaser
+  // step. The scenario purchaser (bookingPurchaserSpecifications) seeds the
+  // model so an already-complete purchaser needs no auto-feed.
+  const _purSpec = objectFromEnv('bookingPurchaserSpecifications');
+  const _purAdd = objectFromEnv('purchaserAdditionalData');
+  const _purModeRaw = String(bru.getEnvVar('bookingPurchaserMode') || 'inline').toLowerCase();
+  const _purMode = (_purModeRaw === 'omit' || _purModeRaw === 'invalid') ? _purModeRaw : 'autofeed';
+
+  const out = processRequestedInformation({
+    expr: _bookingRi,
+    tag: 'booking',
+    additional: _add,
+    specs: _specs,
+    passengerCount: _count,
+    mode: _mode,
+    purchaserAdditional: _purAdd,
+    purchaserSpec: _purSpec,
+    purchaserMode: _purMode,
+    assert: (name, ok, msg) => test(name, () => { expect(ok, msg).to.be.true; }),
+    log: (lvl, msg) => validationLogger(`[${lvl}] ${msg}`),
+  });
+  return out;
+}
+
+// What was fed or is to be probed, kept for the passenger and purchaser steps.
+function keepRequestedInformation(out) {
+  if (out.provided.length || (out.probeTargets?.length)) {
+    bru.setEnvVar('passengerAdditionalData', JSON.stringify(out.additional));
+    if (String(bru.getEnvVar('skipPatchPassengerRequest')) === 'true') {
+      bru.setEnvVar('skipPatchPassengerRequest', 'false');
+    }
+  }
+  if (out.probeTargets?.length) {
+    const _existing = listFromEnv('requestedInfoProbeTargets');
+    bru.setEnvVar('requestedInfoProbeTargets', JSON.stringify(_existing.concat(out.probeTargets)));
+  }
+  // Persist the purchaser channel for the Booking Purchaser step (#258/#203).
+  if ((out.purchaserProvided?.length)
+      || (out.purchaserProbeTargets?.length)) {
+    bru.setEnvVar('purchaserAdditionalData', JSON.stringify(out.purchaserAdditional || {}));
+  }
+  if (out.purchaserProbeTargets?.length) {
+    bru.setEnvVar('requestedInfoPurchaserProbeTargets', JSON.stringify(out.purchaserProbeTargets));
+  }
+}
+
+function warnRequestedAgain(_bookingRi) {
+  // P2: the provider should stop requesting what OSCAR already provided at the
+  // offer step. If it still asks, flag it (WARN — requestedInformation should
+  // shrink as data is supplied).
+  const _autoFed = listFromEnv('requestedInfoAutoFed');
+  if (_autoFed.length) {
+    const s = summariseRequestedInformation(_bookingRi);
+    if (s.parseOk) {
+      s.leaves
+        .filter(l => l.scenarioField && _autoFed.some(a => a.scenarioField === l.scenarioField && (l.index === 'ANY' || a.index === l.index)))
+        .forEach(l => validationLogger(`[WARNING] [P2] booking.requestedInformation still requests '${l.scenarioField}' for ${l.passengerRef}, which OSCAR already provided — requestedInformation should clear once satisfied.`));
+    }
+  }
+}
+
+function keepFirstBookedOffer(booking) {
   // B3: bookedOffers must be non-empty (OSDM: a booking must contain at least one BookedOffer)
   test(`booking.bookedOffers is a non-empty array (OSDM: required)`, () => {
     expect(booking.bookedOffers).to.be.an('array').with.lengthOf.at.least(1);
@@ -1095,7 +1169,12 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   if (bookedOfferId) {
     bru.setEnvVar("bookedOfferId", bookedOfferId);
   }
+}
 
+// The price members of the booking: the one its stage asks for, the amounts
+// kept for the after-sale steps, the currencies. Gives the provisional price
+// and the offer's minimal price for the check that follows.
+function checkBookingPrices(booking, selectedOffer, expectedBookedOffersStatus) {
   // Price structure checks
   const prov      = booking.provisionalPrice;
   // #613 F7: offerSummary is optional in OSDM; reading through it unguarded
@@ -1112,6 +1191,32 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   // isPostConfirmationStage() above for the exact mapping.
   const _stageLabel = String(expectedBookedOffersStatus || '');
   const _expectsConfirmed = isPostConfirmationStage(expectedBookedOffersStatus);
+  checkStagePrice(prov, confirmed, expectedBookedOffersStatus, _stageLabel, _expectsConfirmed);
+  if (prov) bru.setEnvVar("provisionalPriceAmount", prov.amount);
+  if (confirmed) keepConfirmedPriceAmount(prov, confirmed, _stageLabel, _expectsConfirmed);
+
+  // B4: Both prices must use the same currency (OSDM: currency must be consistent within a booking)
+  if (prov?.currency && confirmed?.currency) {
+    test(`provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)`, () => {
+      expect(confirmed.currency).to.eql(prov.currency,
+        `Currency mismatch: provisional=${prov.currency}, confirmed=${confirmed.currency}`);
+      validationLogger(`[DEBUG] Currency consistent across prices: ${prov.currency}`);
+    });
+  }
+  // H3: Offer currency must carry through to booking (OSDM: cross-flow currency consistency)
+  const _offerCurrency = bru.getEnvVar("offerCurrency");
+  if (_offerCurrency && prov?.currency) {
+    test(`booking.provisionalPrice.currency matches offer currency (expected: ${_offerCurrency}, actual: ${prov.currency})`, () => {
+      expect(prov.currency).to.eql(_offerCurrency,
+        `Booking currency (${prov.currency}) differs from offer currency (${_offerCurrency})`);
+    });
+  }
+  return { prov, mini };
+}
+
+// The price member the booking's stage asks for is there, with its currency
+// and amount; the other one is allowed either way.
+function checkStagePrice(prov, confirmed, expectedBookedOffersStatus, _stageLabel, _expectsConfirmed) {
   const _stagePrice = _expectsConfirmed ? confirmed : prov;
   const _stageName  = _expectsConfirmed ? 'confirmedPrice' : 'provisionalPrice';
   const _otherPrice = _expectsConfirmed ? prov : confirmed;
@@ -1141,61 +1246,37 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   validationLogger(_otherPrice
     ? `[DEBUG] ${_otherName} also present at this stage — allowed (optional member).`
     : `[DEBUG] ${_otherName} absent at this stage — allowed (lifecycle-scoped member).`);
-  if (prov) bru.setEnvVar("provisionalPriceAmount", prov.amount);
-  if (confirmed) {
-    // #496: after an after-sales operation, surface confirmedPrice before vs
-    // after so a certifier can eyeball the OSDM identity "confirmedPrice =
-    // confirmed parts − confirmed refund amounts". Logged, NOT asserted, until
-    // OTST confirms the expected provider behaviour — SBB INT still showed the
-    // pre-refund amount after REFUNDED.
-    const _prevConfirmedAmount = bru.getEnvVar("confirmedPriceAmount");
-    if (_expectsConfirmed && /REFUNDED|EXCHANGED/i.test(_stageLabel) &&
-        _prevConfirmedAmount !== undefined && _prevConfirmedAmount !== null && _prevConfirmedAmount !== '') {
-      validationLogger(
-        `[INFO] confirmedPrice at stage ${_stageLabel}: ${confirmed.amount} ${confirmed.currency} (scale ${confirmed.scale}) — ` +
-        `was ${_prevConfirmedAmount} before the after-sales operation. OSDM defines confirmedPrice as the sum of ` +
-        `confirmed parts minus all confirmed refund amounts; not asserted (see #496).`
-      );
-    }
-    if (!_expectsConfirmed && confirmed.amount === 0 && prov && prov.amount > 0) {
-      validationLogger(
-        `[WARNING] confirmedPrice.amount is 0 while provisionalPrice.amount is ${prov.amount} ` +
-        `at pre-confirmation stage — possible provider anomaly. confirmedPriceAmount NOT stored ` +
-        `to avoid corrupting downstream refund/exchange calculations.`
-      );
-    } else {
-      bru.setEnvVar("confirmedPriceAmount", confirmed.amount);
-    }
-  }
+}
 
-  // B4: Both prices must use the same currency (OSDM: currency must be consistent within a booking)
-  if (prov?.currency && confirmed?.currency) {
-    test(`provisionalPrice.currency matches confirmedPrice.currency (OSDM: currency consistency)`, () => {
-      expect(confirmed.currency).to.eql(prov.currency,
-        `Currency mismatch: provisional=${prov.currency}, confirmed=${confirmed.currency}`);
-      validationLogger(`[DEBUG] Currency consistent across prices: ${prov.currency}`);
-    });
+// The confirmed amount is kept for the refund and exchange checks, unless it
+// reads as an anomaly before the confirmation.
+function keepConfirmedPriceAmount(prov, confirmed, _stageLabel, _expectsConfirmed) {
+  // #496: after an after-sales operation, surface confirmedPrice before vs
+  // after so a certifier can eyeball the OSDM identity "confirmedPrice =
+  // confirmed parts − confirmed refund amounts". Logged, NOT asserted, until
+  // OTST confirms the expected provider behaviour — SBB INT still showed the
+  // pre-refund amount after REFUNDED.
+  const _prevConfirmedAmount = bru.getEnvVar("confirmedPriceAmount");
+  if (_expectsConfirmed && /REFUNDED|EXCHANGED/i.test(_stageLabel) &&
+      _prevConfirmedAmount !== undefined && _prevConfirmedAmount !== null && _prevConfirmedAmount !== '') {
+    validationLogger(
+      `[INFO] confirmedPrice at stage ${_stageLabel}: ${confirmed.amount} ${confirmed.currency} (scale ${confirmed.scale}) — ` +
+      `was ${_prevConfirmedAmount} before the after-sales operation. OSDM defines confirmedPrice as the sum of ` +
+      `confirmed parts minus all confirmed refund amounts; not asserted (see #496).`
+    );
   }
-  // H3: Offer currency must carry through to booking (OSDM: cross-flow currency consistency)
-  const _offerCurrency = bru.getEnvVar("offerCurrency");
-  if (_offerCurrency && prov?.currency) {
-    test(`booking.provisionalPrice.currency matches offer currency (expected: ${_offerCurrency}, actual: ${prov.currency})`, () => {
-      expect(prov.currency).to.eql(_offerCurrency,
-        `Booking currency (${prov.currency}) differs from offer currency (${_offerCurrency})`);
-    });
+  if (!_expectsConfirmed && confirmed.amount === 0 && prov && prov.amount > 0) {
+    validationLogger(
+      `[WARNING] confirmedPrice.amount is 0 while provisionalPrice.amount is ${prov.amount} ` +
+      `at pre-confirmation stage — possible provider anomaly. confirmedPriceAmount NOT stored ` +
+      `to avoid corrupting downstream refund/exchange calculations.`
+    );
+  } else {
+    bru.setEnvVar("confirmedPriceAmount", confirmed.amount);
   }
+}
 
-  // #1300: OFFER_PART_PRICE_CHANGE is said by the answer of 02 and kept for
-  // the later reads of the same sale.
-  const _asOffered = require("./bookedAsOffered.js");
-  if (isCreateBookingStep()) bru.setEnvVar("__bookingPriceChangeSaid", String(_asOffered.priceChangeSaid(jsonData)));
-  const _priceChangeSaid = String(bru.getEnvVar("__bookingPriceChangeSaid")) === "true";
-
-  const requestName = (typeof req !== "undefined" && req?.getName?.()) || "";
-  if (requestName === "02. POST Create Booking" || requestName === "05. GET Booking before Fulfillments") {
-    checkProvisionalPrice(prov, mini, booking, _priceChangeSaid);
-  }
-
+function checkBookedOfferParts(selectedOffer, booking, expectedBookedOffersStatus, _asOffered, _priceChangeSaid) {
   // Validate booked offer parts
   const bookedOffers = booking.bookedOffers || [];
   const _context = _asOffered.contextOf(selectedOffer, booking, {
@@ -1219,7 +1300,9 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   if ((req?.getName?.() ?? "") === "02. POST Create Booking") {
     validateAccommodationGoal(selectedOffer, bookedOffers);
   }
+}
 
+function checkBookingFulfillments(booking, expectedFulfillmentStatus, requireFulfillments) {
   // #253: pass the sibling Booking.fulfillmentDocuments[] (v3.8) so each
   // fulfillment.fulfillmentDocumentRef can be checked against its sibling id.
   validateFulfillments(booking.fulfillments || [], 0, expectedFulfillmentStatus, requireFulfillments, booking.fulfillmentDocuments);
@@ -1228,7 +1311,9 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
   if (Array.isArray(booking.fulfillments) && booking.fulfillments.length > 0) {
     bru.setEnvVar("__bookingFulfillmentIds", JSON.stringify(booking.fulfillments.map((f) => f?.id).filter(Boolean)));
   }
+}
 
+function checkBookingPassengerCount(booking) {
   // Check that booking has the same number of passengers as expected from the offer
   const expectedPassengerCount = Number(bru.getEnvVar("passengerCount") || 0);
   const actualPassengerCount = (booking.passengers || []).length;
@@ -1241,14 +1326,6 @@ function postCreateBookingResponse(selectedOffer, jsonData, expectedBookedOffers
       expect(actualPassengerCount).to.be.above(0);
     }
   });
-
-  // C2: fulfillmentStatus (new in OSDM 3.8, optional) is a FulfillmentSummaryStatus:
-  // an x-extensible-enum PENDING / CREATED / COMPLETE (spec 3.8, FulfillmentSummaryStatus).
-  // #613 F3: the list used to be UNISSUED/ISSUED/…, which is not the 3.8 one and
-  // failed every provider sending the 3.8 values. Extensible: FAIL only when the
-  // value is not text, WARNING when it is outside the listed values.
-  // #337: null and undefined both mean "absent".
-  checkFulfillmentSummaryStatus(booking);
 }
 
 // #613 F7: provisionalPrice is "the price of all unconfirmed pre-booked parts

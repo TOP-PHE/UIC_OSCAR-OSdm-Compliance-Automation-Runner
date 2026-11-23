@@ -172,7 +172,15 @@ describe('the wiring', () => {
     const bookings = read('Bruno_Collection/library-bruno/bookings.js');
     const checked = bookings.indexOf('require("./bookingTrip.js").checkBookingTrip(booking);');
     expect(checked).toBeGreaterThan(bookings.indexOf('recordNonTripBookingChecks(booking, _stage, test);'));
-    expect(checked).toBeLessThan(bookings.indexOf('checkBookingAfterOffer(booking, selectedOffer);'));
+    // #1407: both are in the stage that looks at the booking itself, which
+    // every booking step runs before it compares the booking with its offer.
+    const stage = bookings.indexOf('function checkBookingIdentity(booking, expectedBookedOffersStatus) {');
+    expect(stage).toBeGreaterThan(-1);
+    expect(checked).toBeGreaterThan(stage);
+    expect(checked).toBeLessThan(bookings.indexOf('\n}\n', stage));
+    const called = bookings.indexOf('  checkBookingIdentity(booking, expectedBookedOffersStatus);');
+    expect(called).toBeGreaterThan(-1);
+    expect(called).toBeLessThan(bookings.indexOf('checkBookingAfterOffer(booking, selectedOffer);'));
   });
 
   test('the variable is cleared with each scenario', () => {

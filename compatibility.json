@@ -4,6 +4,17 @@
   "current_release": "2026.610",
   "releases": [
     {
+      "release": "2026.616",
+      "date": "2026-11-23",
+      "server": "1.11.575",
+      "collection": "OTST_V2.0.270",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Collection OTST_V2.0.270 (#1407): postCreateBookingResponse() of bookings.js, which checks the answer of 02. POST Create Booking and every read of the booking after it, is split by stage into 16 functions (the booking itself, the passengers' ids, the confirmation deadline, the information still asked for, the first booked offer, the price members, the booked parts, the fulfilments, the number of passengers). Behaviour unchanged: what the function reads, sets, checks, logs and returns is the same on the bookings of a simulator replay and on drawn variants of them, and the replay recorded before and after gives the same checks. Not released on its own: current_release is not moved. Server unchanged."
+      ]
+    },
+    {
       "release": "2026.615",
       "date": "2026-11-23",
       "server": "1.11.575",
