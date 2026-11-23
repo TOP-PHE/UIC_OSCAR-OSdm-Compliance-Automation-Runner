@@ -1290,7 +1290,8 @@ describe('#699 the maximum number of passengers in the Test Framework', () => {
     const src = read('js/scenarios.js');
     expect(src).toContain('<label class="fw-subsection-label" for="fw-max-passengers"');
     expect(src).toContain('id="fw-max-passengers"');
-    expect(src).toMatch(/case 'fw-max-pax': \{\s*\/\/[^\n]*\n\s*const value = fwMaxPassengers\(el\.value\);/);
+    expect(src).toContain("\n  'fw-max-pax': changeFwMaxPax,\n");
+    expect(src).toMatch(/\nfunction changeFwMaxPax\(el\) \{\n {2}\/\/[^\n]*\n {2}const value = fwMaxPassengers\(el\.value\);/);
   });
 });
 
@@ -1310,7 +1311,8 @@ describe('#704 the sales horizon in the Test Framework, and the departure date o
     const src = read('js/scenarios.js');
     expect(src).toContain('<label class="fw-subsection-label" for="fw-sales-horizon"');
     expect(src).toContain('id="fw-sales-horizon"');
-    expect(src).toMatch(/case 'fw-sales-horizon': \{\s*\/\/[^\n]*\n\s*const value = fwSalesHorizonDays\(el\.value\);/);
+    expect(src).toContain("\n  'fw-sales-horizon': changeFwSalesHorizon,\n");
+    expect(src).toMatch(/\nfunction changeFwSalesHorizon\(el\) \{\n {2}\/\/[^\n]*\n {2}const value = fwSalesHorizonDays\(el\.value\);/);
     expect(src).toContain('data-action="set-scenario-departure-days"');
     expect(src).toMatch(/case 'set-scenario-departure-days': \{[\s\S]{0,400}n >= -366 && n <= 1000/);
     expect(src).toContain("departureExpectRejection:          ['off', 'on']");
@@ -1334,8 +1336,9 @@ describe('#705 a passenger\'s age on the day of travel, in the passenger editor'
     const src = read('js/scenarios.js');
     expect(src.match(/data-action="set-pax-age"/g)).toHaveLength(2);
     expect(src).toContain('data-action="set-pax-expected-type"');
-    // Handled before the change switch (Sonar S1479 caps its cases).
-    expect(src).toContain("const action = el.dataset.action;\n  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el) || changeExchange(action, el) || changeTraceContext(action, el)) return;");
+    // The first of the handlers a change tries before its table of actions (#1403).
+    expect(src).toContain('\nconst CHANGE_GROUPS = [\n  changePaxAge,\n  changePassengerUpdate,\n');
+    expect(src).toContain('const action = el.dataset.action;\n  if (CHANGE_GROUPS.some((group) => group(action, el))) return;');
     const fn = src.slice(src.indexOf('function changePaxAge('), src.indexOf('function setPaxField('));
     expect(fn).toContain("PAX_EXPECTED_TYPES.has(el.value) ? el.value : null");
     expect(fn).toContain("const value = paxAgeValue(field, el.value);");
@@ -1565,7 +1568,7 @@ describe('js/scenarios.js — the Fares panel (#937)', () => {
     expect(html).toContain('<label for="fw-fare-free-age">');
   });
 
-  test('a click and the age are saved, handled before their switches', () => {
+  test('a click and the age are saved, each handled before its table of actions', () => {
     const saved = [];
     const opt = { dataset: { key: 'clusters', val: 'PROMO' }, classList: { toggle() {} } };
     const wizData = { framework: {} };
@@ -1587,7 +1590,7 @@ describe('js/scenarios.js — the Fares panel (#937)', () => {
     expect(saved).toHaveLength(4);
     const source = read(page);
     expect(source).toContain('if (clickFarePanel(action, el)) return;');
-    expect(source).toContain('changeFareAge(action, el) ||');
+    expect(source).toMatch(/const CHANGE_GROUPS = \[[^\]]*\n {2}changeFareAge,\n/);
     expect(source).toContain('${faresPanelHtml(fw)}');
   });
 });
@@ -2401,7 +2404,7 @@ describe('scenarios.js — what an exchange is for (#959)', () => {
     const source = read(S);
     expect(source).toContain('${buildTripSection(idx, sc, trip)}\n\n  <!-- #959: what an exchange is for -->\n  ${buildExchangeSection(idx, sc)}');
     expect(source).toContain('  if (changeExchange(action, el)) return;\n');
-    expect(source).toContain('|| changeExchange(action, el) || changeTraceContext(action, el)) return;');
+    expect(source).toContain('\n  changeExchange,\n  changeTraceContext,\n');
     expect(source).toContain('scenarioTripIds(sc).includes(trip.id) && isReadOnlyForMe(sc)');
     expect(source).toContain('...scenarioTripIds(s), s.passengersListId');
   });
@@ -2601,7 +2604,7 @@ describe('scenarios.js — searching the scenario list (#1314)', () => {
     expect(calls).toEqual(['renderAll', 'markDirty', 'renderAll', 'markDirty']);
   });
 
-  test('the search controls never mark the page as changed, and are handled before the table and the switches', () => {
+  test('the search controls never mark the page as changed, and are handled before the tables and the switch', () => {
     const src = read(page);
     for (const name of ['scenarioSearchHtml', 'applyScenarioSearch', 'showRunListCounts', 'inputScenarioSearch', 'changeScenarioSearch', 'clickScenarioSearch']) {
       const body = loadFunction(page, name, {}).toString();
@@ -2610,7 +2613,7 @@ describe('scenarios.js — searching the scenario list (#1314)', () => {
       expect(body).not.toContain('innerHTML');
     }
     expect(src).toContain('if (clickScenarioSearch(action)) return;   // #1314');
-    expect(src).toContain('if (changeScenarioSearch(action, el)) return;   // #1314');
+    expect(src).toContain('\n  changeScenarioSearch,   // #1314\n];');
     expect(src).toContain('if (inputScenarioSearch(action, el)) return;   // #1314');
     // renderAll() draws every row, then the search hides the ones it does not keep.
     const renderAll = loadFunction(page, 'renderAll', {}).toString();
@@ -2750,5 +2753,206 @@ describe('scenarios.js — a click is looked up in a table of actions (#1396)', 
     const html = read('scenarios.html');
     const drawn = (action) => src.includes(`data-action="${action}"`) || html.includes(`data-action="${action}"`);
     expect(actions.filter((action) => !drawn(action))).toEqual(NEVER_DRAWN);
+  });
+});
+
+describe('scenarios.js — a change is looked up in a table of actions (#1403)', () => {
+  const src = read('js/scenarios.js');
+  const from = src.indexOf('\nfunction findAction(target) {');
+  const own = src.indexOf('\n// ── Change event delegation');
+  const to = src.indexOf('\n// ── Input event delegation');
+  // The handlers tried before the table, in the order they are tried: one
+  // that takes the action ends the change, so the order is part of what the
+  // page does.
+  const GROUPS = ['changePaxAge', 'changePassengerUpdate', 'changeFwList', 'changeOfferOptionDiscovery', 'changeFareAge',
+    'changeOfferCombination', 'changeCurrencies', 'changeMandatoryReservationForm', 'changeOsdmVersion', 'changeExchange',
+    'changeTraceContext', 'changeNonTrip', 'changeScenarioSearch'];
+  const HEAD = ['isLockedControl', ...GROUPS];
+
+  // The page's own text from findAction() to the end of the change delegate,
+  // run as it is. Every name it does not declare is a recorder (the call is
+  // written down and the answer is the one given for that name, if any),
+  // but for the names given as data.
+  function delegate(answers = {}, data = {}) {
+    const calls = [];
+    let listener = null;
+    const document = {
+      body: { addEventListener(type, fn) { if (type === 'change') listener = fn; } },
+      getElementById: () => null,
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    };
+    const scope = new Proxy({}, {
+      has: (_, name) => typeof name === 'string' && !['Object', 'Number', 'String', 'Array', 'Math', 'Set', 'structuredClone', 'undefined'].includes(name),
+      get(_, name) {
+        if (typeof name === 'symbol') return undefined;
+        if (name === 'document') return document;
+        if (Object.hasOwn(data, name)) return data[name];
+        return (...args) => { calls.push([name, ...args]); return answers[name]; };
+      },
+    });
+    vm.runInNewContext(`(function (scope) { with (scope) {${src.slice(from, to)}\n} })`)(scope);
+    const change = (target) => {
+      const e = { target, stopped: 0, stopPropagation() { this.stopped += 1; } };
+      listener(e);
+      return e;
+    };
+    return { calls, change, names: () => calls.map((c) => c[0]) };
+  }
+
+  test('the text run ends with the change delegate, which is a table and a list and no switch', () => {
+    expect(from).toBeGreaterThan(-1);
+    expect(own).toBeGreaterThan(from);
+    expect(to).toBeGreaterThan(own);
+    expect(src.slice(from, to).split('document.body.addEventListener(')).toHaveLength(3);   // the click's, then the change's
+    const text = src.slice(own, to);
+    expect(text.split('document.body.addEventListener(')).toHaveLength(2);
+    expect(text).toContain("document.body.addEventListener('change', function(e) {");
+    expect(text).toContain('\nconst CHANGE_ACTIONS = {\n');
+    expect(text).toContain('\nconst CHANGE_GROUPS = [\n');
+    expect(text).not.toContain('switch (action)');
+  });
+
+  test('an action of the table runs with the values of its element, after the refusal and every handler tried first, in their order', () => {
+    const page = delegate();
+    const el = { dataset: { action: 'fw-toggle-flow', key: 'REFUND_FULL' }, checked: true };
+    const e = page.change(el);
+    expect(page.calls).toEqual([
+      ['isLockedControl', el],
+      ...GROUPS.map((name) => [name, 'fw-toggle-flow', el]),
+      ['fwToggleFlow', 'REFUND_FULL', true],
+      ['saveFrameworkDebounced'],
+    ]);
+    expect(e.stopped).toBe(0);
+  });
+
+  test('a change inside a control is the control\'s; one outside any control does nothing', () => {
+    const page = delegate();
+    const el = { dataset: { action: 'wiz-select-train' }, value: 'T7' };
+    page.change({ dataset: {}, parentElement: { parentElement: el } });
+    expect(page.calls.at(-1)).toEqual(['wizSelectTrain', 'T7']);
+    const none = delegate();
+    none.change({ dataset: {}, parentElement: { dataset: {}, parentElement: null } });
+    expect(none.calls).toEqual([]);
+  });
+
+  test('an action that has a function of its own gets the element, and one that uses the event gets it', () => {
+    // A value the check refuses: the field goes back to what is stored, nothing is saved.
+    const refused = delegate({ fwMaxPassengers: undefined }, { wizData: { framework: { maxPassengers: 6 } } });
+    const field = { dataset: { action: 'fw-max-pax' }, value: 'x' };
+    refused.change(field);
+    expect(field.value).toBe(6);
+    expect(refused.names().slice(HEAD.length)).toEqual(['fwMaxPassengers']);
+    // A value it takes is stored and saved; an empty field removes the declaration.
+    const wizData = { framework: { maxPassengers: 6 } };
+    const taken = delegate({ fwMaxPassengers: 9 }, { wizData });
+    taken.change({ dataset: { action: 'fw-max-pax' }, value: '9' });
+    expect(wizData.framework).toEqual({ maxPassengers: 9 });
+    expect(taken.calls.slice(HEAD.length)).toEqual([['fwMaxPassengers', '9'], ['saveFrameworkDebounced']]);
+    const emptied = delegate({ fwMaxPassengers: null }, { wizData });
+    emptied.change({ dataset: { action: 'fw-max-pax' }, value: '' });
+    expect(wizData.framework).toEqual({});
+    expect(emptied.names().at(-1)).toBe('saveFrameworkDebounced');
+
+    const run = delegate();
+    const e = run.change({ dataset: { action: 'toggle-scenario', code: 'S1' }, checked: false });
+    expect(run.calls.at(-1)).toEqual(['toggleScenario', 'S1', false]);
+    expect(e.stopped).toBe(1);
+  });
+
+  test('a scenario is renamed with its place in the run list; a code already used is refused and the field put back', () => {
+    const state = { scenarios: [{ code: 'A' }, { code: 'B' }], scenariosToRun: ['B', 'A'] };
+    const renamed = delegate({ wizNormaliseCustomCode: 'C' }, { state });
+    const field = { dataset: { action: 'set-scenario-code', idx: '0', orig: 'A' }, value: ' c ' };
+    renamed.change(field);
+    expect(state).toEqual({ scenarios: [{ code: 'C' }, { code: 'B' }], scenariosToRun: ['B', 'C'] });
+    expect([field.value, field.dataset.orig]).toEqual(['C', 'C']);
+    expect(renamed.calls.slice(HEAD.length)).toEqual([['wizNormaliseCustomCode', ' c '], ['markDirty']]);
+
+    const taken = delegate({ wizNormaliseCustomCode: 'B' }, { state });
+    const again = { dataset: { action: 'set-scenario-code', idx: '0', orig: 'C' }, value: 'b' };
+    taken.change(again);
+    expect(state.scenarios.map((sc) => sc.code)).toEqual(['C', 'B']);
+    expect(again.value).toBe('C');
+    expect(taken.names().slice(HEAD.length)).toEqual(['wizNormaliseCustomCode', 'oscarToast']);
+    expect(taken.calls.at(-1)[1]).toContain('Another scenario already uses the code "B"');
+
+    const emptied = delegate({ wizNormaliseCustomCode: '' }, { state });
+    const blank = { dataset: { action: 'set-scenario-code', idx: '1' }, value: '  ' };
+    emptied.change(blank);
+    expect(blank.value).toBe('B');
+    expect(emptied.names().slice(HEAD.length)).toEqual(['wizNormaliseCustomCode']);
+  });
+
+  // A table is an object, and every object answers to these names: none of
+  // them is an action. `__proto__` would be called as a function and throw.
+  test.each(['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf', 'no-such-action'])(
+    'a change named %s does nothing', (action) => {
+      const page = delegate();
+      const el = { dataset: { action }, value: 'x' };
+      const e = page.change(el);
+      expect(page.names()).toEqual(HEAD);
+      expect([el.value, e.stopped]).toEqual(['x', 0]);
+    });
+
+  test('a locked control is refused and its card drawn again; a handler that takes the action ends the change', () => {
+    const locked = delegate({ isLockedControl: true, cardScenarioIndex: 4 });
+    const el = { dataset: { action: 'fw-toggle-flow', key: 'SALE' }, checked: true };
+    locked.change(el);
+    expect(locked.calls).toEqual([['isLockedControl', el], ['cardScenarioIndex', el], ['reRenderScenarioDetail', 4]]);
+    for (const [n, name] of GROUPS.entries()) {
+      const page = delegate({ [name]: true });
+      page.change({ dataset: { action: 'fw-toggle-flow', key: 'SALE' }, checked: true });
+      expect(page.names()).toEqual(HEAD.slice(0, n + 2));
+    }
+  });
+
+  test('each entry is one line that calls, or the name of a function laid out as the others', () => {
+    const start = src.indexOf('\nconst CHANGE_ACTIONS = {\n');
+    const lines = src.slice(start + '\nconst CHANGE_ACTIONS = {\n'.length, src.indexOf('\n};\n', start)).split('\n');
+    const actions = [];
+    const named = [];
+    for (const line of lines) {
+      if (line.startsWith('  //')) continue;
+      const entry = /^ {2}'([a-z0-9-]+)': (?:(\(\)|\(el\)|\(el, e\)) => \{ \S.* \}|(change[A-Za-z0-9]+)),$/.exec(line);
+      expect([line, entry === null]).toEqual([line, false]);
+      actions.push(entry[1]);
+      if (entry[2] === '()') expect(line).not.toMatch(/\bel\b|\be\./);
+      if (entry[2] === '(el)') expect(line).not.toMatch(/\be\./);
+      if (entry[3]) {
+        named.push(entry[3]);
+        expect(loadFunction('js/scenarios.js', entry[3], {}).toString()).toMatch(/^function change[A-Za-z0-9]+\((?:el|el, e)?\) \{\n/);
+      }
+    }
+    expect(new Set(actions).size).toBe(actions.length);
+    expect(new Set(named).size).toBe(named.length);
+    expect(actions.length).toBeGreaterThanOrEqual(30);
+    // A function of an action is not one of the handlers tried first.
+    expect(named.filter((name) => GROUPS.includes(name))).toEqual([]);
+    // The table holds no action the page never draws, in its script or in its HTML.
+    const html = read('scenarios.html');
+    const drawn = (action) => src.includes(`data-action="${action}"`) || html.includes(`data-action="${action}"`);
+    expect(actions.filter((action) => !drawn(action))).toEqual([]);
+  });
+
+  test('the list names functions of the page that say whether the action was theirs, each once, in the order pinned here', () => {
+    const start = src.indexOf('\nconst CHANGE_GROUPS = [\n');
+    const lines = src.slice(start + '\nconst CHANGE_GROUPS = [\n'.length, src.indexOf('\n];\n', start)).split('\n');
+    const names = [];
+    for (const line of lines) {
+      if (line.startsWith('  //')) continue;
+      const entry = /^ {2}(change[A-Za-z0-9]+),(?: {3}\/\/ .*)?$/.exec(line);
+      expect([line, entry === null]).toEqual([line, false]);
+      names.push(entry[1]);
+    }
+    expect(names).toEqual(GROUPS);
+    for (const name of names) {
+      const text = loadFunction('js/scenarios.js', name, {}).toString();
+      expect(text.startsWith(`function ${name}(action, el) {\n`)).toBe(true);
+      // It answers false for an action that is not its own, and true for its own.
+      expect(text).toMatch(/return false;/);
+      expect(text).toMatch(/return true;\n\}$/);
+    }
+    expect(src).toContain('  const action = el.dataset.action;\n  if (CHANGE_GROUPS.some((group) => group(action, el))) return;\n');
   });
 });

@@ -109,7 +109,7 @@ describe('the limits a new function is held to', () => {
   // function is brought under a limit. Raising one says, in this diff, that a
   // function over a limit was let in on purpose.
   test.each([
-    ['eslint-suppressions.json', 104, 19],
+    ['eslint-suppressions.json', 103, 18],
     ['eslint-library-suppressions.json', 79, 21],
   ])('%s records no more than what was there', (name, complexity, lines) => {
     const record = recorded(name);

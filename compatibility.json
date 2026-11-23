@@ -4,6 +4,17 @@
   "current_release": "2026.610",
   "releases": [
     {
+      "release": "2026.614",
+      "date": "2026-11-23",
+      "server": "1.11.574",
+      "collection": "OTST_V2.0.269",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.574 (#1403): the change delegate of Test Config (public/js/scenarios.js), one function of 385 lines of code and 134 paths around a switch of 30 actions, is a table of actions (CHANGE_ACTIONS), 15 functions, one per action that does more than call another, and the list of the 13 handlers tried first (CHANGE_GROUPS), in the order they were tried; the delegate itself is 9 lines. Behaviour unchanged: the old and the new delegate leave the same trace on 17,500 changes drawn over every action (the calls made and their arguments, what is read and written on the page's elements, the data at the end). Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.613",
       "date": "2026-11-22",
       "server": "1.11.573",

@@ -358,8 +358,8 @@ function distributionPanelHtml(fw) {
   </div>`;
 }
 
-// #936: a click on a distribution mode, handled before the click switch
-// (Sonar S1479) like clickFwList(). True when the click was this one.
+// #936: a click on a distribution mode, tried before the table of click
+// actions like clickFwList(). True when the click was this one.
 function clickDistributionMode(action, el) {
   if (action !== 'fw-distribution-mode') return false;
   const fw = wizData.framework;
@@ -441,7 +441,8 @@ function faresPanelHtml(fw) {
       </div>`;
 }
 
-// #937: a click in the Fares panel, before the click switch. True when it was one.
+// #937: a click in the Fares panel, tried before the table of click actions.
+// True when it was one.
 function clickFarePanel(action, el) {
   if (action !== 'fw-fare-pill' && action !== 'fw-fare-fee') return false;
   const fw = wizData.framework;
@@ -462,7 +463,8 @@ function clickFarePanel(action, el) {
   return true;
 }
 
-// #937: the free age typed, before the change switch. True when it was it.
+// #937: the free age typed, one of the handlers a change tries first
+// (CHANGE_GROUPS). True when it was it.
 function changeFareAge(action, el) {
   if (action !== 'fw-fare-free-age') return false;
   const fw = wizData.framework;
@@ -591,7 +593,7 @@ function fwSetCurrencies(field, raw) {
   return true;
 }
 
-// #781: handled before the change switch, which is at Sonar's 30-case limit (S1479).
+// #781: one of the handlers a change tries first (CHANGE_GROUPS).
 function changeCurrencies(action, el) {
   if (action !== 'fw-currencies') return false;
   if (fwSetCurrencies(el.dataset.field, el.value)) saveFrameworkDebounced();
@@ -739,7 +741,7 @@ function mandatoryReservationFormHtml(fw) {
             </div>`;
 }
 
-// #793: handled before the change switch, which is at Sonar's 30-case limit (S1479).
+// #793: one of the handlers a change tries first (CHANGE_GROUPS).
 function changeMandatoryReservationForm(action, el) {
   if (action !== 'fw-mandatory-reservation-form') return false;
   if (el.value === 'NONE') wizData.framework.mandatoryReservationForm = 'NONE';
@@ -4184,8 +4186,8 @@ function buildExchangeSection(idx, sc) {
   </div>`;
 }
 
-// A field or tick of the "Exchange to" section. Outside the switches, which
-// are long enough (S1479).
+// A field or tick of the "Exchange to" section: tried first by a change
+// (CHANGE_GROUPS), and before the switch of an input.
 function changeExchange(action, el) {
   if (action !== 'set-exchange-field' && action !== 'toggle-exchange-criterion') return false;
   const idx = Number.parseInt(el.dataset.idx);
@@ -4405,7 +4407,7 @@ function offerScenarioVersionUpdate(before, after) {
 
 // #785: the version fields, once left. One that is not a version is put back
 // and said; a new framework version offers the scenarios on the old one the
-// new one. Handled before the change switch, which is at Sonar's 30-case limit.
+// new one. One of the handlers a change tries first (CHANGE_GROUPS).
 function changeOsdmVersion(action, el) {
   const scenarioField = action === 'set-scenario-text' && el.dataset.field === 'osdmVersion';
   if (action !== 'wiz-osdm-version' && !scenarioField) return false;
@@ -4514,8 +4516,8 @@ function paxAgeValue(field, raw) {
   return n >= min && n <= max ? n : undefined;
 }
 
-// #705: the passenger editor's age fields, outside the change switch. True
-// when the action was one of them.
+// #705: the passenger editor's age fields, tried first by a change
+// (CHANGE_GROUPS). True when the action was one of them.
 function changePaxAge(action, el) {
   const pIdx = Number.parseInt(el.dataset.pidx);
   const pi = Number.parseInt(el.dataset.pi);
@@ -4533,10 +4535,11 @@ function changePaxAge(action, el) {
   return true;
 }
 
-// #709: whether the provider lets a booked passenger be updated, outside the
-// change switch. Absent means yes, as before. True when the action was it.
-// #780 part 3: the count or seed of the random combinations. Handled before
-// the change switch, which is at Sonar's 30-case limit (S1479).
+// #709: whether the provider lets a booked passenger be updated, tried first
+// by a change (CHANGE_GROUPS). Absent means yes, as before. True when the
+// action was it.
+// #780 part 3: the count or seed of the random combinations. One of the
+// handlers a change tries first (CHANGE_GROUPS).
 function changeOfferCombination(action, el) {
   if (action !== 'fw-offer-combinations') return false;
   if (fwSetOfferCombination(el.dataset.field, el.value)) saveFrameworkDebounced();
@@ -9266,6 +9269,494 @@ document.body.addEventListener('click', function(e) {
 });
 
 // ── Change event delegation (selects and checkboxes) ─────────────────────────
+// What a change on an element does, by the element's data-action (#1403).
+// One function per action that does more than call another; the others are
+// written in the table below, CHANGE_ACTIONS. Each takes the element that
+// carries the action, and the event when it uses it.
+function changeFwConcurrentLimit(el) {
+  // Fires on blur / Enter / spinner click. If the user left the input
+  // empty or out-of-range (allowed transiently by the input handler),
+  // snap the visible value back to the stored model value so no phantom
+  // empty / invalid state lingers. A valid value is left alone — it was
+  // already saved (or will be by the debounced auto-save below).
+  const raw = (el.value || '').trim();
+  const n = Number.parseInt(raw, 10);
+  if (raw === '' || !Number.isFinite(n) || n < 1 || n > 10) {
+    el.value = wizData.framework.concurrentSessionLimit || 1;
+  }
+}
+
+function changeSetScenarioCode(el) {
+  // Rename an existing scenario. Fires on blur / Enter to avoid renaming
+  // mid-keystroke (which would flash the list header and race with typing).
+  const sci = Number.parseInt(el.dataset.idx);
+  const scToRename = state.scenarios[sci];
+  if (!scToRename) return;
+  const origCode = el.dataset.orig || scToRename.code;
+  const normalised = wizNormaliseCustomCode(el.value);
+  // Empty → revert to original (can't have a scenario without a code).
+  if (!normalised) {
+    el.value = origCode;
+    return;
+  }
+  if (normalised === origCode) {
+    el.value = normalised;
+    return;
+  }
+  // Reject duplicates — two scenarios with the same code would collide
+  // in scenariosToRun and in the data file's code index.
+  const dup = state.scenarios.some((x, i) => i !== sci && x.code === normalised);
+  if (dup) {
+    oscarToast('Another scenario already uses the code "' + normalised + '". Pick a different one.', 'warning');
+    el.value = origCode;
+    return;
+  }
+  scToRename.code = normalised;
+  // scenariosToRun references the old code string — keep the run-list in
+  // sync so the checkbox state survives the rename.
+  if (Array.isArray(state.scenariosToRun)) {
+    const ri = state.scenariosToRun.indexOf(origCode);
+    if (ri !== -1) state.scenariosToRun[ri] = normalised;
+  }
+  el.value = normalised;
+  el.dataset.orig = normalised;
+  markDirty();
+  // Update just the header row's displayed code (human + raw) without
+  // a full renderAll() that would collapse the detail panel.
+  const detailWrap = document.getElementById('detail-' + sci);
+  const rowHeader = detailWrap?.previousElementSibling;
+  if (rowHeader) {
+    const human = rowHeader.querySelector('div[data-action="toggle-detail"] > div:first-child');
+    const raw   = rowHeader.querySelector('div[data-action="toggle-detail"] > div:nth-child(2)');
+    if (raw)   raw.textContent   = normalised;
+    if (human) {
+      // Preserve trailing ownership/version badges by only rewriting the
+      // leading text node. Show the (normalised) code verbatim — never the
+      // decoded "friendly" rename.
+      const badgeHtml = human.innerHTML.replace(/^[^<]*/, '');
+      human.innerHTML = esc(scenarioTitle({ code: normalised })) + ' ' + badgeHtml;
+    }
+  }
+  // Toggle-scenario checkbox uses the code as identifier — refresh its
+  // data-code so toggling the run flag after a rename still works.
+  const checkbox = rowHeader?.querySelector('input[data-action="toggle-scenario"]');
+  if (checkbox) checkbox.dataset.code = normalised;
+  // in-run badge element id includes the code — rename its id as well.
+  const inrun = document.getElementById('inrun-' + origCode);
+  if (inrun) inrun.id = 'inrun-' + normalised;
+}
+
+function changeSetScenario(el) {
+  const scIdx = Number.parseInt(el.dataset.idx);
+  const field = el.dataset.field;
+  const newVal = (el.dataset.nullable === 'true' && el.value === '') ? null : el.value;
+  setScenarioField(scIdx, field, newVal);
+  // scenarioType drives visibility of the Overrule Code field (IROPS),
+  // and its allowed values. If the user flips REFUND → EXCHANGE (or the
+  // other way) and the new type doesn't support IROPS or doesn't allow
+  // the previously selected code, clear the stale overruleCode and
+  // re-render the detail so the UI matches the model.
+  if (field === 'scenarioType' || field === 'overruleCodeExpectRejection') {
+    const sc = state.scenarios[scIdx];
+    if (sc) {
+      const codesForNew = overruleCodeChoices(sc.scenarioType, sc);
+      const typeSupports = fwSupportsIrops(sc.scenarioType);
+      if (!typeSupports || !codesForNew.includes(sc.overruleCode)) {
+        sc.overruleCode = null;
+      }
+      // OSDM: SALE scenarios have no after-sales action. A stale PATCH
+      // or DELETE carried over from a REFUND/EXCHAGE flow would otherwise
+      // persist into the saved datafile.
+      if (newVal === 'SALE' || newVal == null) {
+        sc.scenarioAction = null;
+      }
+    }
+    const detail = document.getElementById('detail-' + scIdx);
+    if (detail?.dataset.rendered) {
+      // Preserve which param-section headers were open so the user isn't
+      // bounced back to the default section layout.
+      const openSections = new Set();
+      detail.querySelectorAll('.param-section-head').forEach(h => {
+        if (h.nextElementSibling?.classList.contains('open')) {
+          openSections.add((h.textContent || '').trim());
+        }
+      });
+      renderScenarioDetail(detail, scIdx);
+      detail.querySelectorAll('.param-section-head').forEach(h => {
+        const label = (h.textContent || '').trim();
+        if (openSections.has(label)) {
+          h.nextElementSibling?.classList.add('open');
+          const arrow = h.querySelector('.ps-arrow');
+          if (arrow) arrow.classList.add('open');
+        } else {
+          h.nextElementSibling?.classList.remove('open');
+          const arrow = h.querySelector('.ps-arrow');
+          if (arrow) arrow.classList.remove('open');
+        }
+      });
+    }
+  }
+}
+
+function changeSetTripField(el) {
+  const tIdxF = Number.parseInt(el.dataset.tidx);
+  if (el.dataset.field === 'tripType' && tIdxF >= 0) {
+    convertTripType(state.tripRequirements[tIdxF], el.value);
+    markDirty();
+  } else {
+    setTripField(tIdxF, el.dataset.field, el.value);
+  }
+  // tripType drives whether we render legs[] (SPECIFICATION) or a single
+  // trip{} block (SEARCH). Switching between them leaves a stale UI
+  // unless we re-render the scenario details that reference this trip.
+  if (el.dataset.field === 'tripType') {
+    const trip = state.tripRequirements[tIdxF];
+    document.querySelectorAll('.scenario-detail').forEach(det => {
+      if (!det.dataset.rendered) return;
+      const sIdx = Number.parseInt(det.id.replace('detail-', ''));
+      const sc = state.scenarios[sIdx];
+      if (!sc || !scenarioTripIds(sc).includes(trip.id)) return;
+      // Preserve which param sections were open
+      const openSections = new Set();
+      det.querySelectorAll('.param-section-head').forEach(h => {
+        if (h.nextElementSibling?.classList.contains('open')) {
+          openSections.add((h.textContent || '').trim());
+        }
+      });
+      renderScenarioDetail(det, sIdx);
+      det.querySelectorAll('.param-section-head').forEach(h => {
+        const label = (h.textContent || '').trim();
+        const isOpen = openSections.has(label);
+        h.nextElementSibling?.classList.toggle('open', isOpen);
+        const arrow = h.querySelector('.ps-arrow');
+        if (arrow) arrow.classList.toggle('open', isOpen);
+      });
+    });
+  }
+}
+
+function changeSetPaxFamily(el) {
+  const sfpIdx = Number.parseInt(el.dataset.pidx);
+  const sfpPi  = Number.parseInt(el.dataset.pi);
+  const sfpList = state.passengersList[sfpIdx];
+  const sfpPax  = sfpList?.passengers?.[sfpPi];
+  if (!sfpPax) return;
+  const raw = el.value;
+  let nextGroup;
+  if (raw === '' || raw == null) {
+    nextGroup = null;
+  } else if (raw === '__new__') {
+    const usedNumbers = sfpList.passengers
+      .map(p => p && Number.isInteger(p.familyGroup) ? p.familyGroup : null)
+      .filter(n => n != null);
+    nextGroup = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
+  } else {
+    const n = Number.parseInt(raw, 10);
+    nextGroup = Number.isInteger(n) ? n : null;
+  }
+  sfpPax.familyGroup = nextGroup;
+  // Joining a family: adopt the family's current lastName (taken from
+  // any existing member — first one found wins). This makes the very
+  // name-sharing semantics visible immediately.
+  if (nextGroup != null) {
+    const sibling = sfpList.passengers.find((q, qi) =>
+      qi !== sfpPi && q?.familyGroup === nextGroup && q.lastName);
+    if (sibling && sibling.lastName !== sfpPax.lastName) {
+      sfpPax.lastName = sibling.lastName;
+    }
+  }
+  markDirty();
+  // Sync any linked purchaser if the lastName changed above
+  syncPurchaserFromPassenger(sfpList, sfpPax);
+  // Re-render the whole detail panel so the Family dropdown options,
+  // member counts, and compact-row badges all reflect the new state.
+  document.querySelectorAll('.scenario-detail').forEach(det => {
+    if (!det.dataset.rendered) return;
+    const scIdx = Number.parseInt(det.id.replace('detail-', ''));
+    const sc = state.scenarios[scIdx];
+    if (sc && sc.passengersListId === sfpList.id) {
+      reRenderScenarioDetail(scIdx);
+    }
+  });
+}
+
+function changeApplyTripTrain(el) {
+  const atScIdx = Number.parseInt(el.dataset.idx);
+  const atTIdx  = Number.parseInt(el.dataset.tidx);
+  const target  = el.dataset.target; // "trip" or "legs.<n>"
+  const raw = el.value; // "<trainId>::<serviceIndex>"
+  if (!raw) return;
+  const [trainId, svcIdxStr] = String(raw).split('::');
+  const svcIdx = Number.parseInt(svcIdxStr, 10) || 0;
+  const picked = OscarTripApply.trainService(wizData.resources, trainId, svcIdx);
+  if (!picked) return;
+  const tripReq = state.tripRequirements[atTIdx];
+  if (!tripReq) return;
+  // Resolve the target sub-object (trip block or leg N) and populate its
+  // scalar fields from the train set's route + the chosen service.
+  // Preserve any field neither defines — the user may have typed into it.
+  let t;
+  if (target === 'trip') {
+    tripReq.trip = tripReq.trip || {};
+    t = tripReq.trip;
+  } else {
+    const legIdx = Number.parseInt(target.slice(5), 10); // "legs.3" → 3
+    tripReq.legs = tripReq.legs || [];
+    tripReq.legs[legIdx] = tripReq.legs[legIdx] || {};
+    t = tripReq.legs[legIdx];
+  }
+  // Same filling as the scenario copy between providers (js/trip-apply.js).
+  OscarTripApply.applyTrainService(t, picked.d, picked.svc);
+  markDirty();
+  // Reset the dropdown to its placeholder so it reads as "apply again"
+  // next time (avoids users wondering whether the select remembered
+  // their last pick).
+  el.value = '';
+  reRenderScenarioDetail(atScIdx);
+}
+
+function changeApplyTripJourney(el) {
+  const ajScIdx = Number.parseInt(el.dataset.idx);
+  const ajTIdx  = Number.parseInt(el.dataset.tidx);
+  const jid = el.value;
+  if (!jid) return;
+  const journey = (wizData.resources || []).find(r => String(r.id) === String(jid) && r.resource_type === 'JOURNEY');
+  if (!journey) return;
+  const tripReq = state.tripRequirements[ajTIdx];
+  if (!tripReq) return;
+  const legs = journeyToTripLegs(journey);
+  if (legs.length === 0) return;
+  // A journey is an explicit multi-leg itinerary → SPECIFICATION.
+  tripReq.tripType = 'SPECIFICATION';
+  tripReq.legs = legs;
+  markDirty();
+  el.value = '';
+  reRenderScenarioDetail(ajScIdx);
+}
+
+function changeTogglePurchaserIsPax(el) {
+  const tpScIdx = Number.parseInt(el.dataset.idx);
+  const tpPrIdx = Number.parseInt(el.dataset.purchIdx);
+  const tpPurchList = state.purchaserList[tpPrIdx];
+  if (!tpPurchList) return;
+  if (!tpPurchList.purchaser) tpPurchList.purchaser = [{}];
+  const p0 = tpPurchList.purchaser[0];
+  p0.isPassenger = !!el.checked;
+  if (p0.isPassenger) {
+    // When turning the link ON, default the passengerRef to the first
+    // passenger if not already set, then copy its values into the
+    // purchaser fields so the UI shows the resolved values immediately.
+    const sc = state.scenarios[tpScIdx];
+    const paxList = sc && (state.passengersList || []).find(p => p.id === sc.passengersListId);
+    const passengers = paxList?.passengers || [];
+    if (!p0.passengerRef || !passengers.some(p => p.reference === p0.passengerRef)) {
+      p0.passengerRef = passengers[0]?.reference || '';
+    }
+    const linked = passengers.find(p => p.reference === p0.passengerRef);
+    if (linked) syncPurchaserFromPassenger(paxList, linked);
+  }
+  markDirty();
+  reRenderScenarioDetail(tpScIdx);
+}
+
+function changeSetPurchaserPassenger(el) {
+  const ppScIdx = Number.parseInt(el.dataset.idx);
+  const ppPrIdx = Number.parseInt(el.dataset.purchIdx);
+  const ppPurchList = state.purchaserList[ppPrIdx];
+  if (!ppPurchList) return;
+  if (!ppPurchList.purchaser) ppPurchList.purchaser = [{}];
+  const pp0 = ppPurchList.purchaser[0];
+  pp0.passengerRef = el.value;
+  const sc = state.scenarios[ppScIdx];
+  const paxList = sc && (state.passengersList || []).find(p => p.id === sc.passengersListId);
+  const passengers = paxList?.passengers || [];
+  const linked = passengers.find(p => p.reference === el.value);
+  if (linked) syncPurchaserFromPassenger(paxList, linked);
+  markDirty();
+  reRenderScenarioDetail(ppScIdx);
+}
+
+function changeSetPax(el) {
+  const spxIdx = Number.parseInt(el.dataset.pidx);
+  const spxPi  = Number.parseInt(el.dataset.pi);
+  const spxField = el.dataset.field;
+  // Gender 'None' (empty value) means the field is omitted from the
+  // generated request — store null rather than "" so the data file
+  // doesn't carry an empty string, and library-bruno's `!= null`
+  // guards skip the field cleanly.
+  const rawValue = (spxField === 'gender' && el.value === '') ? null : el.value;
+  setPaxField(spxIdx, spxPi, spxField, rawValue);
+  // When the user flips gender (and it's now a real value, not None),
+  // auto-swap the first name to one that matches — but ONLY if the
+  // current name looks like one we generated (leave user-typed names
+  // alone). 'None' keeps the current name as-is (no gendered pool to
+  // pick from).
+  if (spxField === 'gender' && rawValue) {
+    const pxList = state.passengersList[spxIdx];
+    const pxPax  = pxList?.passengers?.[spxPi];
+    if (pxPax) {
+      if (isAutoGeneratedFirstName(pxPax.firstName)) {
+        pxPax.firstName = pickFirstNameForGender(rawValue);
+        // Sync the edit-panel firstName input if it's currently rendered.
+        const fnInput = document.querySelector(
+          'input[data-action="set-pax-text"][data-pidx="' + spxIdx + '"][data-pi="' + spxPi + '"][data-field="firstName"]'
+        );
+        if (fnInput) fnInput.value = pxPax.firstName;
+      }
+      if (isAutoGeneratedFirstName(pxPax.updateFirstName)) {
+        pxPax.updateFirstName = pickFirstNameForGender(rawValue);
+      }
+      // Update the compact "firstName lastName" span on the row header.
+      const disp = document.querySelector('[data-pax-display="' + spxIdx + '-' + spxPi + '"]');
+      if (disp) disp.textContent = (pxPax.firstName || '') + ' ' + (pxPax.lastName || '');
+    }
+  }
+}
+
+function changeChangePaxCategory(el) {
+  const cpIdx = Number.parseInt(el.dataset.pidx);
+  const cpPi = Number.parseInt(el.dataset.pi);
+  const cpScIdx = Number.parseInt(el.dataset.scenidx);
+  const newCat = el.value;
+  const cpList = state.passengersList[cpIdx];
+  if (!cpList?.passengers[cpPi]) return;
+  const pax = cpList.passengers[cpPi];
+  pax.category = newCat;
+  pax.type = WIZ_PAX_TO_OSDM_TYPE[newCat] || 'PERSON';
+  const isH = WIZ_HUMAN_PAX_TYPES.includes(newCat);
+  if (isH) {
+    const ar = WIZ_PAX_DEFAULT_AGES[newCat] || {min:18, max:99};
+    pax.dateOfBirth = genDateOfBirth(ar.min, ar.max);
+    if (pax.updateDateOfBirth) pax.updateDateOfBirth = genDateOfBirth(ar.min, ar.max);
+  }
+  markDirty();
+  // Re-render through the canonical reRenderScenarioDetail helper —
+  // this preserves every param-section's open/closed state AND the
+  // window scroll position. The previous inline `det.innerHTML = …`
+  // collapsed every section except Passengers and snapped the viewport
+  // back to the top, forcing the tester to scroll all the way down and
+  // re-open whatever they had open just to keep editing. (v1.11.102)
+  reRenderScenarioDetail(cpScIdx);
+  // Re-focus the category dropdown so the keyboard / pointer can
+  // continue editing without an extra click. The DOM nodes are fresh
+  // after the re-render, so we re-query by the same data-attrs.
+  const _restored = document.querySelector(
+    `select[data-action="change-pax-category"][data-pidx="${cpIdx}"][data-pi="${cpPi}"]`
+  );
+  if (_restored) _restored.focus();
+}
+
+function changeFwSalesHorizon(el) {
+  // #704: how many days ahead the provider sells; empty = not declared.
+  const value = fwSalesHorizonDays(el.value);
+  if (value === undefined) {
+    const stored = wizData.framework?.salesHorizonDays;
+    el.value = Number.isInteger(stored) ? stored : '';
+    return;
+  }
+  if (value === null) delete wizData.framework.salesHorizonDays;
+  else wizData.framework.salesHorizonDays = value;
+  saveFrameworkDebounced();
+}
+
+function changeFwMaxPax(el) {
+  // #699: the provider's maximum number of passengers; empty = not declared.
+  const value = fwMaxPassengers(el.value);
+  if (value === undefined) {
+    const stored = wizData.framework?.maxPassengers;
+    el.value = Number.isInteger(stored) ? stored : '';
+    return;
+  }
+  if (value === null) delete wizData.framework.maxPassengers;
+  else wizData.framework.maxPassengers = value;
+  saveFrameworkDebounced();
+}
+
+function changeFwPaxAge(el) {
+  const raw = (el.value || '').trim();
+  const n = Number.parseInt(raw, 10);
+  if (raw === '' || !Number.isFinite(n) || n < 0 || n > 120) {
+    const ranges = wizData.framework && wizData.framework.passengerAgeRanges;
+    const stored = ranges?.[el.dataset.paxtype]?.[el.dataset.bound];
+    if (typeof stored === 'number') el.value = stored;
+    return;
+  }
+  fwSetPaxAge(el.dataset.paxtype, el.dataset.bound, n);
+  saveFrameworkDebounced();
+}
+
+function changeWizPaxGender(el) {
+  // Default gender applied to every passenger of this type when the
+  // scenario is generated. Per-passenger refinement is still possible
+  // afterwards via the detail row's gender selector.
+  if (!wizScenario.passengerGender) wizScenario.passengerGender = {};
+  wizScenario.passengerGender[el.dataset.type] = el.value;
+}
+
+// Each action of a change and what it does: one line that calls, or the name
+// of a function above. A new action is a line here. An action that is not
+// here does nothing.
+const CHANGE_ACTIONS = {
+  'file-upload': (el) => { handleFileUpload(el).catch(reportActionError); },
+  'fw-concurrent-limit': changeFwConcurrentLimit,
+  'set-scenario-code': changeSetScenarioCode,
+  'toggle-scenario': (el, e) => { e.stopPropagation(); toggleScenario(el.dataset.code, el.checked); },
+  'set-scenario': changeSetScenario,
+  // #359: selects in the Trip Search Criteria sub-panel write via dot-path
+  // like the text inputs do, but selects fire 'change', not 'input'.
+  'set-trip-path': (el) => { setTripFieldByPath(Number.parseInt(el.dataset.tidx), el.dataset.path, el.value); },
+  'set-trip-field': changeSetTripField,
+  'set-pax-family': changeSetPaxFamily,
+  'journey-leg-pick': (el) => { journeySetLeg(Number.parseInt(el.dataset.jidx), Number.parseInt(el.dataset.li), el.value); },
+  'apply-trip-train': changeApplyTripTrain,
+  'apply-trip-journey': changeApplyTripJourney,
+  'toggle-purchaser-is-pax': changeTogglePurchaserIsPax,
+  'set-purchaser-passenger': changeSetPurchaserPassenger,
+  'set-pax': changeSetPax,
+  'change-pax-category': changeChangePaxCategory,
+  'set-offer': (el) => { setOfferField(Number.parseInt(el.dataset.idx), el.dataset.field, el.value || null); },
+  'toggle-offer-array': (el) => { toggleOfferArray(Number.parseInt(el.dataset.idx), el.dataset.field, el.dataset.val, el.checked, el); },
+  'set-fulfill': (el) => { setFulfillField(Number.parseInt(el.dataset.fidx), el.dataset.field, el.value); },
+  // ── Framework wizard change handlers ──────────────────────────────────────
+  // Checkbox toggles save immediately (binary state, no mid-edit concern).
+  // The number input (fw-pax-age) uses the same empty/out-of-range guard
+  // as fw-concurrent-limit: snap the visible value back to the stored one
+  // so the user can't leave the field in a broken state.
+  'fw-toggle-flow': (el) => { fwToggleFlow(el.dataset.key, el.checked); saveFrameworkDebounced(); },
+  'fw-toggle-mode': (el) => { fwToggleMode(el.dataset.mode, el.checked); saveFrameworkDebounced(); },
+  'fw-toggle-seatmap': (el) => { fwToggleSeatMap(el.checked); saveFrameworkDebounced(); },
+  'fw-sales-horizon': changeFwSalesHorizon,
+  'fw-max-pax': changeFwMaxPax,
+  'fw-pax-age': changeFwPaxAge,
+  // ── Step 3 change handlers ────────────────────────────────────────────────
+  'wiz-select-train': (el) => { wizSelectTrain(el.value); },
+  'wiz-select-journey': (el) => { wizSelectJourney(el.value); },
+  'wiz-flexibility': (el) => { wizScenario.desiredFlexibility = el.value; wizUpdateCodePreview(); },
+  'wiz-overrule': (el) => { wizScenario.overruleCode = el.value || null; },
+  'wiz-offer-mode': (el) => { wizScenario.offerMode = el.value; },
+  'wiz-pax-gender': changeWizPaxGender,
+};
+
+// The groups of actions that have a handler of their own. They are tried
+// first and in this order, and each says whether the action was one of its
+// own. A new group is a line here.
+const CHANGE_GROUPS = [
+  changePaxAge,
+  changePassengerUpdate,
+  changeFwList,
+  changeOfferOptionDiscovery,
+  changeFareAge,
+  changeOfferCombination,
+  changeCurrencies,
+  changeMandatoryReservationForm,
+  changeOsdmVersion,
+  changeExchange,
+  changeTraceContext,
+  // #1258: a NON_TRIP trip's fields.
+  changeNonTrip,
+  changeScenarioSearch,   // #1314
+];
+
 document.body.addEventListener('change', function(e) {
   const el = findAction(e.target);
   if (!el) return;
@@ -9273,473 +9764,11 @@ document.body.addEventListener('change', function(e) {
   // shows nothing the save would not keep.
   if (isLockedControl(el)) { reRenderScenarioDetail(cardScenarioIndex(el)); return; }
   const action = el.dataset.action;
-  if (changePaxAge(action, el) || changePassengerUpdate(action, el) || changeFwList(action, el) || changeOfferOptionDiscovery(action, el) || changeFareAge(action, el) || changeOfferCombination(action, el) || changeCurrencies(action, el) || changeMandatoryReservationForm(action, el) || changeOsdmVersion(action, el) || changeExchange(action, el) || changeTraceContext(action, el)) return;
-  // #1258: a NON_TRIP trip's fields.
-  if (changeNonTrip(action, el)) return;
-  if (changeScenarioSearch(action, el)) return;   // #1314
-
-  switch (action) {
-    case 'file-upload':
-      handleFileUpload(el).catch(reportActionError); break;
-    case 'fw-concurrent-limit': {
-      // Fires on blur / Enter / spinner click. If the user left the input
-      // empty or out-of-range (allowed transiently by the input handler),
-      // snap the visible value back to the stored model value so no phantom
-      // empty / invalid state lingers. A valid value is left alone — it was
-      // already saved (or will be by the debounced auto-save below).
-      const raw = (el.value || '').trim();
-      const n = Number.parseInt(raw, 10);
-      if (raw === '' || !Number.isFinite(n) || n < 1 || n > 10) {
-        el.value = wizData.framework.concurrentSessionLimit || 1;
-      }
-      break;
-    }
-    case 'set-scenario-code': {
-      // Rename an existing scenario. Fires on blur / Enter to avoid renaming
-      // mid-keystroke (which would flash the list header and race with typing).
-      const sci = Number.parseInt(el.dataset.idx);
-      const scToRename = state.scenarios[sci];
-      if (!scToRename) break;
-      const origCode = el.dataset.orig || scToRename.code;
-      const normalised = wizNormaliseCustomCode(el.value);
-      // Empty → revert to original (can't have a scenario without a code).
-      if (!normalised) {
-        el.value = origCode;
-        break;
-      }
-      if (normalised === origCode) {
-        el.value = normalised;
-        break;
-      }
-      // Reject duplicates — two scenarios with the same code would collide
-      // in scenariosToRun and in the data file's code index.
-      const dup = state.scenarios.some((x, i) => i !== sci && x.code === normalised);
-      if (dup) {
-        oscarToast('Another scenario already uses the code "' + normalised + '". Pick a different one.', 'warning');
-        el.value = origCode;
-        break;
-      }
-      scToRename.code = normalised;
-      // scenariosToRun references the old code string — keep the run-list in
-      // sync so the checkbox state survives the rename.
-      if (Array.isArray(state.scenariosToRun)) {
-        const ri = state.scenariosToRun.indexOf(origCode);
-        if (ri !== -1) state.scenariosToRun[ri] = normalised;
-      }
-      el.value = normalised;
-      el.dataset.orig = normalised;
-      markDirty();
-      // Update just the header row's displayed code (human + raw) without
-      // a full renderAll() that would collapse the detail panel.
-      const detailWrap = document.getElementById('detail-' + sci);
-      const rowHeader = detailWrap?.previousElementSibling;
-      if (rowHeader) {
-        const human = rowHeader.querySelector('div[data-action="toggle-detail"] > div:first-child');
-        const raw   = rowHeader.querySelector('div[data-action="toggle-detail"] > div:nth-child(2)');
-        if (raw)   raw.textContent   = normalised;
-        if (human) {
-          // Preserve trailing ownership/version badges by only rewriting the
-          // leading text node. Show the (normalised) code verbatim — never the
-          // decoded "friendly" rename.
-          const badgeHtml = human.innerHTML.replace(/^[^<]*/, '');
-          human.innerHTML = esc(scenarioTitle({ code: normalised })) + ' ' + badgeHtml;
-        }
-      }
-      // Toggle-scenario checkbox uses the code as identifier — refresh its
-      // data-code so toggling the run flag after a rename still works.
-      const checkbox = rowHeader?.querySelector('input[data-action="toggle-scenario"]');
-      if (checkbox) checkbox.dataset.code = normalised;
-      // in-run badge element id includes the code — rename its id as well.
-      const inrun = document.getElementById('inrun-' + origCode);
-      if (inrun) inrun.id = 'inrun-' + normalised;
-      break;
-    }
-    case 'toggle-scenario':
-      e.stopPropagation(); toggleScenario(el.dataset.code, el.checked); break;
-    case 'set-scenario': {
-      const scIdx = Number.parseInt(el.dataset.idx);
-      const field = el.dataset.field;
-      const newVal = (el.dataset.nullable === 'true' && el.value === '') ? null : el.value;
-      setScenarioField(scIdx, field, newVal);
-      // scenarioType drives visibility of the Overrule Code field (IROPS),
-      // and its allowed values. If the user flips REFUND → EXCHANGE (or the
-      // other way) and the new type doesn't support IROPS or doesn't allow
-      // the previously selected code, clear the stale overruleCode and
-      // re-render the detail so the UI matches the model.
-      if (field === 'scenarioType' || field === 'overruleCodeExpectRejection') {
-        const sc = state.scenarios[scIdx];
-        if (sc) {
-          const codesForNew = overruleCodeChoices(sc.scenarioType, sc);
-          const typeSupports = fwSupportsIrops(sc.scenarioType);
-          if (!typeSupports || !codesForNew.includes(sc.overruleCode)) {
-            sc.overruleCode = null;
-          }
-          // OSDM: SALE scenarios have no after-sales action. A stale PATCH
-          // or DELETE carried over from a REFUND/EXCHAGE flow would otherwise
-          // persist into the saved datafile.
-          if (newVal === 'SALE' || newVal == null) {
-            sc.scenarioAction = null;
-          }
-        }
-        const detail = document.getElementById('detail-' + scIdx);
-        if (detail?.dataset.rendered) {
-          // Preserve which param-section headers were open so the user isn't
-          // bounced back to the default section layout.
-          const openSections = new Set();
-          detail.querySelectorAll('.param-section-head').forEach(h => {
-            if (h.nextElementSibling?.classList.contains('open')) {
-              openSections.add((h.textContent || '').trim());
-            }
-          });
-          renderScenarioDetail(detail, scIdx);
-          detail.querySelectorAll('.param-section-head').forEach(h => {
-            const label = (h.textContent || '').trim();
-            if (openSections.has(label)) {
-              h.nextElementSibling?.classList.add('open');
-              const arrow = h.querySelector('.ps-arrow');
-              if (arrow) arrow.classList.add('open');
-            } else {
-              h.nextElementSibling?.classList.remove('open');
-              const arrow = h.querySelector('.ps-arrow');
-              if (arrow) arrow.classList.remove('open');
-            }
-          });
-        }
-      }
-      break;
-    }
-    // #359: selects in the Trip Search Criteria sub-panel write via dot-path
-    // like the text inputs do, but selects fire 'change', not 'input'.
-    case 'set-trip-path':
-      setTripFieldByPath(Number.parseInt(el.dataset.tidx), el.dataset.path, el.value); break;
-    case 'set-trip-field': {
-      const tIdxF = Number.parseInt(el.dataset.tidx);
-      if (el.dataset.field === 'tripType' && tIdxF >= 0) {
-        convertTripType(state.tripRequirements[tIdxF], el.value);
-        markDirty();
-      } else {
-        setTripField(tIdxF, el.dataset.field, el.value);
-      }
-      // tripType drives whether we render legs[] (SPECIFICATION) or a single
-      // trip{} block (SEARCH). Switching between them leaves a stale UI
-      // unless we re-render the scenario details that reference this trip.
-      if (el.dataset.field === 'tripType') {
-        const trip = state.tripRequirements[tIdxF];
-        document.querySelectorAll('.scenario-detail').forEach(det => {
-          if (!det.dataset.rendered) return;
-          const sIdx = Number.parseInt(det.id.replace('detail-', ''));
-          const sc = state.scenarios[sIdx];
-          if (!sc || !scenarioTripIds(sc).includes(trip.id)) return;
-          // Preserve which param sections were open
-          const openSections = new Set();
-          det.querySelectorAll('.param-section-head').forEach(h => {
-            if (h.nextElementSibling?.classList.contains('open')) {
-              openSections.add((h.textContent || '').trim());
-            }
-          });
-          renderScenarioDetail(det, sIdx);
-          det.querySelectorAll('.param-section-head').forEach(h => {
-            const label = (h.textContent || '').trim();
-            const isOpen = openSections.has(label);
-            h.nextElementSibling?.classList.toggle('open', isOpen);
-            const arrow = h.querySelector('.ps-arrow');
-            if (arrow) arrow.classList.toggle('open', isOpen);
-          });
-        });
-      }
-      break;
-    }
-    case 'set-pax-family': {
-      const sfpIdx = Number.parseInt(el.dataset.pidx);
-      const sfpPi  = Number.parseInt(el.dataset.pi);
-      const sfpList = state.passengersList[sfpIdx];
-      const sfpPax  = sfpList?.passengers?.[sfpPi];
-      if (!sfpPax) break;
-      const raw = el.value;
-      let nextGroup;
-      if (raw === '' || raw == null) {
-        nextGroup = null;
-      } else if (raw === '__new__') {
-        const usedNumbers = sfpList.passengers
-          .map(p => p && Number.isInteger(p.familyGroup) ? p.familyGroup : null)
-          .filter(n => n != null);
-        nextGroup = usedNumbers.length > 0 ? Math.max(...usedNumbers) + 1 : 1;
-      } else {
-        const n = Number.parseInt(raw, 10);
-        nextGroup = Number.isInteger(n) ? n : null;
-      }
-      sfpPax.familyGroup = nextGroup;
-      // Joining a family: adopt the family's current lastName (taken from
-      // any existing member — first one found wins). This makes the very
-      // name-sharing semantics visible immediately.
-      if (nextGroup != null) {
-        const sibling = sfpList.passengers.find((q, qi) =>
-          qi !== sfpPi && q?.familyGroup === nextGroup && q.lastName);
-        if (sibling && sibling.lastName !== sfpPax.lastName) {
-          sfpPax.lastName = sibling.lastName;
-        }
-      }
-      markDirty();
-      // Sync any linked purchaser if the lastName changed above
-      syncPurchaserFromPassenger(sfpList, sfpPax);
-      // Re-render the whole detail panel so the Family dropdown options,
-      // member counts, and compact-row badges all reflect the new state.
-      document.querySelectorAll('.scenario-detail').forEach(det => {
-        if (!det.dataset.rendered) return;
-        const scIdx = Number.parseInt(det.id.replace('detail-', ''));
-        const sc = state.scenarios[scIdx];
-        if (sc && sc.passengersListId === sfpList.id) {
-          reRenderScenarioDetail(scIdx);
-        }
-      });
-      break;
-    }
-    case 'journey-leg-pick':
-      journeySetLeg(Number.parseInt(el.dataset.jidx), Number.parseInt(el.dataset.li), el.value); break;
-    case 'apply-trip-train': {
-      const atScIdx = Number.parseInt(el.dataset.idx);
-      const atTIdx  = Number.parseInt(el.dataset.tidx);
-      const target  = el.dataset.target; // "trip" or "legs.<n>"
-      const raw = el.value; // "<trainId>::<serviceIndex>"
-      if (!raw) break;
-      const [trainId, svcIdxStr] = String(raw).split('::');
-      const svcIdx = Number.parseInt(svcIdxStr, 10) || 0;
-      const picked = OscarTripApply.trainService(wizData.resources, trainId, svcIdx);
-      if (!picked) break;
-      const tripReq = state.tripRequirements[atTIdx];
-      if (!tripReq) break;
-      // Resolve the target sub-object (trip block or leg N) and populate its
-      // scalar fields from the train set's route + the chosen service.
-      // Preserve any field neither defines — the user may have typed into it.
-      let t;
-      if (target === 'trip') {
-        tripReq.trip = tripReq.trip || {};
-        t = tripReq.trip;
-      } else {
-        const legIdx = Number.parseInt(target.slice(5), 10); // "legs.3" → 3
-        tripReq.legs = tripReq.legs || [];
-        tripReq.legs[legIdx] = tripReq.legs[legIdx] || {};
-        t = tripReq.legs[legIdx];
-      }
-      // Same filling as the scenario copy between providers (js/trip-apply.js).
-      OscarTripApply.applyTrainService(t, picked.d, picked.svc);
-      markDirty();
-      // Reset the dropdown to its placeholder so it reads as "apply again"
-      // next time (avoids users wondering whether the select remembered
-      // their last pick).
-      el.value = '';
-      reRenderScenarioDetail(atScIdx);
-      break;
-    }
-    case 'apply-trip-journey': {
-      const ajScIdx = Number.parseInt(el.dataset.idx);
-      const ajTIdx  = Number.parseInt(el.dataset.tidx);
-      const jid = el.value;
-      if (!jid) break;
-      const journey = (wizData.resources || []).find(r => String(r.id) === String(jid) && r.resource_type === 'JOURNEY');
-      if (!journey) break;
-      const tripReq = state.tripRequirements[ajTIdx];
-      if (!tripReq) break;
-      const legs = journeyToTripLegs(journey);
-      if (legs.length === 0) break;
-      // A journey is an explicit multi-leg itinerary → SPECIFICATION.
-      tripReq.tripType = 'SPECIFICATION';
-      tripReq.legs = legs;
-      markDirty();
-      el.value = '';
-      reRenderScenarioDetail(ajScIdx);
-      break;
-    }
-    case 'toggle-purchaser-is-pax': {
-      const tpScIdx = Number.parseInt(el.dataset.idx);
-      const tpPrIdx = Number.parseInt(el.dataset.purchIdx);
-      const tpPurchList = state.purchaserList[tpPrIdx];
-      if (!tpPurchList) break;
-      if (!tpPurchList.purchaser) tpPurchList.purchaser = [{}];
-      const p0 = tpPurchList.purchaser[0];
-      p0.isPassenger = !!el.checked;
-      if (p0.isPassenger) {
-        // When turning the link ON, default the passengerRef to the first
-        // passenger if not already set, then copy its values into the
-        // purchaser fields so the UI shows the resolved values immediately.
-        const sc = state.scenarios[tpScIdx];
-        const paxList = sc && (state.passengersList || []).find(p => p.id === sc.passengersListId);
-        const passengers = paxList?.passengers || [];
-        if (!p0.passengerRef || !passengers.some(p => p.reference === p0.passengerRef)) {
-          p0.passengerRef = passengers[0]?.reference || '';
-        }
-        const linked = passengers.find(p => p.reference === p0.passengerRef);
-        if (linked) syncPurchaserFromPassenger(paxList, linked);
-      }
-      markDirty();
-      reRenderScenarioDetail(tpScIdx);
-      break;
-    }
-    case 'set-purchaser-passenger': {
-      const ppScIdx = Number.parseInt(el.dataset.idx);
-      const ppPrIdx = Number.parseInt(el.dataset.purchIdx);
-      const ppPurchList = state.purchaserList[ppPrIdx];
-      if (!ppPurchList) break;
-      if (!ppPurchList.purchaser) ppPurchList.purchaser = [{}];
-      const pp0 = ppPurchList.purchaser[0];
-      pp0.passengerRef = el.value;
-      const sc = state.scenarios[ppScIdx];
-      const paxList = sc && (state.passengersList || []).find(p => p.id === sc.passengersListId);
-      const passengers = paxList?.passengers || [];
-      const linked = passengers.find(p => p.reference === el.value);
-      if (linked) syncPurchaserFromPassenger(paxList, linked);
-      markDirty();
-      reRenderScenarioDetail(ppScIdx);
-      break;
-    }
-    case 'set-pax': {
-      const spxIdx = Number.parseInt(el.dataset.pidx);
-      const spxPi  = Number.parseInt(el.dataset.pi);
-      const spxField = el.dataset.field;
-      // Gender 'None' (empty value) means the field is omitted from the
-      // generated request — store null rather than "" so the data file
-      // doesn't carry an empty string, and library-bruno's `!= null`
-      // guards skip the field cleanly.
-      const rawValue = (spxField === 'gender' && el.value === '') ? null : el.value;
-      setPaxField(spxIdx, spxPi, spxField, rawValue);
-      // When the user flips gender (and it's now a real value, not None),
-      // auto-swap the first name to one that matches — but ONLY if the
-      // current name looks like one we generated (leave user-typed names
-      // alone). 'None' keeps the current name as-is (no gendered pool to
-      // pick from).
-      if (spxField === 'gender' && rawValue) {
-        const pxList = state.passengersList[spxIdx];
-        const pxPax  = pxList?.passengers?.[spxPi];
-        if (pxPax) {
-          if (isAutoGeneratedFirstName(pxPax.firstName)) {
-            pxPax.firstName = pickFirstNameForGender(rawValue);
-            // Sync the edit-panel firstName input if it's currently rendered.
-            const fnInput = document.querySelector(
-              'input[data-action="set-pax-text"][data-pidx="' + spxIdx + '"][data-pi="' + spxPi + '"][data-field="firstName"]'
-            );
-            if (fnInput) fnInput.value = pxPax.firstName;
-          }
-          if (isAutoGeneratedFirstName(pxPax.updateFirstName)) {
-            pxPax.updateFirstName = pickFirstNameForGender(rawValue);
-          }
-          // Update the compact "firstName lastName" span on the row header.
-          const disp = document.querySelector('[data-pax-display="' + spxIdx + '-' + spxPi + '"]');
-          if (disp) disp.textContent = (pxPax.firstName || '') + ' ' + (pxPax.lastName || '');
-        }
-      }
-      break;
-    }
-    case 'change-pax-category': {
-      const cpIdx = Number.parseInt(el.dataset.pidx);
-      const cpPi = Number.parseInt(el.dataset.pi);
-      const cpScIdx = Number.parseInt(el.dataset.scenidx);
-      const newCat = el.value;
-      const cpList = state.passengersList[cpIdx];
-      if (!cpList?.passengers[cpPi]) break;
-      const pax = cpList.passengers[cpPi];
-      pax.category = newCat;
-      pax.type = WIZ_PAX_TO_OSDM_TYPE[newCat] || 'PERSON';
-      const isH = WIZ_HUMAN_PAX_TYPES.includes(newCat);
-      if (isH) {
-        const ar = WIZ_PAX_DEFAULT_AGES[newCat] || {min:18, max:99};
-        pax.dateOfBirth = genDateOfBirth(ar.min, ar.max);
-        if (pax.updateDateOfBirth) pax.updateDateOfBirth = genDateOfBirth(ar.min, ar.max);
-      }
-      markDirty();
-      // Re-render through the canonical reRenderScenarioDetail helper —
-      // this preserves every param-section's open/closed state AND the
-      // window scroll position. The previous inline `det.innerHTML = …`
-      // collapsed every section except Passengers and snapped the viewport
-      // back to the top, forcing the tester to scroll all the way down and
-      // re-open whatever they had open just to keep editing. (v1.11.102)
-      reRenderScenarioDetail(cpScIdx);
-      // Re-focus the category dropdown so the keyboard / pointer can
-      // continue editing without an extra click. The DOM nodes are fresh
-      // after the re-render, so we re-query by the same data-attrs.
-      const _restored = document.querySelector(
-        `select[data-action="change-pax-category"][data-pidx="${cpIdx}"][data-pi="${cpPi}"]`
-      );
-      if (_restored) _restored.focus();
-      break;
-    }
-    case 'set-offer':
-      setOfferField(Number.parseInt(el.dataset.idx), el.dataset.field, el.value || null); break;
-    case 'toggle-offer-array':
-      toggleOfferArray(Number.parseInt(el.dataset.idx), el.dataset.field, el.dataset.val, el.checked, el); break;
-    case 'set-fulfill':
-      setFulfillField(Number.parseInt(el.dataset.fidx), el.dataset.field, el.value); break;
-
-    // ── Framework wizard change handlers ──────────────────────────────────────
-    // Checkbox toggles save immediately (binary state, no mid-edit concern).
-    // The number input (fw-pax-age) uses the same empty/out-of-range guard
-    // as fw-concurrent-limit: snap the visible value back to the stored one
-    // so the user can't leave the field in a broken state.
-    case 'fw-toggle-flow':
-      fwToggleFlow(el.dataset.key, el.checked); saveFrameworkDebounced(); break;
-    case 'fw-toggle-mode':
-      fwToggleMode(el.dataset.mode, el.checked); saveFrameworkDebounced(); break;
-    case 'fw-toggle-seatmap':
-      fwToggleSeatMap(el.checked); saveFrameworkDebounced(); break;
-    case 'fw-sales-horizon': {
-      // #704: how many days ahead the provider sells; empty = not declared.
-      const value = fwSalesHorizonDays(el.value);
-      if (value === undefined) {
-        const stored = wizData.framework?.salesHorizonDays;
-        el.value = Number.isInteger(stored) ? stored : '';
-        break;
-      }
-      if (value === null) delete wizData.framework.salesHorizonDays;
-      else wizData.framework.salesHorizonDays = value;
-      saveFrameworkDebounced();
-      break;
-    }
-    case 'fw-max-pax': {
-      // #699: the provider's maximum number of passengers; empty = not declared.
-      const value = fwMaxPassengers(el.value);
-      if (value === undefined) {
-        const stored = wizData.framework?.maxPassengers;
-        el.value = Number.isInteger(stored) ? stored : '';
-        break;
-      }
-      if (value === null) delete wizData.framework.maxPassengers;
-      else wizData.framework.maxPassengers = value;
-      saveFrameworkDebounced();
-      break;
-    }
-    case 'fw-pax-age': {
-      const raw = (el.value || '').trim();
-      const n = Number.parseInt(raw, 10);
-      if (raw === '' || !Number.isFinite(n) || n < 0 || n > 120) {
-        const ranges = wizData.framework && wizData.framework.passengerAgeRanges;
-        const stored = ranges?.[el.dataset.paxtype]?.[el.dataset.bound];
-        if (typeof stored === 'number') el.value = stored;
-        break;
-      }
-      fwSetPaxAge(el.dataset.paxtype, el.dataset.bound, n);
-      saveFrameworkDebounced();
-      break;
-    }
-
-    // ── Step 3 change handlers ────────────────────────────────────────────────
-    case 'wiz-select-train':
-      wizSelectTrain(el.value); break;
-    case 'wiz-select-journey':
-      wizSelectJourney(el.value); break;
-    case 'wiz-flexibility':
-      wizScenario.desiredFlexibility = el.value; wizUpdateCodePreview(); break;
-    case 'wiz-overrule':
-      wizScenario.overruleCode = el.value || null; break;
-    case 'wiz-offer-mode':
-      wizScenario.offerMode = el.value; break;
-    case 'wiz-pax-gender': {
-      // Default gender applied to every passenger of this type when the
-      // scenario is generated. Per-passenger refinement is still possible
-      // afterwards via the detail row's gender selector.
-      if (!wizScenario.passengerGender) wizScenario.passengerGender = {};
-      wizScenario.passengerGender[el.dataset.type] = el.value;
-      break;
-    }
-  }
+  if (CHANGE_GROUPS.some((group) => group(action, el))) return;
+  // Only what the table itself holds: every object also answers to names
+  // such as `constructor`, which are no action.
+  const act = Object.hasOwn(CHANGE_ACTIONS, action) ? CHANGE_ACTIONS[action] : null;
+  if (act) act(el, e);
 });
 
 // ── Input event delegation (text inputs) ─────────────────────────────────────

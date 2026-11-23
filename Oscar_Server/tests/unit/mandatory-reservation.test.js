@@ -85,9 +85,9 @@ describe('#793 the Test Framework page', () => {
     expect(source).toContain('the same seed always gives the same combinations');
   });
 
-  test('the panel shows it and the change handler is wired before the switch', () => {
+  test('the panel shows it and the change handler is in the list a change tries first', () => {
     const source = lines.join('\n');
     expect(source).toContain('${mandatoryReservationFormHtml(fw)}');
-    expect(source).toContain('|| changeMandatoryReservationForm(action, el) ||');
+    expect(source).toMatch(/const CHANGE_GROUPS = \[[^\]]*\n {2}changeMandatoryReservationForm,\n/);
   });
 });
