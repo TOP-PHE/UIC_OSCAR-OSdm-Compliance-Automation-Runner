@@ -21,10 +21,10 @@
   },
   "Bruno_Collection/library-bruno/bookings.js": {
     "complexity": {
-      "count": 5
+      "count": 4
     },
     "max-lines-per-function": {
-      "count": 5
+      "count": 4
     }
   },
   "Bruno_Collection/library-bruno/displays.js": {

@@ -22,6 +22,7 @@
 const { isDeepStrictEqual } = require('node:util');
 
 const sorted = (list) => list.map((v) => JSON.stringify(v)).sort((a, b) => a.localeCompare(b));
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 function chaiExpect(actual, message) {
   let negate = false;
@@ -37,7 +38,7 @@ function chaiExpect(actual, message) {
       return check((Array.isArray(actual) || typeof actual === 'string') && actual.includes(v), `to include ${JSON.stringify(v)}`);
     },
     a: (type) => check(type === 'array' ? Array.isArray(actual) : typeof actual === type, `to be a ${type}`),
-    above: (n) => check(actual > n, `to be above ${n}`),
+    above: (n, m) => { if (m) message = m; return check(actual > n, `to be above ${n}`); },
     below: (n, m) => { if (m) message = m; return check(actual < n, `to be below ${n}`); },
     members: (arr) => check(Array.isArray(actual) && isDeepStrictEqual(sorted(actual), sorted(arr)), `to have members ${JSON.stringify(arr)}`),
     equal: (v, m) => { if (m) message = m; return check(actual === v, `to equal ${JSON.stringify(v)}`); },
@@ -49,7 +50,8 @@ function chaiExpect(actual, message) {
   api.an = api.a;
   const getters = {
     exist: () => check(actual != null, 'to exist'),
-    empty: () => check(actual != null && actual.length === 0, 'to be empty'),
+    // As chai: an object is empty when it has no key of its own, anything else by its length.
+    empty: () => check(isPlainObject(actual) ? Object.keys(actual).length === 0 : actual != null && actual.length === 0, 'to be empty'),
     true: () => check(actual === true, 'to be true'),
     false: () => check(actual === false, 'to be false'),
     not: () => { negate = !negate; return api; },

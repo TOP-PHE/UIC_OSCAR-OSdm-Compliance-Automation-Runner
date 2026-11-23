@@ -2398,8 +2398,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `public` and library blocks, not the tests. What was over them is ESLint's
   own baseline (bulk suppressions, ESLint 9.24+): `eslint-suppressions.json`
   (found by itself in the folder ESLint starts in: 102 + 17 since #1405) and
-  `eslint-library-suppressions.json` (`--suppressions-location`, 79 + 21
-  since #1388),
+  `eslint-library-suppressions.json` (`--suppressions-location`, 78 + 20
+  since #1407),
   paths with forward slashes from that folder. **One more function over a
   limit in a file fails (exit 1, every one of the file listed); one less
   fails too (exit 2, "suppressions left that do not occur anymore") until
@@ -2536,6 +2536,40 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   cognitive complexity (S3776, 15) is not the lint's count of paths**:
   `changeSetPax()` is 14 for the lint and 19 for Sonar, a code smell on
   #1404 (the delegate it came out of was 172).
+- **`postCreateBookingResponse()` is split by stage** (#1407,
+  OTST_V2.0.270; M2, sixth function). It reads as the list of its stages,
+  **in the order of before**: the booking itself, the passengers' ids, the
+  confirmation deadline, the information asked for, the first booked offer,
+  the price members, the price change and the provisional price, the booked
+  parts, the fulfilments, the number of passengers. A new check of a booking
+  goes in its stage's function, or in a new stage called from the list.
+  `listFromEnv()` / `objectFromEnv()` read a variable of the run as a list
+  or an object (`[]` / `{}` when it is not set or does not read): use them,
+  not a bare `JSON.parse`. **How it was proved** (the #1388 method, scratch
+  scripts): `trace-bookings.js` runs the old and the new function with a
+  recording `bru`, a fixed clock and chai's own `expect`, on **the bookings a
+  simulator replay recorded** (the raw runs hold every answer: the offer
+  chosen is the one the booking request names) and on seeded variants of
+  them. **A variable the function does not set is answered from a pool by the
+  case and the variable's name alone**, so both versions get the same value
+  whatever the order of their reads; a pool of odd values for a variable a
+  called function reads (`"1"` for a list) cut half the cases short at the
+  first stage, so each variable read was given a pool of plausible values.
+  **The runs kept from an earlier replay were a fares replay** (no booked
+  part in 84 of 94): the comparison passed and proved little; look at what
+  the base cases hold (`look-parts.js`) before trusting them.
+  `replay-chunks.js` keeps each chunk's raw runs with
+  `REPLAY_KEEP_RUNS=<folder>` (`record` clears its own at each call). The
+  two replays (before on a tree of `main`, after on the branch) can run at
+  the same time on one simulator: 6 minutes a chunk of 30 each; Jest or a
+  fault campaign beside them doubles a scenario's time. **The library reads
+  and writes its two report variables whole at each log line**: a recording
+  `bru` that keeps them made a 289-fault campaign three hours; answered
+  empty there (`TRACE_LIGHT=1`), 13 s a run. **A test may read the order of
+  two lines of a module's text** (`bruno-booking-trip.test.js`' wiring test
+  did, and failed on the split): run every test file that names the module,
+  not only its own. `mutate-jest-file.js` tries the trace campaign's faults
+  against a Jest file (a copy of module and test per fault, one Jest run).
 - **CI required checks:** Lint/audit/test, CodeQL, Trivy (image scan), Docker
   build, Gitleaks, SonarCloud scan, Bruno-collection validation, PR labeler,
   **`SonarQube Quality Gate check`** (added to required list 2026-07-02 via

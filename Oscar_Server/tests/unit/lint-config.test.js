@@ -110,7 +110,7 @@ describe('the limits a new function is held to', () => {
   // function over a limit was let in on purpose.
   test.each([
     ['eslint-suppressions.json', 102, 17],
-    ['eslint-library-suppressions.json', 79, 21],
+    ['eslint-library-suppressions.json', 78, 20],
   ])('%s records no more than what was there', (name, complexity, lines) => {
     const record = recorded(name);
     expect(totalOf(record, 'complexity')).toBeLessThanOrEqual(complexity);
