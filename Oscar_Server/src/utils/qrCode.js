@@ -89,7 +89,11 @@ function dataCodewords(bytes, version) {
   for (const byte of bytes) appendBits(bits, byte, 8);
   appendBits(bits, 0, Math.min(4, capacity - bits.length));
   appendBits(bits, 0, (8 - (bits.length % 8)) % 8);
-  for (let pad = 0xec; bits.length < capacity; pad ^= 0xec ^ 0x11) appendBits(bits, pad, 8);
+  let pad = 0xec;   // the pad codewords alternate 0xEC and 0x11
+  while (bits.length < capacity) {
+    appendBits(bits, pad, 8);
+    pad ^= 0xec ^ 0x11;
+  }
   const codewords = [];
   for (let i = 0; i < bits.length; i += 8) {
     codewords.push(bits.slice(i, i + 8).reduce((byte, bit) => (byte << 1) | bit, 0));
@@ -187,7 +191,8 @@ function alignmentPositions(version) {
   const count = Math.floor(version / 7) + 2;
   const step = version === 32 ? 26 : Math.ceil((version * 4 + 4) / (count * 2 - 2)) * 2;
   const result = [6];
-  for (let position = size - 7; result.length < count; position -= step) result.splice(1, 0, position);
+  // From the last one (size - 7) inwards, each `step` before the previous.
+  for (let i = 0; i < count - 1; i++) result.splice(1, 0, size - 7 - i * step);
   return result;
 }
 
