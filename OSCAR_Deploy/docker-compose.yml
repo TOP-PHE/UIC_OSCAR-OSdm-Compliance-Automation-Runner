@@ -181,7 +181,7 @@ services:
     # maintained drop-in replacement using the same env-var contract.
     # A version and its digest, never :latest: this container holds the
     # Docker socket, so whatever the tag points to runs as root on the host.
-    image: nickfedor/watchtower:1.24.0@sha256:e96976bcbeaf0a9adeddc9016a539c27a2245ef6bb7d3ca97ed106783350d387
+    image: nickfedor/watchtower:1.24.1@sha256:617a7d5523280cb73adac4d7977604afbe66b7ea86211f2ae0cbfa2043041d61
     container_name: watchtower
     restart: unless-stopped
     environment:

@@ -654,6 +654,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.579] — 2026-11-23
+
+**Release 2026.620 (`current_release`)**: two-factor authentication (#1414) and the dependency updates of 23 November. Server 1.11.577 (2026.618, the codes of an authenticator app and the QR code encoder) and 1.11.578 (2026.619, an administrator signs in with a second factor) are described in their own sections below; this section is the dependency updates. Collection unchanged at OTST_V2.0.270.
+
+**What to do with this release.**
+- **Before approving the promotion:** each administrator has an authenticator app on a phone at hand (Google or Microsoft Authenticator, 1Password…), and the server's clock is synchronised (`timedatectl`: *System clock synchronized: yes*). A code is accepted one 30-second step either side of the server's time.
+- **At the first sign-in after it:** migration 62 ends the administrators' sessions opened before the update. Each administrator then sets the factor up: a QR code, then its first code.
+- **A lost phone:** another administrator clicks *Reset 2FA* on *Manage Users*. For the last one, `node src/cli/reset-mfa.js <e-mail>` in the server's container (*OSCAR - Server Admin Guide*, 13.5).
+- **Not affected:** testers, Test Managers, certifiers (unless they turn a factor on), Company API accounts and API keys. The production smoke test signs in as an API account.
+- **On the VPS,** Watchtower and Loki change only when their stacks are started again.
+
+### Changed — dependencies (Dependabot, combined)
+The three Dependabot changes are copied unchanged onto the release branch: one round of CI instead of four, each merge into `main` making the others out of date. Dependabot closes its pull requests once their changes are on `main`.
+
+| Package | From | To | Used for | PR |
+|---|---|---|---|---|
+| nodemailer | 10.5.0 | 10.6.1 | e-mail | #1400 |
+| express-rate-limit | 8.7.4 | 8.7.5 | rate limits | #1400 |
+| nickfedor/watchtower | 1.24.0 | 1.24.1 | updates of a VPS deployment | #1401 |
+| grafana/loki | 3.7.9 | 3.7.10 | logs of a VPS deployment and of the k3s monitoring stack | #1402 |
+
+- **Loki on Kubernetes follows the VPS's image:** `kubernetes/monitoring/stack/loki.yaml` takes the same 3.7.10 digest. `kubernetes-monitoring.test.js` requires the two to be one image; Dependabot changed the compose file only, which is why #1402's own CI failed.
+- `npm ci --dry-run` reads the lock file without error.
+
+---
+
 ## [server-1.11.578] — 2026-11-23
 
 Two-factor authentication, part 2 of 2 (#1414): an administrator signs in with a second factor, the code of an authenticator app; every other account may turn one on. Not released on its own: listed in `compatibility.json` (2026.619) without moving `current_release`. Collection unchanged.
