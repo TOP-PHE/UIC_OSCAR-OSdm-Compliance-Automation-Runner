@@ -647,6 +647,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.576] — 2026-11-23
+
+`mergeTesterSave()` split by stage, behaviour unchanged (#1408; point M2 of the code quality review for #221, seventh and last function). Not released on its own: listed in `compatibility.json` (2026.617) without moving `current_release`. Collection unchanged.
+
+### Changed
+- **`mergeTesterSave()` is 7 functions instead of one.** It merges a tester's Save & Apply into the company's data file: 120 lines of code and 48 paths in one function, where `npm run lint` allows 100 and 15. Every rule in it closes a defect an independent review reproduced (the lettered tests), and a change to one was made with all the others in view.
+  - The function now reads as its stages, **in the order of before**: the stored scenarios by owner (`storedByOwner()`), the scenarios sent (`sortSentScenarios()`: the tester's own, the codes renamed, the read-only ones sent changed), where each goes (`placedScenarios()`), the keys a first save may write, each resource list (`mergedList()`), then the company's run list and the tester's own.
+  - A resource list is itself in parts: `mergedList()` finds the entries that are not the tester's to change and the ones only hidden scenarios use, `ownEntries()` goes through the links of the tester's scenarios, and `shareOrFork()` decides for a link to an entry that is not theirs: a copy under a fresh id, the link cut, or the entry shared as it is.
+  - The largest new function has 9 paths (`ownEntries()`) and 35 lines (`sortSentScenarios()`); `mergeTesterSave()` itself has 13 and 32.
+  - One statement changed place: a list that neither the stored file nor the save holds is passed over before its entries are read, not after. Reading them had no effect.
+  - The function is as pure as before: it changes neither the stored file nor the save.
+- **The lint's record goes down.** `datafileOwnership.js` leaves it: one function over the path limit and one over the line limit, none now. The server's totals in `lint-config.test.js` go from 102 and 17 to 101 and 16.
+
+### How it was checked
+- **The moved code was not typed again.** A script assembled the new functions from the line ranges of the old one: 14 ranges, 1,442 tokens (comments included), the same token for token before and after. Of the old function's 1,449 tokens, the seven that were not moved are `datafile[list] = result;`, now `datafile[list] = mergedList(…)` and `return result;`. The headers of the stages, their calls and their returned values are new.
+- **The same answer, case by case.** Old and new module, each loaded as it is (it requires nothing), on 200,000 cases drawn with a seed: a data file as a company holds one (scenarios of the tester, of colleagues, shared, without owner; the five resource lists; entries used by one, several or no scenario), a save made as the editor makes one (the tester's view echoed back, the stored file, or a file from nothing) and edited (own scenarios changed, added, added under a taken code, deleted; read-only ones changed; links to own, protected, hidden-only and dangling entries; entries edited, added under a new or a taken id, removed; root keys written; malformed values), and who saves. The record of a case holds the answer or the error thrown, and the two inputs after the call. The same SHA-256 for the two records: 200,000 answers and no error, 4,404 with a scenario renamed, 1,604 with an entry copied, 34,631 with a read-only change reported; neither the stored file nor the save changed in any case.
+- **The cases run every line.** 120 of the 120 lines of code of the new functions ran in those cases, none of them in part (V8's precise coverage, read through the inspector).
+- **The comparison sees a fault.** 93 faults, one at a time, in the lines of the new functions (a statement removed, a condition negated, `&&` or `||` exchanged, a comparison turned round, a number changed, a return emptied, the two answers of a `? :` swapped), each run on 20,000 cases and its record compared with the old function's: 92 are seen, 88 by a record that differs and 4 because the call never ends (the loop that looks for a free code, the one that places the scenarios). The two unchanged copies run as controls give the same record. The one left changes nothing: `datafile.scenariosToRun = 'ALL'` removed, where `datafile` is a copy of the stored file, whose list is `'ALL'` already.
+
+### Tests
+- `datafile-ownership.test.js`: the 62 tests that were there pass unchanged on the new function. The 93 faults were tried against them too (a copy of the module and of the test file per fault, one Jest run; the four that never end left out, since Jest cannot stop them): 83 of 89 made a test fail. Five tests were added for five of the six others, and pass on the old function as well: the resource lists of a first save; a stored list the save leaves out; the two skeleton keys (text of 64 characters at most, never over a stored value); two new scenarios under one taken code; an entry without an id. With them 88 of 89 make a test fail, and the one left is the one that changes nothing.
+- The whole suite: 352 test files, 7,304 tests. 348 files pass; the four that fail on Windows only fail here as on `main` (7 tests: `/metrics` in `server.test.js`, `mcp-end-to-end`, `runner-agent`, the timing test of `bruno-answer-threats`); CI runs them on Linux.
+
+### Not done here
+- Nothing of M2 is left: `parseScenarioData` (#1388), `runSteps` (#1390), the three delegates of `scenarios.js` (#1396, #1403, #1405), `postCreateBookingResponse` (#1407) and `mergeTesterSave` are split. The lint's records still hold the functions over a limit that M2 did not name.
+
 ## [collection-OTST_V2.0.270] — 2026-11-23
 
 `postCreateBookingResponse()` split by stage, behaviour unchanged (#1407; point M2 of the code quality review for #221, sixth function). Not released on its own: listed in `compatibility.json` (2026.616) without moving `current_release`. Server unchanged.

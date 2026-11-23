@@ -214,14 +214,6 @@
       "count": 3
     }
   },
-  "src/utils/datafileOwnership.js": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/utils/fareDeclarations.js": {
     "complexity": {
       "count": 1

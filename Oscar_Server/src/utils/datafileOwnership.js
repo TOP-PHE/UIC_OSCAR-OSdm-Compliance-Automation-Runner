@@ -262,14 +262,74 @@ function mergeTesterSave(stored, incoming, email) {
   const inc  = isObj(incoming) ? incoming : {};
   const storedScenarios = arr(base.scenarios).filter(isObj);
   const sentScenarios = arr(inc.scenarios).filter(isObj);
+  const { ownedStored, othersByCode } = storedByOwner(storedScenarios, email);
+  const { ownIncoming, renamed, ignoredReadOnly } = sortSentScenarios(sentScenarios, storedScenarios, ownedStored, othersByCode, email);
+  const scenarios = placedScenarios(storedScenarios, ownIncoming, email);
 
+  // (A) A tester writes scenarios, the resource lists and their own run list —
+  // nothing else. Every other top-level key is company configuration, and
+  // systemInfoParameters in particular is turned by Bruno into environment
+  // variables for EVERY run (api_base included): a key planted by a tester would
+  // send colleagues' runs, bearer token and all, wherever they chose. The only
+  // exception is the two plain strings the editor's own first-save skeleton
+  // carries, and only while the file has none.
+  const datafile = { ...base };
+  for (const key of FIRST_SAVE_KEYS) {
+    const v = inc[key];
+    if (!(key in base) && typeof v === 'string' && v.length <= 64) datafile[key] = v;
+  }
+  datafile.scenarios = scenarios;
+
+  // (J) Fresh ids, over the stored file and the request: see idAllocator().
+  const allocateId = idAllocator(base, inc);
+
+  const forked = [];
+  const visibleOthers = scenarios.filter(s => !isOwnedBy(s, email) && isVisibleTo(s, email));
+  const hiddenOthers  = scenarios.filter(s => !isVisibleTo(s, email));
+  const merge = { base, inc, email, storedScenarios, ownedStored, ownIncoming, scenarios, allocateId, forked, visibleOthers, hiddenOthers };
+  for (const [list, ref] of RESOURCE_LISTS) {
+    if (!(list in base) && !(list in inc)) continue;
+    datafile[list] = mergedList(list, ref, merge);
+  }
+
+  // The company run list is the Test Manager's: unchanged, apart from codes
+  // that no longer exist (the tester deleted or renamed an owned scenario).
+  // (H) Bruno's comma-separated form is pruned the same way — kept verbatim, a
+  // list naming only deleted codes made Bruno abort every run in the company.
+  // On a first save there is none yet, so the request's list becomes the default.
+  const allCodes = [...new Set(scenarios.map(s => s.code))];
+  const exists = new Set(allCodes);
+  if (base.scenariosToRun === 'ALL') datafile.scenariosToRun = 'ALL';
+  else if (Array.isArray(base.scenariosToRun)) datafile.scenariosToRun = base.scenariosToRun.filter(c => exists.has(c));
+  else if (typeof base.scenariosToRun === 'string') datafile.scenariosToRun = resolveRunList(base.scenariosToRun, allCodes);
+  else datafile.scenariosToRun = resolveRunList(withRenames(inc.scenariosToRun, renamed), allCodes);
+
+  const selection = resolveRunList(withRenames(inc.scenariosToRun, renamed), visibleCodes(datafile, email));
+
+  return { datafile, selection, ignoredReadOnly: orderedUnique(ignoredReadOnly), renamed, forked };
+}
+
+// The stages of mergeTesterSave(), in the order it runs them (#1408). Each is
+// pure, as the function is: it reads what it is handed and gives its answer
+// back, but for the tester's own scenarios, whose links to resource entries
+// the lists' stage may repoint.
+
+// The stored scenarios by owner: the tester's own by code (the first of a
+// code), the others by code (all of them).
+function storedByOwner(storedScenarios, email) {
   const ownedStored = new Map();                 // code -> stored owned scenario
   const othersByCode = new Map();                // code -> [stored non-owned scenarios]
   for (const s of storedScenarios) {
     if (isOwnedBy(s, email)) { if (!ownedStored.has(s.code)) ownedStored.set(s.code, s); }
     else othersByCode.set(s.code, [...(othersByCode.get(s.code) || []), s]);
   }
+  return { ownedStored, othersByCode };
+}
 
+// The scenarios of the save: the tester's own as they will be stored (changed,
+// new, or new under a free code when theirs is taken), the codes renamed, and
+// the read-only scenarios they sent changed.
+function sortSentScenarios(sentScenarios, storedScenarios, ownedStored, othersByCode, email) {
   // (C) Codes are the only identity a scenario has, and the editor picks them
   // from what the tester can see. A new scenario of theirs whose code someone
   // else's already uses is stored under the next free code — never dropped
@@ -310,7 +370,10 @@ function mergeTesterSave(stored, incoming, email) {
     // is simply not kept: never resurrected as theirs, never a clash.
     if (others.some(o => isVisibleTo(o, email))) ignoredReadOnly.push(sc.code);
   }
+  return { ownIncoming, renamed, ignoredReadOnly };
+}
 
+function placedScenarios(storedScenarios, ownIncoming, email) {
   // Keep every non-owned scenario where it was; the tester's scenarios fill the
   // slots theirs used to occupy, and any extra ones go at the end.
   const scenarios = [];
@@ -320,111 +383,92 @@ function mergeTesterSave(stored, incoming, email) {
     else if (k < ownIncoming.length) scenarios.push(ownIncoming[k++]);
   }
   while (k < ownIncoming.length) scenarios.push(ownIncoming[k++]);
+  return scenarios;
+}
 
-  // (A) A tester writes scenarios, the resource lists and their own run list —
-  // nothing else. Every other top-level key is company configuration, and
-  // systemInfoParameters in particular is turned by Bruno into environment
-  // variables for EVERY run (api_base included): a key planted by a tester would
-  // send colleagues' runs, bearer token and all, wherever they chose. The only
-  // exception is the two plain strings the editor's own first-save skeleton
-  // carries, and only while the file has none.
-  const datafile = { ...base };
-  for (const key of FIRST_SAVE_KEYS) {
-    const v = inc[key];
-    if (!(key in base) && typeof v === 'string' && v.length <= 64) datafile[key] = v;
+// One resource list after the save.
+function mergedList(list, ref, { base, inc, email, storedScenarios, ownedStored, ownIncoming, scenarios, allocateId, forked, visibleOthers, hiddenOthers }) {
+  const storedList = arr(base[list]).filter(isObj);
+  const incomingList = arr(inc[list]).filter(isObj);
+  const slots = refSlots(list, ref);
+
+  // Not the tester's to change: entries a non-owned scenario references,
+  // stored entries nothing references (company data), and (K) the first
+  // purchaser — Bruno reads purchaserList[0] for every scenario, whatever its
+  // purchaserListId says, so that entry is everyone's.
+  const referencedInStore = new Set(storedScenarios.flatMap(s => refsIn(s, slots)));
+  const protectedIds = new Set([
+    ...scenarios.filter(s => !isOwnedBy(s, email)).flatMap(s => refsIn(s, slots)),
+    ...storedList.filter(e => !referencedInStore.has(e.id)).map(e => e.id),
+    ...(list === 'purchaserList' && storedList.length ? [storedList[0].id] : []),
+  ]);
+  // (L) Entries only hidden scenarios use. Linking an own scenario to one would
+  // put it in the tester's view, so a new link is cut; a link their stored
+  // scenario already had (old aliasing, from when everyone saw everything) stays.
+  const visibleUse = new Set(visibleOthers.flatMap(s => refsIn(s, slots)));
+  const hiddenOnly = new Set(hiddenOthers.flatMap(s => refsIn(s, slots)).filter(id => !visibleUse.has(id)));
+
+  const storedById = new Map(storedList.map(e => [e.id, e]));
+  const incomingById = new Map(incomingList.map(e => [e.id, e]));
+  const { ownNeeded, forkEntries } = ownEntries({ list, slots, ownIncoming, ownedStored, incomingById, storedById, protectedIds, hiddenOnly, allocateId, forked });
+
+  // Walk the stored list so nothing moves: protected entries as stored, the
+  // tester's entries replaced in place, the rest (entries of scenarios they
+  // deleted) dropped. New entries and copies go at the end. An unchanged save
+  // therefore rewrites nothing.
+  const result = [];
+  for (const e of storedList) {
+    if (protectedIds.has(e.id)) result.push(e);
+    else if (ownNeeded.has(e.id)) { result.push(ownNeeded.get(e.id)); ownNeeded.delete(e.id); }
   }
-  datafile.scenarios = scenarios;
+  result.push(...ownNeeded.values(), ...forkEntries);
+  return result;
+}
 
-  // (J) Fresh ids, over the stored file and the request: see idAllocator().
-  const allocateId = idAllocator(base, inc);
-
-  const forked = [];
-  const visibleOthers = scenarios.filter(s => !isOwnedBy(s, email) && isVisibleTo(s, email));
-  const hiddenOthers  = scenarios.filter(s => !isVisibleTo(s, email));
-  for (const [list, ref] of RESOURCE_LISTS) {
-    const storedList = arr(base[list]).filter(isObj);
-    const incomingList = arr(inc[list]).filter(isObj);
-    if (!(list in base) && !(list in inc)) continue;
-    const slots = refSlots(list, ref);
-
-    // Not the tester's to change: entries a non-owned scenario references,
-    // stored entries nothing references (company data), and (K) the first
-    // purchaser — Bruno reads purchaserList[0] for every scenario, whatever its
-    // purchaserListId says, so that entry is everyone's.
-    const referencedInStore = new Set(storedScenarios.flatMap(s => refsIn(s, slots)));
-    const protectedIds = new Set([
-      ...scenarios.filter(s => !isOwnedBy(s, email)).flatMap(s => refsIn(s, slots)),
-      ...storedList.filter(e => !referencedInStore.has(e.id)).map(e => e.id),
-      ...(list === 'purchaserList' && storedList.length ? [storedList[0].id] : []),
-    ]);
-    // (L) Entries only hidden scenarios use. Linking an own scenario to one would
-    // put it in the tester's view, so a new link is cut; a link their stored
-    // scenario already had (old aliasing, from when everyone saw everything) stays.
-    const visibleUse = new Set(visibleOthers.flatMap(s => refsIn(s, slots)));
-    const hiddenOnly = new Set(hiddenOthers.flatMap(s => refsIn(s, slots)).filter(id => !visibleUse.has(id)));
-
-    const storedById = new Map(storedList.map(e => [e.id, e]));
-    const incomingById = new Map(incomingList.map(e => [e.id, e]));
-    const ownNeeded = new Map();                 // id -> the entry to keep for the tester's scenarios
-    const forkOf = new Map();                    // protected id -> fresh id, one copy per id
-    const forkEntries = [];
-    for (const sc of ownIncoming) for (const slot of slots) {
-      const id = slot.get(sc);
-      if (id === undefined || id === null) continue;
-      const mine = incomingById.get(id);
-      if (protectedIds.has(id)) {
-        const theirs = storedById.get(id);
-        // Fork when the tester's entry differs from the protected one — or when
-        // there is no stored entry at all (another scenario's dangling id), which
-        // would otherwise drop the tester's entry and break their scenario.
-        if (mine && (!theirs || canonical(mine) !== canonical(theirs))) {
-          if (!forkOf.has(id)) {
-            const fresh = allocateId();
-            forkOf.set(id, fresh);
-            forkEntries.push({ ...mine, id: fresh });
-            forked.push({ list, from: id, to: fresh });
-          }
-          slot.set(sc, forkOf.get(id));
-        } else if (hiddenOnly.has(id)) {
-          const before = ownedStored.get(sc.code);
-          if (!before || slot.get(before) !== id) slot.set(sc, null);
-        }
-        continue;                                // otherwise it shares the protected entry as is
-      }
-      if (!ownNeeded.has(id)) {
-        const entry = mine || storedById.get(id);
-        if (entry) ownNeeded.set(id, entry);
-      }
+// The entries the tester's scenarios need in a list: their own (by id), and
+// the copies made of entries that are not theirs to change. A scenario's link
+// is repointed to its copy, or cut, as shareOrFork() decides.
+function ownEntries({ list, slots, ownIncoming, ownedStored, incomingById, storedById, protectedIds, hiddenOnly, allocateId, forked }) {
+  const ownNeeded = new Map();                 // id -> the entry to keep for the tester's scenarios
+  const forkOf = new Map();                    // protected id -> fresh id, one copy per id
+  const forkEntries = [];
+  for (const sc of ownIncoming) for (const slot of slots) {
+    const id = slot.get(sc);
+    if (id === undefined || id === null) continue;
+    const mine = incomingById.get(id);
+    if (protectedIds.has(id)) {
+      shareOrFork(sc, slot, id, mine, { list, ownedStored, storedById, hiddenOnly, allocateId, forked, forkOf, forkEntries });
+      continue;                                // otherwise it shares the protected entry as is
     }
-
-    // Walk the stored list so nothing moves: protected entries as stored, the
-    // tester's entries replaced in place, the rest (entries of scenarios they
-    // deleted) dropped. New entries and copies go at the end. An unchanged save
-    // therefore rewrites nothing.
-    const result = [];
-    for (const e of storedList) {
-      if (protectedIds.has(e.id)) result.push(e);
-      else if (ownNeeded.has(e.id)) { result.push(ownNeeded.get(e.id)); ownNeeded.delete(e.id); }
+    if (!ownNeeded.has(id)) {
+      const entry = mine || storedById.get(id);
+      if (entry) ownNeeded.set(id, entry);
     }
-    result.push(...ownNeeded.values(), ...forkEntries);
-    datafile[list] = result;
   }
+  return { ownNeeded, forkEntries };
+}
 
-  // The company run list is the Test Manager's: unchanged, apart from codes
-  // that no longer exist (the tester deleted or renamed an owned scenario).
-  // (H) Bruno's comma-separated form is pruned the same way — kept verbatim, a
-  // list naming only deleted codes made Bruno abort every run in the company.
-  // On a first save there is none yet, so the request's list becomes the default.
-  const allCodes = [...new Set(scenarios.map(s => s.code))];
-  const exists = new Set(allCodes);
-  if (base.scenariosToRun === 'ALL') datafile.scenariosToRun = 'ALL';
-  else if (Array.isArray(base.scenariosToRun)) datafile.scenariosToRun = base.scenariosToRun.filter(c => exists.has(c));
-  else if (typeof base.scenariosToRun === 'string') datafile.scenariosToRun = resolveRunList(base.scenariosToRun, allCodes);
-  else datafile.scenariosToRun = resolveRunList(withRenames(inc.scenariosToRun, renamed), allCodes);
-
-  const selection = resolveRunList(withRenames(inc.scenariosToRun, renamed), visibleCodes(datafile, email));
-
-  return { datafile, selection, ignoredReadOnly: orderedUnique(ignoredReadOnly), renamed, forked };
+// A scenario of the tester names an entry that is not theirs to change: it
+// gets a copy of its own when the tester's version differs, loses the link
+// when the entry is one only hidden scenarios use and the link is new, and
+// shares the entry as it is otherwise.
+function shareOrFork(sc, slot, id, mine, { list, ownedStored, storedById, hiddenOnly, allocateId, forked, forkOf, forkEntries }) {
+  const theirs = storedById.get(id);
+  // Fork when the tester's entry differs from the protected one — or when
+  // there is no stored entry at all (another scenario's dangling id), which
+  // would otherwise drop the tester's entry and break their scenario.
+  if (mine && (!theirs || canonical(mine) !== canonical(theirs))) {
+    if (!forkOf.has(id)) {
+      const fresh = allocateId();
+      forkOf.set(id, fresh);
+      forkEntries.push({ ...mine, id: fresh });
+      forked.push({ list, from: id, to: fresh });
+    }
+    slot.set(sc, forkOf.get(id));
+  } else if (hiddenOnly.has(id)) {
+    const before = ownedStored.get(sc.code);
+    if (!before || slot.get(before) !== id) slot.set(sc, null);
+  }
 }
 
 
