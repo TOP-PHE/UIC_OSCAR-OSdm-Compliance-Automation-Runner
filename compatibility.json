@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.610",
+  "current_release": "2026.617",
   "releases": [
     {
       "release": "2026.617",
@@ -11,6 +11,7 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
+        "Release 2026.617 (current_release): everything merged since 2026.610, which is point M2 of the code quality review for #221. The seven largest functions of OSCAR are each split by stage, behaviour unchanged, each described in its own entry below (2026.611 to 2026.617): parseScenarioData, through which every run loads its scenario (collection OTST_V2.0.269); runSteps, the whole of a run in the runner (server 1.11.572); the click, change and input delegates of Test Config (servers 1.11.573 to 1.11.575); postCreateBookingResponse, which checks every booking (collection OTST_V2.0.270); mergeTesterSave, which merges a tester's save into the company's data file (server 1.11.576). Each was compared before and after on recorded and drawn cases, with one fault at a time to show the comparison sees one; the two collection changes also by a simulator replay. Nothing changes for a user. Without a version of their own: three corrections of the guides (the quality gate's coverage floor, compression on an installed nginx, creating the server again when the monitoring stack is installed). Nothing to do on a server with this release: no migration, no setting. After the promotion, the production smoke test runs three scenarios through the API by itself.",
         "Server 1.11.576 (#1408): mergeTesterSave() of utils/datafileOwnership.js, which merges a tester's Save & Apply into the company's data file, is split by stage into 7 functions (the stored scenarios by owner, the scenarios sent, where each goes, each resource list, the entries the tester's scenarios need, an entry that is not theirs to change). Behaviour unchanged: the old and the new function give the same answer on 200,000 drawn data files and saves, and leave what they are handed untouched. With it the seven functions of point M2 of the code quality review are split. Not released on its own: current_release is not moved. Collection unchanged."
       ]
     },

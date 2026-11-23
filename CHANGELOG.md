@@ -649,7 +649,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-1.11.576] — 2026-11-23
 
-`mergeTesterSave()` split by stage, behaviour unchanged (#1408; point M2 of the code quality review for #221, seventh and last function). Not released on its own: listed in `compatibility.json` (2026.617) without moving `current_release`. Collection unchanged.
+`mergeTesterSave()` split by stage, behaviour unchanged (#1408; point M2 of the code quality review for #221, seventh and last function). Collection unchanged.
+
+**Release 2026.617 (`current_release`)**, with everything merged since 2026.610, which is point M2 of the code quality review for #221: the seven largest functions of OSCAR split by stage, behaviour unchanged. Collections OTST_V2.0.269 (`parseScenarioData`) and OTST_V2.0.270 (`postCreateBookingResponse`), servers 1.11.572 (`runSteps`), 1.11.573 to 1.11.575 (the click, change and input delegates of Test Config) and 1.11.576 (`mergeTesterSave`): this section and the six below, each listed in `compatibility.json` without having been released on its own. With them, the three corrections of the guides under *Unreleased* (the quality gate's coverage floor, compression on an installed nginx, creating the server again when the monitoring stack is installed). Nothing changes for a user, and nothing is to be done on a server: no migration, no setting. After the promotion the production smoke test runs three scenarios through the API by itself; since these functions carry every run, every booking check, every action in Test Config and every tester's save, a run of a few scenarios and a save in Test Config are worth a look as well.
 
 ### Changed
 - **`mergeTesterSave()` is 7 functions instead of one.** It merges a tester's Save & Apply into the company's data file: 120 lines of code and 48 paths in one function, where `npm run lint` allows 100 and 15. Every rule in it closes a defect an independent review reproduced (the lettered tests), and a change to one was made with all the others in view.
