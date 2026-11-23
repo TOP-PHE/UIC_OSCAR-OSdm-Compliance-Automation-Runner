@@ -398,7 +398,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     A refusal, an error or no offer for it still fails.
     Editor: under the
     tariff section (`fwOfferOptionsHtml()`, `changeOfferOptionDiscovery()`
-    before the change switch; the code lists are `FW_LISTS` `corporate` /
+    in the change's list, `CHANGE_GROUPS`; the code lists are `FW_LISTS` `corporate` /
     `promotion`).
     **PR 3 (1.11.394): checklist and Report Builder.** Template V01.07:
     A2.5 `fw.offerOptionDiscovery.maxRequests`, P1.19 / P1.20 the
@@ -505,8 +505,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     position, an inner station becomes the last before the destination, a
     one-leg trip takes the whole trip, a station not on the trip is left as
     it is. Editor: `faresPanelHtml()` in the Distribution section, hidden
-    without FARE; `clickFarePanel()` / `changeFareAge()` before their
-    switches; `FW_FARE_LISTS` pinned by `ui-scripts.test.js`. References:
+    without FARE; `clickFarePanel()` before the click's table, `changeFareAge()`
+    in the change's list; `FW_FARE_LISTS` pinned by `ui-scripts.test.js`. References:
     `referenceFares(profile)`. No run-time warning for undeclared fare
     features yet.
     **The checklist asks them** (#938, part C, 1.11.389): template V01.06,
@@ -2397,7 +2397,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   comments out; the function's own first and last lines count), in the `src`,
   `public` and library blocks, not the tests. What was over them is ESLint's
   own baseline (bulk suppressions, ESLint 9.24+): `eslint-suppressions.json`
-  (found by itself in the folder ESLint starts in: 104 + 19 since #1396) and
+  (found by itself in the folder ESLint starts in: 103 + 18 since #1403) and
   `eslint-library-suppressions.json` (`--suppressions-location`, 79 + 21
   since #1388),
   paths with forward slashes from that folder. **One more function over a
@@ -2471,7 +2471,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   Sonar's limit of cases and stay as they are. The delegate asks
   `Object.hasOwn(CLICK_ACTIONS, action)`, **never `CLICK_ACTIONS[action]`
   alone**: every object answers to `constructor` and `__proto__`. The change
-  and input delegates are still switches. Tests that pinned `case 'x':` of a
+  delegate followed (#1403, next bullet); the input delegate is still a
+  switch. Tests that pinned `case 'x':` of a
   click pin the table's line; `ui-scripts.test.js` runs the real delegate
   (its text inside `with (scope)`, every name it does not declare a
   recorder). `refresh-sections` is in the table and drawn nowhere, as before.
@@ -2492,6 +2493,28 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     tuned until every line ran often;
   - one fault at a time, each in a process of its own (a fault can loop for
     ever), with two unchanged copies as a control.
+- **A change in Test Config is looked up in a table too** (#1403, 1.11.574;
+  M2, fourth function). `CHANGE_ACTIONS` replaces the change delegate's switch
+  of 30 actions, with 15 top-level `change<Action>(el, e)` functions, as the
+  click's. **The handlers tried first are a list, `CHANGE_GROUPS`**: 13
+  functions `(action, el)` that answer `true` when the action was theirs,
+  tried in the list's order by `CHANGE_GROUPS.some((group) => group(action,
+  el))`; the first that takes the action ends the change, so **the order is
+  behaviour** (a test pins it) and **a handler of the list answers `true` or
+  `false`, nothing else**. Left as one line of `||` they alone put the
+  delegate over the limit of paths. **A new change action is a line in the
+  table; a new group with a handler of its own is a line in the list.** The
+  two families share the prefix `change`: a group is `(action, el)` and
+  returns a boolean, an action's function is `(el, e)`. The list is read when
+  the script loads: a harness that runs the page's text in a scope of
+  recorders must answer those 13 names at that moment (the test's recorder
+  does; `trace-delegate.js` answers with a function that asks the case's
+  world when called). What is drawn for another event than the click is in
+  `world-<event>.js` beside `trace-delegate.js` (the value of the element by
+  action, the passengers' families, the purchaser, the Test Framework).
+  **A `change` event sent by hand shows nothing in the page's HTML when the
+  handler only puts a value back in its field**: the browser pass hashes the
+  live `value` / `checked` of every field beside the HTML.
 - **CI required checks:** Lint/audit/test, CodeQL, Trivy (image scan), Docker
   build, Gitleaks, SonarCloud scan, Bruno-collection validation, PR labeler,
   **`SonarQube Quality Gate check`** (added to required list 2026-07-02 via
@@ -3013,7 +3036,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   gives the card holder the first declared card (code + issuer, an object
   entry) in a list of its own (`passengersWithCard()`), not copiable without
   one. The page's list is drawn by `fwReductionCardsHtml()`, its click handled
-  before the click's table (`clickReductionCard()`), like the change chain.
+  before the click's table (`clickReductionCard()`), like the change's list.
   Named products and groups are PRs 2-3 of #887.
   **A card's rate is checked when declared** (#889, 1.11.363 / OTST_V2.0.198):
   `percent` on a framework card (`percentOf()`: "25", "25 %", "12,5"; A3.7's
@@ -3506,8 +3529,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   Simulator: the exchange answer names its `trips`; variant
   `wrong-exchange-keeps-trip`. PR 3 is the catalogue entry.
   **PR 2 (1.11.400): "Exchange to" in Test Config** (`buildExchangeSection()`,
-  EXCHANGE scenarios only; `changeExchange()` before the input and change
-  switches). An emptied field leaves the block, an empty block leaves the
+  EXCHANGE scenarios only; `changeExchange()` in the change's list and before
+  the input switch). An emptied field leaves the block, an empty block leaves the
   scenario; an invalid value keeps the stored one. **The editor's "trips a
   scenario uses" is `scenarioTripIds()`** (own + exchange): a new place that
   asks which scenarios use a trip goes through it. The criteria are pinned
@@ -3862,8 +3885,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   OTST_V2.0.151). `passengerUpdate: false` in the Test Framework (Passenger
   Types; absent = yes) turns `patchPassengers` off in every catalogue copy:
   a provider without `PATCH …/passengers/{id}` stopped every copy at 03. It
-  is handled before the change switch (`changePassengerUpdate()`), like the
-  age fields: that switch is at Sonar's 30-case limit (S1479). A transfer or
+  is handled by `changePassengerUpdate()`, one of the handlers a change tries
+  first (`CHANGE_GROUPS`), like the age fields. A transfer or
   continuous leg is checked for its start and end, not a train
   (`otherLegOf()`). `PERSON` alone in `appliedPassengerTypes` is "no band
   stated" (WARNING) in `passengerAges.js`.
