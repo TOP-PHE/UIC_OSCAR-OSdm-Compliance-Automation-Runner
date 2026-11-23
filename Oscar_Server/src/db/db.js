@@ -1375,6 +1375,21 @@ const MIGRATIONS = [
       // unable to write meanwhile.
       _safeAlter('ALTER TABLE runs ADD COLUMN warn_lines_kept INTEGER NOT NULL DEFAULT 0');
   }},
+  { version: 62, name: 'two-factor', up: () => {
+      // A second factor (#1414, api/helpers/mfa.js): the TOTP secret,
+      // encrypted; the one being set up, until its first code; when it was
+      // turned on; the last step accepted (a code is never accepted twice);
+      // the wrong codes of the current window. Administrators must have one
+      // from now on: their sessions signed before this update end, so the
+      // next sign-in asks for it.
+      _safeAlter('ALTER TABLE users ADD COLUMN mfa_secret_enc TEXT');
+      _safeAlter('ALTER TABLE users ADD COLUMN mfa_pending_enc TEXT');
+      _safeAlter('ALTER TABLE users ADD COLUMN mfa_enabled_at TEXT');
+      _safeAlter('ALTER TABLE users ADD COLUMN mfa_last_step INTEGER');
+      _safeAlter('ALTER TABLE users ADD COLUMN mfa_failures INTEGER NOT NULL DEFAULT 0');
+      _safeAlter('ALTER TABLE users ADD COLUMN mfa_failures_since INTEGER');
+      db.exec("UPDATE users SET sessions_valid_after = CAST(strftime('%s','now') AS INTEGER) WHERE role = 'administrator'");
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

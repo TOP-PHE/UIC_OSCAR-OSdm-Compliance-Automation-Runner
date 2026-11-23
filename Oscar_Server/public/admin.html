@@ -57,6 +57,7 @@ tr.del-by-admin{background:#fce4ec;opacity:.85}
 .sb-DELETED_BY_ADMIN  {background:#fce4ec;color:#c62828;border:1px solid #ef9a9a;text-decoration:line-through}
 .sb-COMPLETED         {background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7}
 .sb-pending           {background:#fff3e0;color:#e65100;border:1px solid #ffcc80}
+.sb-mfa               {background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7}
 .sb-FAILED            {background:#ffebee;color:#c62828;border:1px solid #ef9a9a}
 .sb-RUNNING           {background:#fff8e1;color:#e65100;border:1px solid #ffcc80}
 .sb-QUEUED            {background:#e3f2fd;color:#1565c0;border:1px solid #90caf9}
@@ -543,7 +544,7 @@ async function loadUsers() {
   tbody.innerHTML = (data.users || []).map(u => `
     <tr>
       <td class="mono">${esc(u.email)}</td>
-      <td>${u.status === 'pending' ? '<span class="status-badge sb-pending">Pending</span>' : ''}</td>
+      <td>${u.status === 'pending' ? '<span class="status-badge sb-pending">Pending</span>' : ''}${u.mfa_enabled ? ' <span class="status-badge sb-mfa" title="Two-factor authentication is on">2FA</span>' : ''}</td>
       <td><select id="role-${u.id}" data-action="role-change" data-user-id="${u.id}" data-company-id="${esc(u.company_id || '')}">${roleOptions(u.role)}</select></td>
       <td id="company-cell-${u.id}">${companyCellHtml(u)}</td>
       <td>${fmtDate(u.created_at)}</td>
@@ -552,6 +553,7 @@ async function loadUsers() {
         <button class="btn btn-small btn-secondary" data-action="save-user" data-user-id="${u.id}">Save</button>
         <button class="btn btn-small btn-secondary" data-action="send-reset" data-user-id="${u.id}" data-email="${esc(u.email)}">Send reset e-mail</button>
         ${platformPasswordButtons(u)}
+        ${!isTestMgr && u.mfa_enabled ? `<button class="btn btn-small btn-secondary" data-action="reset-mfa" data-user-id="${u.id}" data-email="${esc(u.email)}" title="A lost phone: remove the account's second factor and sign it out everywhere">Reset 2FA</button>` : ''}
         <button class="btn btn-small btn-danger" data-action="delete-user" data-user-id="${u.id}" data-email="${esc(u.email)}">Delete</button>
       </td>
     </tr>
@@ -697,6 +699,18 @@ async function saveUser(userId) {
   showMsg(`User updated: ${data.user.email}${companyLabel}`, true);
   await loadCompanies();
   await loadUsers();
+}
+
+// A lost phone (#1414): the account's second factor goes and every session
+// of the account ends; the owner is told by e-mail. An administrator sets up
+// a new one at the next sign-in.
+async function resetMfa(userId, email) {
+  if (!confirm(`Reset the two-factor authentication of ${email}? The account is signed out everywhere; an administrator sets up a new factor at the next sign-in.`)) return;
+  const res = await fetch(`/v1/admin/users/${userId}/mfa/reset`, { method: 'POST', headers: authHeaders });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { showMsg(data.detail || data.title || 'The second factor was not reset.', false); return; }
+  showMsg(`Two-factor authentication of ${email} reset. They were told by e-mail.`, true);
+  loadUsers();
 }
 
 // A company account's password is its owner's (decision 3): they receive a
@@ -1299,6 +1313,7 @@ document.getElementById('users-tbody').addEventListener('click', function(e) {
   else if (action === 'send-reset') sendReset(userId, el.dataset.email);
   else if (action === 'reset-pwd') resetPwd(userId, el.dataset.email);
   else if (action === 'reset-link') generateResetLink(userId, el.dataset.email);
+  else if (action === 'reset-mfa') resetMfa(userId, el.dataset.email);
   else if (action === 'delete-user') deleteUser(userId, el.dataset.email);
 });
 document.getElementById('users-tbody').addEventListener('change', function(e) {

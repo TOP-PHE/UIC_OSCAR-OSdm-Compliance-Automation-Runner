@@ -413,6 +413,11 @@ async function sendSecurityAlert({ to, subject, heading, lines, url }) {
   return sendNotice('security_alert', { to, subject, heading, lines, url });
 }
 
+/** A notice to an account about its own security: its second factor reset (#1414). */
+async function sendAccountNotice({ to, subject, heading, lines, url }) {
+  return sendNotice('account_security', { to, subject, heading, lines, url });
+}
+
 // A short notice: a heading, a few lines of text and an optional link.
 async function sendNotice(kind, { to, subject, heading, lines, url }) {
   if (!isSmtpConfigured()) {
@@ -443,4 +448,4 @@ async function sendNotice(kind, { to, subject, heading, lines, url }) {
   }
 }
 
-module.exports = { sendVerificationEmail, sendPendingApprovalEmail, sendTestEmail, sendPasswordResetEmail, sendAiAccessNotice, sendSecurityAlert, sendAccessNotice, isSmtpConfigured };
+module.exports = { sendVerificationEmail, sendPendingApprovalEmail, sendTestEmail, sendPasswordResetEmail, sendAiAccessNotice, sendSecurityAlert, sendAccountNotice, sendAccessNotice, isSmtpConfigured };

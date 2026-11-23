@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-23-two-factor-authentication",
+    "date": "November 23, 2026",
+    "tag": "Security",
+    "title": "Two-factor authentication: required for administrators, available to everyone",
+    "summary": "After the password, OSCAR can ask for the six-digit code of an authenticator app on your phone. Administrators must use it; every other account can turn it on from My account.",
+    "content": "OSCAR now supports two-factor authentication. After your password, it asks for the six-digit code that an authenticator app on your phone shows (Google or Microsoft Authenticator, 1Password and the like). Someone who learns your password still cannot sign in as you.\n\nFor OSCAR's administrators it is required. At their first sign-in after this update, OSCAR shows a QR code to scan with the app (or a key to type), then asks for the first code; from then on every sign-in asks for a code.\n\nFor Test Managers, testers and certifiers it is your choice. To turn it on, click your e-mail at the right of the menu bar (My account), type your password, scan the code and type the first code the app shows. You can turn it off on the same page with your password and a code.\n\nIf you lose your phone, ask an OSCAR administrator: they can reset it, and you will be told by e-mail. Nothing changes for the Company API accounts of your test automation, nor for API keys."
+  },
+  {
     "id": "2026-11-22-waiting-runs-ceiling",
     "date": "November 22, 2026",
     "tag": "Operations",

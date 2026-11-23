@@ -32,7 +32,8 @@ const { requireAuth, requireRole, normalizeRole, END_SESSIONS_SQL } = require('.
 const { ALLOWED_ROLES, PLATFORM_SLUG, resolveRole, ensurePlatformCompany, auditLog } = require('../helpers/shared');
 const { membershipChanged } = require('../helpers/provider-access');
 const { validate, v } = require('../middleware/validate');
-const { sendTestEmail, sendAiAccessNotice, isSmtpConfigured } = require('../../utils/mailer');
+const { sendTestEmail, sendAiAccessNotice, sendAccountNotice, isSmtpConfigured } = require('../../utils/mailer');
+const Mfa = require('../helpers/mfa');
 const AiAccess = require('../../utils/aiAccess');
 const { readBackupStatus } = require('../../utils/backupStatus');
 const { purgeCompany } = require('../../utils/companyPurge');
@@ -100,7 +101,8 @@ function sanitizeUserRow(row) {
     company_id: row.company_id,
     company_name: row.company_name,
     company_slug: row.company_slug,
-    created_at: row.created_at
+    created_at: row.created_at,
+    mfa_enabled: Boolean(row.mfa_enabled_at),
   };
 }
 
@@ -110,7 +112,7 @@ router.get('/users', (req, res) => {
   let rows;
   if (q) {
     rows = all(
-      `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
+      `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at, u.mfa_enabled_at,
               c.name AS company_name, c.slug AS company_slug
        FROM users u
        JOIN companies c ON c.id = u.company_id
@@ -120,7 +122,7 @@ router.get('/users', (req, res) => {
     );
   } else {
     rows = all(
-      `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
+      `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at, u.mfa_enabled_at,
               c.name AS company_name, c.slug AS company_slug
        FROM users u
        JOIN companies c ON c.id = u.company_id
@@ -192,7 +194,7 @@ router.post('/users',
 
 function userRowOf(userId) {
   return get(
-    `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
+    `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at, u.mfa_enabled_at,
             c.name AS company_name, c.slug AS company_slug
      FROM users u
      JOIN companies c ON c.id = u.company_id
@@ -317,7 +319,7 @@ router.patch('/users/:id',
   auditLog(req.user.id, null, req.user.email, `user_updated:${userId}`);
 
   const updated = get(
-    `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
+    `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at, u.mfa_enabled_at,
             c.name AS company_name, c.slug AS company_slug
      FROM users u
      JOIN companies c ON c.id = u.company_id
@@ -346,7 +348,7 @@ router.post('/users/:id/approve', (req, res) => {
   auditLog(req.user.id, null, req.user.email, `user_approved:${target.email}`);
 
   const updated = get(
-    `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at,
+    `SELECT u.id, u.email, u.role, u.status, u.company_id, u.created_at, u.mfa_enabled_at,
             c.name AS company_name, c.slug AS company_slug
      FROM users u
      JOIN companies c ON c.id = u.company_id
@@ -401,6 +403,35 @@ router.post('/users/:id/send-reset', (req, res) => {
   AccessRequests.sendPasswordReset(user);
   auditLog(req.user.id, null, req.user.email, `password_reset_sent:${user.email}`);
   return res.json({ sent: true, email: user.email });
+});
+
+// ── POST /v1/admin/users/:id/mfa/reset (#1414) ────────────────────────────────
+// A lost phone: the account's second factor goes, and every one of its
+// sessions ends. An administrator sets up a new one at the next sign-in; any
+// other account signs in with its password alone until it turns one on again.
+// The owner is told by e-mail, in case they did not ask for it.
+router.post('/users/:id/mfa/reset', (req, res) => {
+  const user = get('SELECT id, email, role, mfa_enabled_at, mfa_pending_enc FROM users WHERE id = ?', [String(req.params.id)]);
+  if (!user) return res.status(404).json({ status: 404, title: 'Not Found', detail: 'User not found.' });
+  if (!user.mfa_enabled_at && !user.mfa_pending_enc) {
+    return res.status(409).json({ status: 409, title: 'Conflict', detail: 'This account has no second factor.' });
+  }
+  Mfa.removeFactor(user.id);
+  auditLog(req.user.id, null, req.user.email, `mfa_reset:${user.email}`);
+  const appUrl = (process.env.APP_URL || `${req.protocol}://${req.get('host')}`).replace(/\/$/, '');
+  const next = Mfa.isRequired(normalizeRole(user.role))
+    ? 'At your next sign-in OSCAR will ask you to set up two-factor authentication again, with your authenticator app.'
+    : 'You can sign in with your password, and turn two-factor authentication on again from your account page.';
+  sendAccountNotice({
+    to: user.email,
+    subject: 'OSCAR — your two-factor authentication was reset',
+    heading: 'Your two-factor authentication was reset',
+    lines: ['An OSCAR administrator removed the second factor of your account, and every session of your account ended.',
+      next,
+      'If you did not ask for this, tell the OSCAR administrators at once.'],
+    url: `${appUrl}/index.html`,
+  }).catch(err => log.warn({ err: err.message }, 'Two-factor reset notice not sent'));
+  return res.json({ id: user.id, email: user.email, mfa_reset: true });
 });
 
 router.post('/users/:id/generate-reset-link', (req, res) => {

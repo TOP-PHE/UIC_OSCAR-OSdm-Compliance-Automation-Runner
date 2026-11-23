@@ -48,6 +48,11 @@ input:focus{outline:none;border-color:#0090D4}
 .news-banner li{font-size:12px;line-height:1.5;margin-bottom:3px}
 .site-footer{width:100%;text-align:center;padding:16px;color:#888;font-size:11px;border-top:1px solid #555;background:#2e2e2d}
 .page-center{flex:1;display:flex;align-items:center;justify-content:center;padding:30px 16px}
+.mfa-intro,.mfa-step,.mfa-hint{font-size:13px;color:#546e7a;line-height:1.5;margin-bottom:10px}
+.mfa-qr{display:block;margin:6px auto 12px;width:200px;height:200px}
+.mfa-key{display:block;font-family:Consolas,monospace;font-size:13px;background:#f5f7f9;border:1px solid #e0e0e0;border-radius:6px;padding:8px;text-align:center;letter-spacing:1px;margin:0 0 14px;word-break:break-all}
+.mfa-back{margin-top:12px;text-align:center;font-size:13px}
+.mfa-back a{color:#0090D4;text-decoration:none}
 </style>
 </head>
 <body>
@@ -79,6 +84,22 @@ input:focus{outline:none;border-color:#0090D4}
     <div style="margin-top:12px;text-align:center;font-size:13px">
       <a href="/forgot-password.html" style="color:#0090D4;text-decoration:none">Forgot password?</a>
     </div>
+  </form>
+
+  <!-- Second factor (#1414): after a right password, the code of the app -->
+  <form id="mfa-verify" class="form">
+    <p class="mfa-intro">Two-factor authentication: type the six-digit code your authenticator app shows for OSCAR.</p>
+    <div class="field"><label for="mfa-code">Code</label><input type="text" id="mfa-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required></div>
+    <button class="btn" type="submit" id="mfa-btn">Verify</button>
+    <div class="mfa-back"><a href="/" data-mfa-cancel>Sign in again</a> · lost your phone? Ask an OSCAR administrator.</div>
+  </form>
+
+  <!-- An administrator's first sign-in: setting the second factor up -->
+  <form id="mfa-setup" class="form">
+    <p class="mfa-intro">OSCAR asks every administrator for a second factor: a code from an authenticator app on your phone. Set it up now; each sign-in will ask for a code.</p>
+    <div id="mfa-setup-box"></div>
+    <button class="btn" type="submit" id="mfa-setup-btn">Turn it on and sign in</button>
+    <div class="mfa-back"><a href="/" data-mfa-cancel>Sign in again</a></div>
   </form>
 
   <div id="beta-notice" class="beta-notice">
@@ -143,7 +164,9 @@ input:focus{outline:none;border-color:#0090D4}
   &copy; UIC - International union of railways. 2026. All rights reserved.
 </footer>
 
+<script src="/js/mfa-setup.js"></script>
 <script>
+/* global OscarMfa */
 const API = '';
 
 function showTab(tab) {
@@ -188,27 +211,84 @@ function nextAfterSignIn(search) {
   } catch (_e) { /* sessionStorage unavailable — silently skip */ }
 })();
 
+// A session answered: remember who signed in, then go on.
+function finishSignIn(data) {
+  // Primary auth path is the httpOnly cookie set by the server. We ALSO
+  // mirror the token in localStorage so the existing Bearer-header fetch
+  // calls in admin/dashboard pages keep working (the auth middleware
+  // accepts both cookie and Bearer). The cookie is the source of truth
+  // in production HTTPS; localStorage is the dev-HTTP fallback because
+  // browsers refuse to set Secure cookies on plain http://localhost.
+  if (data.token) localStorage.setItem('oscar_token', data.token);
+  localStorage.setItem('oscar_company', JSON.stringify(data.company));
+  localStorage.setItem('oscar_user', JSON.stringify(data.user));
+  window.location.href = nextAfterSignIn(window.location.search) || '/welcome.html';
+}
+
+// ── Second factor (#1414) ────────────────────────────────────────────────────
+// After a right password the server may answer { mfa: 'verify' | 'setup',
+// mfa_token } instead of a session: the next step goes on with that token.
+let mfaToken = null;
+
+function showForm(id) {
+  document.querySelectorAll('.form').forEach(f => f.classList.toggle('active', f.id === id));
+  document.getElementById('error').style.display = 'none';
+}
+
+function backToSignIn(message) {
+  mfaToken = null;
+  showForm('login');
+  if (message) showError(message);
+}
+
+async function postJson(url, body) {
+  const res = await fetch(`${API}${url}`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  });
+  return { res, data: await res.json().catch(() => ({})) };
+}
+
+async function startMfaSetup() {
+  const { res, data } = await postJson('/v1/auth/mfa/setup', { mfa_token: mfaToken });
+  if (!res.ok) { backToSignIn(data.detail || 'The set-up could not start. Sign in again.'); return; }
+  showForm('mfa-setup');
+  OscarMfa.showSetup(document.getElementById('mfa-setup-box'), data, 'mfa-setup-code').focus();
+}
+
+async function sendCode(url, codeId, btn) {
+  const code = OscarMfa.cleanCode(document.getElementById(codeId).value);
+  if (!code) { showError('Type the six digits your authenticator app shows.'); return; }
+  btn.disabled = true;
+  try {
+    const { res, data } = await postJson(url, { mfa_token: mfaToken, code });
+    if (res.status === 401) { backToSignIn(data.detail || 'This sign-in has expired. Sign in again.'); return; }
+    if (!res.ok) { showError(data.detail || 'That code was not accepted.'); return; }
+    finishSignIn(data);
+  } catch (err) { console.error('Second factor failed:', err); showError('Server unreachable. Is OSCAR running?'); }
+  finally { btn.disabled = false; }
+}
+
 async function doLogin(e) {
   e.preventDefault();
   const btn = document.getElementById('l-btn');
   btn.disabled = true; btn.textContent = 'Signing in...';
   try {
-    const res = await fetch(`${API}/v1/auth/login`, {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ email: document.getElementById('l-email').value, password: document.getElementById('l-password').value })
+    const { res, data } = await postJson('/v1/auth/login', {
+      email: document.getElementById('l-email').value, password: document.getElementById('l-password').value
     });
-    const data = await res.json();
     if (!res.ok) { showError(data.detail || data.title || 'Login failed.'); return; }
-    // Primary auth path is the httpOnly cookie set by the server. We ALSO
-    // mirror the token in localStorage so the existing Bearer-header fetch
-    // calls in admin/dashboard pages keep working (the auth middleware
-    // accepts both cookie and Bearer). The cookie is the source of truth
-    // in production HTTPS; localStorage is the dev-HTTP fallback because
-    // browsers refuse to set Secure cookies on plain http://localhost.
-    if (data.token) localStorage.setItem('oscar_token', data.token);
-    localStorage.setItem('oscar_company', JSON.stringify(data.company));
-    localStorage.setItem('oscar_user', JSON.stringify(data.user));
-    window.location.href = nextAfterSignIn(window.location.search) || '/welcome.html';
+    if (data.mfa === 'verify') {
+      mfaToken = data.mfa_token;
+      showForm('mfa-verify');
+      document.getElementById('mfa-code').focus();
+      return;
+    }
+    if (data.mfa === 'setup') {
+      mfaToken = data.mfa_token;
+      await startMfaSetup();
+      return;
+    }
+    finishSignIn(data);
   } catch(err) { console.error('Sign-in failed:', err); showError('Server unreachable. Is OSCAR running?'); }
   finally { btn.disabled = false; btn.textContent = 'Sign In'; }
 }
@@ -252,6 +332,18 @@ document.getElementById('tab-login').addEventListener('click', () => showTab('lo
 document.getElementById('tab-register').addEventListener('click', () => showTab('register'));
 document.getElementById('login').addEventListener('submit', doLogin);
 document.getElementById('register-form').addEventListener('submit', doRegister);
+document.getElementById('mfa-verify').addEventListener('submit', (e) => {
+  e.preventDefault();
+  sendCode('/v1/auth/mfa/verify', 'mfa-code', document.getElementById('mfa-btn'));
+});
+document.getElementById('mfa-setup').addEventListener('submit', (e) => {
+  e.preventDefault();
+  sendCode('/v1/auth/mfa/setup/confirm', 'mfa-setup-code', document.getElementById('mfa-setup-btn'));
+});
+document.querySelectorAll('[data-mfa-cancel]').forEach(a => a.addEventListener('click', (e) => {
+  e.preventDefault();
+  backToSignIn('');
+}));
 
 // If already logged in, go straight to the welcome page. Not when a sign-in
 // check sent the browser here (?next=): its session has ended, whatever this

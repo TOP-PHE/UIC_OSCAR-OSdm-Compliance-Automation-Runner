@@ -966,6 +966,7 @@ app.get('/metrics', async (req, res) => {
 // ── API Routes ────────────────────────────────────────────────────────────────
 app.use('/v1/auth',            require('./api/routes/auth'));
 app.use('/v1/me/credentials',  require('./api/routes/me-credentials'));
+app.use('/v1/me/mfa',          require('./api/routes/me-mfa'));   // an account's own second factor (#1414)
 app.use('/v1/company/users',   require('./api/routes/company-users'));
 app.use('/v1/company/providers', require('./api/routes/company-providers'));
 app.use('/v1/company/api-accounts', require('./api/routes/company-api-accounts'));   // Company API accounts (#1342)

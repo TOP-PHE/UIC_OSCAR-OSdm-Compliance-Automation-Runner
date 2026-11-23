@@ -20,14 +20,17 @@
 #   OSCAR_NAMESPACE  optional, the namespace of deploy/oscar (oscar by default);
 #                    kubectl reads the Test Manager's activation link there
 #   SMOKE_ACCOUNT_FILE  optional: where to write the Test Manager's and the
-#                    administrator's e-mail and password, the scenario and the
-#                    run, as JSON, for later steps that read them back (the
-#                    data move, oscar-data.sh; Grafana's sign-in check)
+#                    administrator's e-mail and password, the administrator's
+#                    second factor (#1414), the scenario and the run, as JSON,
+#                    for later steps that read them back (the data move,
+#                    oscar-data.sh; Grafana's sign-in check)
 set -euo pipefail
 OSCAR_NAMESPACE=${OSCAR_NAMESPACE:-oscar}
 
 : "${OSCAR_URL:?}" "${SIM_BASE:?}" "${SIM_SECRET:?}" "${BOOTSTRAP_TOKEN:?}" "${METRICS_TOKEN:?}"
 root=$(cd "$(dirname "$0")/../../.." && pwd)
+# shellcheck source=totp.sh
+. "$(dirname "$0")/totp.sh"
 scenario=${SCENARIO:-SIM_SALE_SEARCH_1ADT_38}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -94,7 +97,21 @@ login() {
   expect "login of $1" 200 "$c"
   jq -r .token "$work/out"
 }
-admin_token=$(login "$admin_email" "$admin_password")
+
+# An administrator must have a second factor (#1414): the first sign-in sets
+# it up, as the sign-in page does: the password, a new secret, its first code.
+step "the administrator's second factor"
+b=$(json --arg e "$admin_email" --arg p "$admin_password" '{email: $e, password: $p}')
+code=$(call POST /v1/auth/login "" "$b")
+expect "login of the administrator" 200 "$code"
+jq -e '.mfa == "setup" and (.token | not)' "$work/out" > /dev/null || fail "an administrator's password alone opened a session: $(cat "$work/out")"
+mfa_token=$(jq -r .mfa_token "$work/out")
+code=$(call POST /v1/auth/mfa/setup "" "$(json --arg t "$mfa_token" '{mfa_token: $t}')")
+expect "second factor set-up" 200 "$code"
+admin_mfa_secret=$(jq -r .secret "$work/out")
+code=$(call POST /v1/auth/mfa/setup/confirm "" "$(json --arg t "$mfa_token" --arg c "$(totp "$admin_mfa_secret")" '{mfa_token: $t, code: $c}')")
+expect "second factor on" 200 "$code"
+admin_token=$(jq -r .token "$work/out")
 
 step "company and Test Manager"
 code=$(call POST /v1/admin/companies "$admin_token" "$(json '{name: "CI smoke", slug: "ci-smoke"}')")
@@ -162,6 +179,6 @@ if [ "$total" -lt 20 ]; then show_log; fail "only $total checks: the scenario di
 echo "OK: $scenario passed $total checks on the cluster"
 if [ -n "${SMOKE_ACCOUNT_FILE:-}" ]; then
   jq -n --arg e "$tm_email" --arg p "$tm_password" --arg s "$scenario" --arg r "$run_id" \
-    --arg ae "$admin_email" --arg ap "$admin_password" \
-    '{tm_email: $e, tm_password: $p, admin_email: $ae, admin_password: $ap, scenario: $s, run_id: $r}' > "$SMOKE_ACCOUNT_FILE"
+    --arg ae "$admin_email" --arg ap "$admin_password" --arg am "$admin_mfa_secret" \
+    '{tm_email: $e, tm_password: $p, admin_email: $ae, admin_password: $ap, admin_mfa_secret: $am, scenario: $s, run_id: $r}' > "$SMOKE_ACCOUNT_FILE"
 fi

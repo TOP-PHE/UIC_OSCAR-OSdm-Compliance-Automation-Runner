@@ -302,7 +302,11 @@ Expected response:
 ```
 
 Now sign in at `https://oscar.example.org` with the credentials you just
-created. You'll land on the admin welcome page with full access.
+created. Have your phone at hand: an administrator signs in with a second
+factor (server 1.11.578), so this first sign-in asks you to scan a QR code
+with an authenticator app (Google or Microsoft Authenticator, 1Password…)
+and type its first code. You'll then land on the admin welcome page with
+full access. A lost phone: *OSCAR - Server Admin Guide*, section 13.5.
 
 After this, **clear the bootstrap token**. From server 1.11.566 the route
 creates the first administrator only: once one exists it answers `409` and

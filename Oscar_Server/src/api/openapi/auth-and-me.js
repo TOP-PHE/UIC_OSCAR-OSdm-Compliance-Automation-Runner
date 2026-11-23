@@ -13,7 +13,13 @@ const TOKEN = queryParam('token', 'The token of the link sent by e-mail (require
 const PROVIDER = { name: 'X-Provider-Id', in: 'header', required: false, description: 'A provider of the own company; none or empty = the own company', schema: { type: 'string' } };
 const AUTH_LIMIT = 'Shares the sign-in rate limit of /v1/auth (by default 50 requests in 15 minutes per address).';
 const LINK_ANSWERS = { 400: { description: 'No token' }, 404: { description: 'Unknown or already used link' }, 410: { description: 'The link has expired' }, 429: { description: 'Too many attempts' } };
-const CREDENTIALS_WHO = 'For the signed-in user and the company or provider of the request (X-Provider-Id; one the user may not use = 404). An administrator or certifier keeps one set, for its own company.';
+// Two-factor authentication (#1414).
+const MFA_STEP = 'No session: the mfa_token of the sign-in stands for the account (#1414).';
+const MFA_CODES = 'A code is six digits; the code of the step before or after is taken, never the same code twice. Ten wrong codes in 15 minutes stop the account\'s codes until the window ends (429 with Retry-After).';
+const MFA_LIMIT = 'At most 50 requests in 15 minutes per address (AUTH_RATE_LIMIT_MAX), in a bucket of their own.';
+const ME_MFA_LIMIT = 'At most 50 requests in 15 minutes per address (AUTH_RATE_LIMIT_MAX).';
+const MFA_429 = { description: 'Too many attempts, or too many wrong codes for the account' };
+const CREDENTIALS_WHO ='For the signed-in user and the company or provider of the request (X-Provider-Id; one the user may not use = 404). An administrator or certifier keeps one set, for its own company.';
 
 module.exports = {
   '/v1/auth/password-reset/check-token': {
@@ -51,6 +57,45 @@ module.exports = {
       parameters: [{ name: 'X-Platform-Bootstrap-Token', in: 'header', required: true, schema: { type: 'string' } }],
       requestBody: jsonBody('{ email, password, role? }'),
       responses: { 201: { description: '{ user: { id, email, role, company_id } }' }, 400: { description: 'A field refused' }, 401: { description: 'Wrong or missing bootstrap token' }, 409: { description: 'An active administrator already exists (administrator_exists: true): the route creates the first one only (#1365). Or the e-mail is already registered' }, 429: { description: 'Too many attempts' }, 503: { description: 'No bootstrap token configured' } } },
+  },
+  '/v1/auth/mfa/verify': {
+    post: { tags: ['Auth'], summary: 'Second step of a sign-in: the code of the authenticator app', security: open,
+      description: `${MFA_STEP} Body: { mfa_token, code } (mfa_token answered by /v1/auth/login with mfa "verify", valid 5 minutes). Answer: the session, as /v1/auth/login gives it ({ token, user, company } and the session cookie). ${MFA_CODES} ${MFA_LIMIT}`,
+      requestBody: jsonBody('{ mfa_token, code }'),
+      responses: { 200: { description: 'The session' }, 400: { description: 'Not six digits, or a field missing' }, 401: { description: 'The sign-in expired: sign in again' }, 403: { description: 'Wrong code, or one already used' }, 429: MFA_429 } },
+  },
+  '/v1/auth/mfa/setup': {
+    post: { tags: ['Auth'], summary: 'Set up the second factor during a sign-in (an administrator without one)', security: open,
+      description: `${MFA_STEP} Body: { mfa_token } (answered by /v1/auth/login with mfa "setup", valid 10 minutes). Answer: { secret (base32), otpauth_uri, qr (the QR code of otpauth_uri, an SVG data: URL) }. A new secret each call, kept encrypted and pending until /v1/auth/mfa/setup/confirm; never answered again. ${MFA_LIMIT}`,
+      requestBody: jsonBody('{ mfa_token }'),
+      responses: { 200: { description: '{ secret, otpauth_uri, qr }' }, 400: { description: 'A field missing' }, 401: { description: 'The sign-in expired, or the account needs no set-up' }, 429: MFA_429 } },
+  },
+  '/v1/auth/mfa/setup/confirm': {
+    post: { tags: ['Auth'], summary: 'Turn the second factor on with its first code, and sign in', security: open,
+      description: `${MFA_STEP} Body: { mfa_token, code }. The first code of the pending secret turns the factor on; every other session of the account ends. Answer: the session, as /v1/auth/login gives it. ${MFA_CODES} ${MFA_LIMIT}`,
+      requestBody: jsonBody('{ mfa_token, code }'),
+      responses: { 200: { description: 'The factor is on; the session' }, 400: { description: 'Not six digits, or a field missing' }, 401: { description: 'The sign-in expired, or the factor is already on' }, 403: { description: 'Wrong code' }, 409: { description: 'Nothing is being set up: call /v1/auth/mfa/setup first' }, 429: MFA_429 } },
+  },
+  '/v1/me/mfa': {
+    get: { tags: ['Auth'], summary: 'My second factor: on or off, required or not', security: bearer,
+      description: `Answer: { enabled, required (an administrator's), enabled_at }. ${ME_MFA_LIMIT}`,
+      responses: { 200: { description: '{ enabled, required, enabled_at }' }, 401: { description: 'Not signed in' }, 429: MFA_429 } },
+    delete: { tags: ['Auth'], summary: 'Turn my second factor off (not for an administrator)', security: bearer,
+      description: `Body: { password, code }. An administrator's factor is required: 403 (another administrator resets it). Every session of the account ends; the answer carries the new one ({ enabled: false, required, enabled_at, token, user, company } and the cookie). ${MFA_CODES} ${ME_MFA_LIMIT}`,
+      requestBody: jsonBody('{ password, code }'),
+      responses: { 200: { description: 'Off; the new session' }, 400: { description: 'A field refused' }, 401: { description: 'Not signed in' }, 403: { description: 'Wrong password or code, or an administrator' }, 409: { description: 'The factor is not on' }, 429: MFA_429 } },
+  },
+  '/v1/me/mfa/setup': {
+    post: { tags: ['Auth'], summary: 'Start turning my second factor on', security: bearer,
+      description: `Body: { password } (asked again). Answer: { secret (base32), otpauth_uri, qr (an SVG data: URL) }; the secret is kept encrypted and pending until /v1/me/mfa/confirm, and never answered again. ${ME_MFA_LIMIT}`,
+      requestBody: jsonBody('{ password }'),
+      responses: { 200: { description: '{ secret, otpauth_uri, qr }' }, 400: { description: 'A field refused' }, 401: { description: 'Not signed in' }, 403: { description: 'Wrong password' }, 409: { description: 'The factor is already on' }, 429: MFA_429 } },
+  },
+  '/v1/me/mfa/confirm': {
+    post: { tags: ['Auth'], summary: 'Turn my second factor on with its first code', security: bearer,
+      description: `Body: { code }. Every session of the account ends; the answer carries the new one ({ enabled: true, required, enabled_at, token, user, company } and the cookie). ${MFA_CODES} ${ME_MFA_LIMIT}`,
+      requestBody: jsonBody('{ code }'),
+      responses: { 200: { description: 'On; the new session' }, 400: { description: 'Not six digits' }, 401: { description: 'Not signed in' }, 403: { description: 'Wrong code' }, 409: { description: 'Already on, or nothing being set up' }, 429: MFA_429 } },
   },
   '/v1/auth/logout': {
     post: { tags: ['Auth'], summary: 'Sign out: the session token is revoked and the cookie cleared', security: bearer,

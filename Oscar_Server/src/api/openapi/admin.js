@@ -19,7 +19,7 @@ const tags = ['Admin'];
 
 // routes/admin.js: administrators only; its writes share one limit.
 const ADMIN = 'Administrators only. Writes (POST, PATCH, PUT, DELETE) share a limit of 60 per 5 minutes per address.';
-const USER = '{ user: { id, email, role, status, company_id, company_name, company_slug, created_at } }';
+const USER = '{ user: { id, email, role, status, company_id, company_name, company_slug, created_at, mfa_enabled } }';
 const COMPANY = '{ id, name, slug, auth_mode, api_base, created_at, user_count }';
 
 const userId = pathParam('id', 'The user\'s id');
@@ -85,6 +85,12 @@ module.exports = {
       description: `${ADMIN} Administrators and certifiers only: a company account's password is its owner's (403; use send-reset). Body: { new_password } (at least 12 characters, with an upper-case letter, a lower-case letter and a digit). Answer: { id, email, password_reset }; the password is never returned.`,
       parameters: [userId], requestBody: jsonBody('{ new_password }'),
       responses: { 200: { description: 'Password set' }, 400: { description: 'Password refused' }, 401: r401, 403: { description: 'Administrators only, and a platform account only' }, 404: r404User, 429: r429 } },
+  },
+  '/v1/admin/users/{id}/mfa/reset': {
+    post: { tags, summary: 'Reset a user\'s second factor (a lost phone)', security: bearer,
+      description: `${ADMIN} The factor (or the one being set up) is removed and every session of the account ends (#1414). An administrator sets up a new one at the next sign-in; another account signs in with its password until it turns one on again. Audited; the owner is told by e-mail. A Company API account has none (409). Answer: { id, email, mfa_reset: true }.`,
+      parameters: [userId],
+      responses: { 200: { description: 'Reset' }, 401: r401, 403: r403, 404: r404User, 409: { description: 'The account has no second factor, or is a Company API account' }, 429: r429 } },
   },
   '/v1/admin/users/{id}/send-reset': {
     post: { tags, summary: 'Send a user a link to choose a new password', security: bearer,
