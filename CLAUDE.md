@@ -1093,6 +1093,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   that changes a password, role or company sets `END_SESSIONS_SQL` in the
   same UPDATE. **A test token must stand for a stored user** with that role
   and company, or the route answers 401.
+- **Two-factor authentication** (#1414; maintainer 2026-11-23: required for
+  administrators, offered to every other account, TOTP, no recovery codes:
+  another administrator resets it, a command on the server for the last
+  one; a QR code without dependency). **PR 1 (1.11.577)**:
+  `utils/totp.js` (RFC 6238, base32, `otpauth://`; `verifyCode()` takes one
+  step either side and never a step at or before `lastStep`) and
+  `utils/qrCode.js` (byte mode, level M, versions 1–40, SVG / `data:` URL),
+  pure, unused until PR 2. `qr-code.test.js` compares all 40 versions and 8
+  masks with segno through `tests/helpers/qr-reference.json`, made by
+  `scripts/qr-reference.py` (not run by CI; segno on `PYTHONPATH`). **segno
+  1.6.6 adds a 0x00 codeword when the stream ends on a byte boundary**
+  (`8 - length % 8` without `% 8`); the script puts that right, so regenerate
+  through it, never with plain segno. The auto-chosen mask is not compared:
+  encoders read penalty rule N3 differently.
 - **A run's secret works from the run only; an answer meant to attack OSCAR
   stops the run** (1.11.458 / OTST_V2.0.249, 1.11.460 / OTST_V2.0.250).
   `fromThisMachine()` (`server.js`): the two loopback routes take

@@ -654,6 +654,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.577] — 2026-11-23
+
+Two-factor authentication, part 1 of 2 (#1414): the codes of an authenticator app and a QR code encoder, both pure, without dependency and not used yet. No behaviour changes. Not released on its own: listed in `compatibility.json` (2026.618) without moving `current_release`; the release comes once part 2 (the sign-in, the pages) is merged. Collection unchanged.
+
+### Added
+- **`utils/totp.js`**: TOTP as RFC 6238 defines it (HMAC-SHA1 of the 30-second step, six digits), which Google and Microsoft Authenticator, 1Password and the like compute. Base32 both ways (RFC 4648; a key typed in lower case, in groups or with padding reads the same), a new secret of 20 random bytes, and the `otpauth://` address those apps read. `verifyCode()` accepts the code of the step before, the step and the step after, compares in constant time, and refuses a step at or before the last one accepted: a code is never accepted twice.
+- **`utils/qrCode.js`**: a QR code encoder (ISO/IEC 18004), byte mode in UTF-8, level M, versions 1 to 40, the mask of lowest penalty, drawn as an SVG with its four-module light border, or as a `data:` URL an `<img>` shows (the SVG holds the drawing only, never the text). Written after the steps of Project Nayuki's reference encoder, without its code. It will draw the address a person scans when turning on the second factor.
+
+### How it was checked
+- **The RFC vectors:** HOTP for counters 0 to 9 (RFC 4226, appendix D) and the six TOTP times of RFC 6238, appendix B; base32 for RFC 4648's examples.
+- **The standard's tables:** the byte capacity of all 40 versions (table 7), the blocks filling exactly the modules left by the patterns, the alignment patterns (annex E), the format information of the eight masks (annex C), the version information of versions 7 to 40 (annex D), and the standard's worked Reed–Solomon example (1-M).
+- **Read back:** a reader written in the test, apart from the encoder, reads every code made back to its text: format and version information in both copies, the remainder bits, each block's error correction, the mode and the length. 83 texts, from 1 to 2,331 bytes, the smallest and the largest of each of the 40 versions, two real `otpauth://` addresses and a text in three scripts.
+- **Against another encoder:** the same 83 texts with each of the eight masks are compared, module by module, with segno 1.6.6 (`tests/helpers/qr-reference.json`, made by `scripts/qr-reference.py`, which CI does not run: CI compares the stored hashes). All 664 codes are the same once one point of segno is put right: when the data stream already ends on a codeword boundary, segno adds eight 0 bits where ISO/IEC 18004 7.4.10, which its own comment quotes, adds none. Readers stop at the character count either way, but the pad codewords start a byte later. The script says so where it puts it right. The mask chosen by the penalty rules is not compared: encoders read rule N3 differently (segno chose another mask for 37 of the 83 texts), and every mask gives a valid code.
+- **Faults injected:** 11 in the encoder (pad codeword, terminator, a mask, the format and version information, the column skipped for the timing pattern, the field polynomial, a block of the table, the length field of version 10, the dark module, the alignment step of version 32) and 7 in the TOTP module (truncation offset and mask, window, replay, period, hash, base32). All are seen by the tests but one: a terminator of three bits instead of four, which changes nothing in byte mode (the padding to the byte adds the missing bit).
+
+### Tests
+- `totp.test.js` (33 tests) and `qr-code.test.js` (177 tests).
+
+---
+
 ## [server-1.11.576] — 2026-11-23
 
 `mergeTesterSave()` split by stage, behaviour unchanged (#1408; point M2 of the code quality review for #221, seventh and last function). Collection unchanged.
