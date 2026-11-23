@@ -1,0 +1,1246 @@
+{
+ "generator": "segno 1.6.6, padding bits per ISO/IEC 18004 7.4.10",
+ "cases": [
+  {
+   "length": 14,
+   "seed": 1,
+   "version": 1,
+   "masks": [
+    "0e57bd19556e8ee1",
+    "27118ce8886a002b",
+    "aec18533c8216fc2",
+    "e9fc03650b4d943a",
+    "b8957362ae5e66dd",
+    "0dbc4eb785b0a4cb",
+    "51057970189ee374",
+    "76d2accb4f0b8b6f"
+   ]
+  },
+  {
+   "length": 26,
+   "seed": 2,
+   "version": 2,
+   "masks": [
+    "be4bf0c61768b608",
+    "3ec5c3e8b49ee027",
+    "774f27db23abf550",
+    "4e243f63fb335845",
+    "5cc6936ad859ad4a",
+    "f6629256a15e0b91",
+    "c40ecaf17b7ca7b4",
+    "c0f79d731ec8ec4a"
+   ]
+  },
+  {
+   "length": 15,
+   "seed": 42,
+   "version": 2,
+   "masks": [
+    "356af17d766f1f96",
+    "8427de2b77f57577",
+    "6e049e6db23d3c49",
+    "593b03b6f7675704",
+    "455e28879918c577",
+    "b2a834ef016e42df",
+    "bea13d822f55e538",
+    "7152c33474668280"
+   ]
+  },
+  {
+   "length": 42,
+   "seed": 3,
+   "version": 3,
+   "masks": [
+    "5d3d26ee5d4b6fe0",
+    "1ee1b0c5a662024c",
+    "da8157c912591d7c",
+    "82521fead7693ccc",
+    "6ac26558a927f815",
+    "5acca193b5d3949b",
+    "aa4811d6d6e2d491",
+    "cb63aadcbf3b8ab1"
+   ]
+  },
+  {
+   "length": 27,
+   "seed": 43,
+   "version": 3,
+   "masks": [
+    "0d1524c3e4716a1b",
+    "97a68abd82c436ad",
+    "fbc88c54bb3b0f6e",
+    "4861b256daa49c2e",
+    "cedd5d235f6b67d3",
+    "6dfb7e60e73e9c2c",
+    "e2beaa215940d608",
+    "7f5b30e3e3aa565f"
+   ]
+  },
+  {
+   "length": 62,
+   "seed": 4,
+   "version": 4,
+   "masks": [
+    "66cc8a1cbe9afbfe",
+    "de542713f9b55c99",
+    "898ec3da4e9cae1b",
+    "b460f44fe5a29711",
+    "508a661976cf509a",
+    "3df5735e525c8275",
+    "8564b544787a61dd",
+    "6bfbd3e3e375f5f3"
+   ]
+  },
+  {
+   "length": 43,
+   "seed": 44,
+   "version": 4,
+   "masks": [
+    "b8616552b5fce486",
+    "a56e8b7bd0a98d63",
+    "a5dd36174c474ebd",
+    "ca6412dc791c89b0",
+    "dba8493435694bde",
+    "9ec4b57b0fd6e654",
+    "4190ce7c4470ae7a",
+    "54ccc5d8cecb721b"
+   ]
+  },
+  {
+   "length": 84,
+   "seed": 5,
+   "version": 5,
+   "masks": [
+    "a56288f40da20b7e",
+    "cb40c1658e61c792",
+    "864bd08961356d33",
+    "c698b26b9da6a33e",
+    "f9794661cdc5309f",
+    "370c48e1fb4e2186",
+    "899d4eba9600cc29",
+    "a0ce516f291ac5a6"
+   ]
+  },
+  {
+   "length": 63,
+   "seed": 45,
+   "version": 5,
+   "masks": [
+    "e896d73f8da298e2",
+    "c1449fec4afbc370",
+    "31162657ce0394d1",
+    "c4936f0851dc48a4",
+    "5083a09b9f5e980c",
+    "796a18ffdb9c2eaf",
+    "2a93d187479e8031",
+    "19e9960660cb9d57"
+   ]
+  },
+  {
+   "length": 106,
+   "seed": 6,
+   "version": 6,
+   "masks": [
+    "1adbf29f510f667c",
+    "c479e854dfdf821f",
+    "a273e17cd29ae03d",
+    "fee543f369578826",
+    "12172c511abcad41",
+    "b070aacaf074a902",
+    "0e1e8415cf43b4c6",
+    "d703378e9823253c"
+   ]
+  },
+  {
+   "length": 85,
+   "seed": 46,
+   "version": 6,
+   "masks": [
+    "0713a26f5b9c9797",
+    "c1ea822ac7bd2596",
+    "eec6a7aa8fa2c8e5",
+    "85997fbf2d06cc67",
+    "609837d36614d86b",
+    "ee8eb00b761444b7",
+    "9c53d0619bc5f6f1",
+    "ac873cf00966b140"
+   ]
+  },
+  {
+   "length": 122,
+   "seed": 7,
+   "version": 7,
+   "masks": [
+    "2d6a876c4a15f67f",
+    "8c21c6894ee0df4a",
+    "48af4d0f648bcbeb",
+    "49068e46c9458b50",
+    "e189cb19072e5a65",
+    "13f0155c7dd5c0c8",
+    "127b601752cef830",
+    "1bf11925a3d7fa9a"
+   ]
+  },
+  {
+   "length": 107,
+   "seed": 47,
+   "version": 7,
+   "masks": [
+    "5bcb092e7dd02fc7",
+    "5aab30e889732a2d",
+    "ba67671fa25af9ae",
+    "306166206c736466",
+    "532b7148b2a23487",
+    "dd08698a372a237d",
+    "7c7d70450933257c",
+    "9e7c2dc86675084a"
+   ]
+  },
+  {
+   "length": 152,
+   "seed": 8,
+   "version": 8,
+   "masks": [
+    "cd23c7729d9a4964",
+    "d2cd975b5477da54",
+    "ae33f3810ff553a6",
+    "7c4cadd51b513f18",
+    "d7adea4736f2cb3b",
+    "097695ae55d3b149",
+    "4912ac75b3a574d1",
+    "c1493f725da853e9"
+   ]
+  },
+  {
+   "length": 123,
+   "seed": 48,
+   "version": 8,
+   "masks": [
+    "b96d719fa60a8ce9",
+    "9cee824b075f16e7",
+    "c8afe9137113e903",
+    "0d2400c344a239be",
+    "8a7e2031ba05e849",
+    "0f61a7624e4f6cba",
+    "f93bec41866bd50a",
+    "2d24de16ac4c08c1"
+   ]
+  },
+  {
+   "length": 180,
+   "seed": 9,
+   "version": 9,
+   "masks": [
+    "0d32bbfaa9f6ef48",
+    "0ae34e9107e547ab",
+    "01e771ff4c00ef27",
+    "d91c917c52d6ff4f",
+    "9ca78e6fac85b129",
+    "89c65c6738768ae3",
+    "0eb7c2a380dd6d6b",
+    "66408b026a1291a3"
+   ]
+  },
+  {
+   "length": 153,
+   "seed": 49,
+   "version": 9,
+   "masks": [
+    "fd8e4c905165f9be",
+    "270b4eff01b3fb86",
+    "1b13bdc1829990c4",
+    "06f41e42a00b1ae6",
+    "3ed431906b0c37a7",
+    "bc064e61084657a2",
+    "56eb67bba0d6594e",
+    "b66183ee912a61e7"
+   ]
+  },
+  {
+   "length": 213,
+   "seed": 10,
+   "version": 10,
+   "masks": [
+    "f6bd20a03796f668",
+    "035e3622106f43a1",
+    "b84cad46e787a039",
+    "c62d61b85dcfd32c",
+    "1918c649dd7854fc",
+    "72c925a2b068217b",
+    "842f77f9359350d8",
+    "c591905cbc3fcd2d"
+   ]
+  },
+  {
+   "length": 181,
+   "seed": 50,
+   "version": 10,
+   "masks": [
+    "98e8279cb9fb4017",
+    "74c3568023912850",
+    "9a613fe79e48cc99",
+    "64f3a2f6f61f0825",
+    "c5160eda5e3f662b",
+    "ca514ba7155ee955",
+    "d3e259351204f465",
+    "546b49c215cdfbcb"
+   ]
+  },
+  {
+   "length": 251,
+   "seed": 11,
+   "version": 11,
+   "masks": [
+    "58a7a6f37f1889e8",
+    "ebc5705fe0101fe7",
+    "c049f50e712c94dc",
+    "6a3175e100266621",
+    "6aa852272b54515a",
+    "fd137fb67283c052",
+    "5458c8b7b4b9086c",
+    "2d6b8feb72d7ddc8"
+   ]
+  },
+  {
+   "length": 214,
+   "seed": 51,
+   "version": 11,
+   "masks": [
+    "0077862a32ac7b03",
+    "5c7b2458649dd62e",
+    "320870139a09da40",
+    "de9a2c75754acd4e",
+    "d8a8dcef8177d812",
+    "63b0c1bef440cf45",
+    "29bb9efa0994f893",
+    "b825fd7d3b30948e"
+   ]
+  },
+  {
+   "length": 287,
+   "seed": 12,
+   "version": 12,
+   "masks": [
+    "e70afc0a839a5014",
+    "9dfa9553b0e2b5c4",
+    "aee7bdae8e923b10",
+    "1b8111b55b0142a1",
+    "dc2113f66d2feb73",
+    "0c86ee015cf1fbc1",
+    "1295e21f5a07ff8f",
+    "80419936882c3eb8"
+   ]
+  },
+  {
+   "length": 252,
+   "seed": 52,
+   "version": 12,
+   "masks": [
+    "f2a5d1c2c97827a2",
+    "8b79c5356d97f48c",
+    "449dba16c140a65f",
+    "be413b61ba0bb73f",
+    "7d0e8ead08cb5c44",
+    "f55df9df3da2053e",
+    "45bc6db4de59aacb",
+    "ce1324b23bdfcb2b"
+   ]
+  },
+  {
+   "length": 331,
+   "seed": 13,
+   "version": 13,
+   "masks": [
+    "1e577334b352048d",
+    "3e46cfeaaa6c236a",
+    "8f3c63c5d6510c14",
+    "47490ba89b1fccd8",
+    "60383d2a71a36702",
+    "981c257c81aca1c7",
+    "2eed824eea292610",
+    "1327359a7e512742"
+   ]
+  },
+  {
+   "length": 288,
+   "seed": 53,
+   "version": 13,
+   "masks": [
+    "41d8fc0f1f90938c",
+    "b88a0e5aa1f0dd5f",
+    "39ee862741bd4f10",
+    "8285ae98134976b4",
+    "13e099e4adb023c0",
+    "65dd168095426610",
+    "161bacdc98cd7f13",
+    "36f6a8973178d0e7"
+   ]
+  },
+  {
+   "length": 362,
+   "seed": 14,
+   "version": 14,
+   "masks": [
+    "247c58db8ee9da0a",
+    "a7c656f2efdc4624",
+    "be4b5773c6dbe60a",
+    "1a7f2fa8f5a6774b",
+    "ea1cb91030eee5cd",
+    "c07915d5e6e8388c",
+    "f17cc8ac132d1aea",
+    "5967a9d45034b7a6"
+   ]
+  },
+  {
+   "length": 332,
+   "seed": 54,
+   "version": 14,
+   "masks": [
+    "1ac96ef3cc07c5a1",
+    "0ad7ff0474a7cf53",
+    "f40e7e7573375cb8",
+    "5c0c24e927e3aa08",
+    "fefbb1b6fea512fc",
+    "06964b683833574e",
+    "06c16672ac7c28de",
+    "975dc831d27b038f"
+   ]
+  },
+  {
+   "length": 412,
+   "seed": 15,
+   "version": 15,
+   "masks": [
+    "6c4cb43d5f90994f",
+    "a3928370b80df8bf",
+    "25d443fd17aeb661",
+    "d2010ba33c3de116",
+    "565f30ba2199e4ea",
+    "2b145e3987aaea63",
+    "cd831c4486e0362c",
+    "03b4b3950ff7a270"
+   ]
+  },
+  {
+   "length": 363,
+   "seed": 55,
+   "version": 15,
+   "masks": [
+    "0367c697abf70382",
+    "1c063b7ca0df83b2",
+    "fbf663dd98b6df4e",
+    "6720cf37b23fbd77",
+    "b14eb431973195b5",
+    "8356092b5fe400f4",
+    "d0727bf74ef34eae",
+    "5e46905685d1215b"
+   ]
+  },
+  {
+   "length": 450,
+   "seed": 16,
+   "version": 16,
+   "masks": [
+    "e97bcaafb711a5ca",
+    "674b814be6841762",
+    "b1d0a1ecd46734f5",
+    "66756666a155e4b5",
+    "c10902c13223a63a",
+    "0ab64e4f2f23642f",
+    "eb7bf83aeefc532f",
+    "e6f0e8aae10efeb0"
+   ]
+  },
+  {
+   "length": 413,
+   "seed": 56,
+   "version": 16,
+   "masks": [
+    "b3c064f1e89eac22",
+    "a51996d262929332",
+    "044357fb1c6d408d",
+    "7cd249c3797dcd96",
+    "3999b1630757a28d",
+    "41d46474398b33fb",
+    "e3bc79d08fe475d0",
+    "c3fb65d5aeb544e6"
+   ]
+  },
+  {
+   "length": 504,
+   "seed": 17,
+   "version": 17,
+   "masks": [
+    "e65667db2f2b933a",
+    "28b8d17f8d28b059",
+    "084d85198313f8f5",
+    "3efe35f7d467022b",
+    "d1d08a26d6783c29",
+    "963724e84fec6702",
+    "c6fbd39f3355a8fa",
+    "4259ad58361b8941"
+   ]
+  },
+  {
+   "length": 451,
+   "seed": 57,
+   "version": 17,
+   "masks": [
+    "d2319e3ec6e80b7c",
+    "a0d839ff4903cf23",
+    "91d2da865bc70329",
+    "eed3fad071467ea0",
+    "39990c7b6c6422a0",
+    "0776bcfae20b4ea6",
+    "d5b0fa37712a65df",
+    "7ff4e62cffd36fce"
+   ]
+  },
+  {
+   "length": 560,
+   "seed": 18,
+   "version": 18,
+   "masks": [
+    "206318862f429242",
+    "642a7d50eabf82da",
+    "f8199c6ad5d1f567",
+    "7978c356b85d32b3",
+    "bd1d6092722701fe",
+    "db54093d91622579",
+    "3b1fcf6a54c054d3",
+    "ab7f1f0374b08d69"
+   ]
+  },
+  {
+   "length": 505,
+   "seed": 58,
+   "version": 18,
+   "masks": [
+    "aeaf9ff3277cd1c4",
+    "153d1dd1d1b4ec72",
+    "d1f73917c5ab3cb0",
+    "e155801e5836dd91",
+    "67f485af4109ceed",
+    "f90e98ded0e1ac2e",
+    "3ea550a1b1fb2fa9",
+    "cac16dc7bdbeaa16"
+   ]
+  },
+  {
+   "length": 624,
+   "seed": 19,
+   "version": 19,
+   "masks": [
+    "af639c8b38175d63",
+    "492004bf5295abd9",
+    "18877b16875d421f",
+    "5ef3541f41f31a98",
+    "dad3ace0431b51b9",
+    "9ad3795893f5453d",
+    "2cbb6ee20cec29f5",
+    "1ed762730f2c05e8"
+   ]
+  },
+  {
+   "length": 561,
+   "seed": 59,
+   "version": 19,
+   "masks": [
+    "8a616997743b48ec",
+    "fa6d72440f00c980",
+    "21e57360c69c79ae",
+    "b6cace43e13f89cb",
+    "73d3fde10bd9b35c",
+    "4291cf2c76f241d0",
+    "6880d6c12c36551d",
+    "dccf841f94bb6380"
+   ]
+  },
+  {
+   "length": 666,
+   "seed": 20,
+   "version": 20,
+   "masks": [
+    "2be3a512bb56ab1d",
+    "cb6241baaeace265",
+    "9c49d992081f705c",
+    "f20b13a0a91be24f",
+    "d56cbce36b1c8f41",
+    "c8f85a135c011ef6",
+    "48a42e8a89d6292b",
+    "5a7afd38116859c3"
+   ]
+  },
+  {
+   "length": 625,
+   "seed": 60,
+   "version": 20,
+   "masks": [
+    "074d73b414d59951",
+    "a8141e09cbc24733",
+    "11a4fe0a1ee923ab",
+    "c7f23ca8bccc993c",
+    "82be25fd2411dc24",
+    "bce5d09fb94a612c",
+    "2f247becdfab2a0c",
+    "77a25b5240c29874"
+   ]
+  },
+  {
+   "length": 711,
+   "seed": 21,
+   "version": 21,
+   "masks": [
+    "20d161e3d07dd151",
+    "8093808dbc7c05bf",
+    "ade60ebf6ac68ea9",
+    "690b1aa4003a8ca4",
+    "1b8a9cf1cd5f6415",
+    "d715eec85084604b",
+    "132ebb5066f55a7e",
+    "a0c87fbbe17aee6d"
+   ]
+  },
+  {
+   "length": 667,
+   "seed": 61,
+   "version": 21,
+   "masks": [
+    "1ec8d2585122798b",
+    "138c81ea57b8bf42",
+    "5f96ab82be493371",
+    "a1412008fda880da",
+    "c53845820a849b35",
+    "400b78b923c71e7d",
+    "91a9930c7929b075",
+    "a9e1471372af3fee"
+   ]
+  },
+  {
+   "length": 779,
+   "seed": 22,
+   "version": 22,
+   "masks": [
+    "5bb3368d2682f174",
+    "7ca77cc1aee1e325",
+    "6681e8ec6506c7fe",
+    "b0482e8bf846ffb4",
+    "18ce858c6bb85155",
+    "7d5e975c12feff82",
+    "c0cd9fb4f5c58edb",
+    "732b41ff13d60346"
+   ]
+  },
+  {
+   "length": 712,
+   "seed": 62,
+   "version": 22,
+   "masks": [
+    "385b4da1baebcf9c",
+    "51778e11b1b6dad1",
+    "5c9478c1ac3c8467",
+    "1ace4b313aafd7da",
+    "4e09e5ea3807f51c",
+    "c24ebcda42064bc5",
+    "14fdab45300b4451",
+    "d963a7fe7dfe1dc9"
+   ]
+  },
+  {
+   "length": 857,
+   "seed": 23,
+   "version": 23,
+   "masks": [
+    "bf4a66317f458b8e",
+    "681f9c91cf74239e",
+    "ae203bd99043f1e5",
+    "12f9028e0a620721",
+    "57ba5c2a6c47c9ab",
+    "eab1ce07aa543639",
+    "81f77fa077f14b10",
+    "e5845d2e3cceb568"
+   ]
+  },
+  {
+   "length": 780,
+   "seed": 63,
+   "version": 23,
+   "masks": [
+    "47959db4d3b34282",
+    "80f9b1f89339d62a",
+    "98ec5bf89188819d",
+    "c7b783b6595aeb30",
+    "e5dcddf65b4360be",
+    "4417b28c2f43375b",
+    "feb273a1c1ad7ede",
+    "ce96ec37ecd32b81"
+   ]
+  },
+  {
+   "length": 911,
+   "seed": 24,
+   "version": 24,
+   "masks": [
+    "4ea81ae444c878d2",
+    "d4fbc8ce2dd10211",
+    "a074e506f7ae3f8a",
+    "f562e526c5cdaa8f",
+    "a2a0ec0cffd4a453",
+    "badd4072274fc2b9",
+    "d8431fef8a3861cc",
+    "fca06ffe3a1fcfc0"
+   ]
+  },
+  {
+   "length": 858,
+   "seed": 64,
+   "version": 24,
+   "masks": [
+    "1a89362393789c8c",
+    "a5f9c605332757c4",
+    "f05271879c563bcb",
+    "d6368b80270cafcb",
+    "e50a86f3e8f7888f",
+    "31df35a3c6942354",
+    "b90b9d267f898c63",
+    "dd664b4936a9990e"
+   ]
+  },
+  {
+   "length": 997,
+   "seed": 25,
+   "version": 25,
+   "masks": [
+    "5b168b4adb4fab92",
+    "450927cb61b22ba0",
+    "3ca5438a3204d98f",
+    "0255714b55a7abb8",
+    "e6be7fa005a111a2",
+    "69411862b9914870",
+    "5519c6e22170e031",
+    "19deaa74137b1ffe"
+   ]
+  },
+  {
+   "length": 912,
+   "seed": 65,
+   "version": 25,
+   "masks": [
+    "4dace877e414fb92",
+    "f53cf083d37cfe2c",
+    "906fee634b037b05",
+    "fd781c4a49d52c40",
+    "092d80e19150bf85",
+    "6d6b621b8e0c59b1",
+    "d3567fd4d76fa395",
+    "d9aebda9c466d119"
+   ]
+  },
+  {
+   "length": 1059,
+   "seed": 26,
+   "version": 26,
+   "masks": [
+    "41582eb7297ab7fb",
+    "75e87e4d43c68e4c",
+    "0d8fd378d03875b7",
+    "f0258292cf51a5b9",
+    "457c643f4359a98c",
+    "014871ad32988933",
+    "db18786424a00f22",
+    "417b7a4d912efd5c"
+   ]
+  },
+  {
+   "length": 998,
+   "seed": 66,
+   "version": 26,
+   "masks": [
+    "5c8fc8b0429663d9",
+    "fad73e480488115e",
+    "451a0f84102a9e79",
+    "2034d7f874d788d5",
+    "7b2ddd932f7d9a1b",
+    "1a05a6b1f6313adc",
+    "1ba6baab25b96857",
+    "ce3aa163cbe5f8fa"
+   ]
+  },
+  {
+   "length": 1125,
+   "seed": 27,
+   "version": 27,
+   "masks": [
+    "ce2527ebaad37db0",
+    "5dd06c4b19659511",
+    "431c908deec1e619",
+    "716a617a2a7b2055",
+    "cced06f07ec39379",
+    "7a87655d54773852",
+    "e42a77ef3eb08dcb",
+    "a2219f9dec603297"
+   ]
+  },
+  {
+   "length": 1060,
+   "seed": 67,
+   "version": 27,
+   "masks": [
+    "1d5678c0e3d6adf4",
+    "0539b548fc2d9c12",
+    "29fe958636c7fff3",
+    "85b8dda1cb50b4f9",
+    "2fc119ac59c2f587",
+    "3d816f8f1b3f92f6",
+    "5275086d997482db",
+    "0f4f39a9c24dc1b2"
+   ]
+  },
+  {
+   "length": 1190,
+   "seed": 28,
+   "version": 28,
+   "masks": [
+    "1a695be9d20d0753",
+    "e03b92b601b910f6",
+    "358eb97f4f8f7c05",
+    "5894234f065859d6",
+    "7ce1e7c21e6f408a",
+    "427ffa3586d3fd5a",
+    "ae4144e0ce7eb01a",
+    "982681802af7e1fd"
+   ]
+  },
+  {
+   "length": 1126,
+   "seed": 68,
+   "version": 28,
+   "masks": [
+    "b6d31738de23c8a1",
+    "3015e651a54dcec1",
+    "49327a7e10dba76b",
+    "9ec6cafe75aa3243",
+    "0003c1e639642b2b",
+    "d2f88bcaa98f5594",
+    "295b21b939eb0344",
+    "775b84ca51d91a70"
+   ]
+  },
+  {
+   "length": 1264,
+   "seed": 29,
+   "version": 29,
+   "masks": [
+    "de6c48a9c1bd8a60",
+    "0a5dd1c2ef5e41a4",
+    "01b14a5b57f7621f",
+    "ce2c1a6ad26e9283",
+    "681b57ce7966fe22",
+    "4e6b485ed479e0bf",
+    "5b554c2c281de87b",
+    "2a4237fba176e758"
+   ]
+  },
+  {
+   "length": 1191,
+   "seed": 69,
+   "version": 29,
+   "masks": [
+    "a2fdeed95b8aa5a6",
+    "ccacaa4fc86eda84",
+    "e5d14c70060426d0",
+    "d4ff61c9865de76f",
+    "992b491b339f0c88",
+    "c4d1286a70f9e37e",
+    "3666b4f20f56384b",
+    "0141167667bc6b44"
+   ]
+  },
+  {
+   "length": 1370,
+   "seed": 30,
+   "version": 30,
+   "masks": [
+    "194c9cb69100a417",
+    "0ba5a7cb1b202cb0",
+    "a761f40800fd07cd",
+    "a4ce8fe44ecfd2bc",
+    "fe4a00646085785a",
+    "05b9c31e812414e6",
+    "a3e6da4236232eaf",
+    "542b8df1462655bd"
+   ]
+  },
+  {
+   "length": 1265,
+   "seed": 70,
+   "version": 30,
+   "masks": [
+    "ad31e72c3ec8e49a",
+    "6096f9d0f3488a3d",
+    "284465262702b65b",
+    "3e80fd22d6648200",
+    "54e51d81b45be62e",
+    "4503e764db947204",
+    "c6b8b766a0809fba",
+    "07c8d08a232983c2"
+   ]
+  },
+  {
+   "length": 1452,
+   "seed": 31,
+   "version": 31,
+   "masks": [
+    "b7ae9393fa84f959",
+    "af4ec97243f6813a",
+    "e5fef7adc98065c3",
+    "e10edcd772be1525",
+    "a8d4b696bdb1cc41",
+    "55c59086a209e340",
+    "bf524e75083af644",
+    "830fc8356a13fdb7"
+   ]
+  },
+  {
+   "length": 1371,
+   "seed": 71,
+   "version": 31,
+   "masks": [
+    "fa7a34c2e9889bb3",
+    "ea7d7aa63e7b302f",
+    "d0961fa4974c4bc5",
+    "505cdb3c1bdc19b6",
+    "cfcdd4694f5e4162",
+    "f2878cdaa4b1e57c",
+    "36fe266ecdbe3839",
+    "7b578de55f9dc7b2"
+   ]
+  },
+  {
+   "length": 1538,
+   "seed": 32,
+   "version": 32,
+   "masks": [
+    "aa7374a9a5f5ee29",
+    "f03bf189cf583769",
+    "e415971881f79834",
+    "3a893d16e5d3de74",
+    "1bc378fb4e84961d",
+    "3796cba135204cee",
+    "f8bdda6afc146df0",
+    "7fab82da41dace69"
+   ]
+  },
+  {
+   "length": 1453,
+   "seed": 72,
+   "version": 32,
+   "masks": [
+    "f1b4fc57229f16b0",
+    "99a0aaea6717daa2",
+    "b584d5bdddd8eaef",
+    "f336319e6520736f",
+    "217467792a79ec19",
+    "3b4d66d10e6c62a4",
+    "5842dba906aa73d3",
+    "27d7db007bee8a62"
+   ]
+  },
+  {
+   "length": 1628,
+   "seed": 33,
+   "version": 33,
+   "masks": [
+    "c97a0fb5cefd82ee",
+    "8fd15f2c304fdeb5",
+    "9ae05d06798d50e7",
+    "41f098cf87405e73",
+    "1666be33b851df3b",
+    "c68d33da881569e0",
+    "69359cb70b2bdf9c",
+    "2bba27668b83004b"
+   ]
+  },
+  {
+   "length": 1539,
+   "seed": 73,
+   "version": 33,
+   "masks": [
+    "799de4867b8d21fe",
+    "75313feda6aaf1b2",
+    "3579b3d41816e752",
+    "61eb2ff5e2522ef4",
+    "99511be3b75d6817",
+    "39bcdc8acb1739e1",
+    "77478830db1cce30",
+    "2ecc6345d3825943"
+   ]
+  },
+  {
+   "length": 1722,
+   "seed": 34,
+   "version": 34,
+   "masks": [
+    "cf60a068ca0a4ed9",
+    "c897933c7165da96",
+    "3dd30b14874b5b44",
+    "e97dcc3aeaf09d56",
+    "ce05a2c0c94a84f2",
+    "d5839339c5edfff6",
+    "ba694f2f2bc2b033",
+    "24bcc3c8422fc87e"
+   ]
+  },
+  {
+   "length": 1629,
+   "seed": 74,
+   "version": 34,
+   "masks": [
+    "51c55384dc4e3056",
+    "5284907a12ba129f",
+    "954117d4901dad79",
+    "57e6f7305771fefa",
+    "2538d0df6a317086",
+    "4b7cf124fc35ef63",
+    "0f40eadfa6d0c0a0",
+    "32d6a40d4ced38d9"
+   ]
+  },
+  {
+   "length": 1809,
+   "seed": 35,
+   "version": 35,
+   "masks": [
+    "47a498ee7e43bc8b",
+    "8eed6455e3697c32",
+    "f7857181281e9ffe",
+    "3f44b48be1c96be2",
+    "9ca4611de6de57f4",
+    "f5affc78ed24033e",
+    "95bd31881fd4c12e",
+    "f8cddb59800a7b0e"
+   ]
+  },
+  {
+   "length": 1723,
+   "seed": 75,
+   "version": 35,
+   "masks": [
+    "3a465ad798b76f93",
+    "843f36ae51cbb704",
+    "b54442aff39f623d",
+    "a32d19d993769be7",
+    "e787b88420a2e6da",
+    "621ac54651d58f42",
+    "b3fa82b2624df9ad",
+    "c8b0a45bd91f72b8"
+   ]
+  },
+  {
+   "length": 1911,
+   "seed": 36,
+   "version": 36,
+   "masks": [
+    "dcd5a2ba5f290ed7",
+    "3d09bcd038d4da91",
+    "674cda70d488e8f0",
+    "d932ef654ae053fa",
+    "8df031a183311773",
+    "9acac6871b34123c",
+    "f3d8fd5440052e5d",
+    "b332843c3bf4c4c1"
+   ]
+  },
+  {
+   "length": 1810,
+   "seed": 76,
+   "version": 36,
+   "masks": [
+    "0b19e7b2f0aff1bc",
+    "39ea54ea95f219f2",
+    "b53a05c52949ba9d",
+    "6246bd6a3a1d8aa1",
+    "1416bc51403dc557",
+    "062403ccf5b56d1a",
+    "368591c9ecb7cddd",
+    "4b35fbdb4c470b35"
+   ]
+  },
+  {
+   "length": 1989,
+   "seed": 37,
+   "version": 37,
+   "masks": [
+    "163013a86d970544",
+    "d77b246c751effad",
+    "8936ae32f26ca8e5",
+    "ccc1a0a215943f05",
+    "894ac11f8c811320",
+    "08ca19a87bed4234",
+    "70898522e10575e7",
+    "1282c9b465095ddf"
+   ]
+  },
+  {
+   "length": 1912,
+   "seed": 77,
+   "version": 37,
+   "masks": [
+    "0ecf9e58247b5bc3",
+    "89bfdf8f428c59a9",
+    "b5d1b03a2bbe4141",
+    "3da9d7a9fb1dc141",
+    "d95b85be56d21f31",
+    "ee17e1f9abd96092",
+    "a7014b54256e2d7c",
+    "e8f2bdf4b51edaa7"
+   ]
+  },
+  {
+   "length": 2099,
+   "seed": 38,
+   "version": 38,
+   "masks": [
+    "a3a1740149a97bdf",
+    "1df1dd57ad3d5a12",
+    "61b55c263ed6b9d2",
+    "834f607fbe911ff8",
+    "48ab38cd4dc4229b",
+    "0049e1450b8d1a98",
+    "752d970a9d75cb26",
+    "8c5090dad5c57703"
+   ]
+  },
+  {
+   "length": 1990,
+   "seed": 78,
+   "version": 38,
+   "masks": [
+    "cd3ec34e51f97af2",
+    "c2b6fb3463dd6600",
+    "c4c0a301c19680bb",
+    "5d33a3b73a3bcf53",
+    "016950218c31755a",
+    "7e14ba36033c8ee2",
+    "967b22596a66794f",
+    "5c481e788f69c750"
+   ]
+  },
+  {
+   "length": 2213,
+   "seed": 39,
+   "version": 39,
+   "masks": [
+    "86b53376abe6c2a3",
+    "7242adf211be7955",
+    "620e7861b53d719e",
+    "679ec72c2b4590c4",
+    "eb6a76e49be65cbf",
+    "21af76b6972f55ec",
+    "f04973628099e9c2",
+    "5e29edf277be1dec"
+   ]
+  },
+  {
+   "length": 2100,
+   "seed": 79,
+   "version": 39,
+   "masks": [
+    "9d373dad8dea5a17",
+    "2649a2e3e53203fa",
+    "4627f6e94a406b9f",
+    "9b1bf03373db6c2e",
+    "f3e371e20db8d053",
+    "453d76bbfeef3da8",
+    "f42766df940763ca",
+    "8e7049c2119b071f"
+   ]
+  },
+  {
+   "length": 2331,
+   "seed": 40,
+   "version": 40,
+   "masks": [
+    "a57e2e69a9a3320c",
+    "7311e0e88385d6a9",
+    "3cff8557f10f87d5",
+    "529bdb05d56e2517",
+    "7df90e96bad19371",
+    "829befbe3a6912f3",
+    "3cadf702a24979bf",
+    "367717f698a77bb6"
+   ]
+  },
+  {
+   "length": 2214,
+   "seed": 80,
+   "version": 40,
+   "masks": [
+    "86615428ca73e899",
+    "1e3e4fc41928d7e6",
+    "1cf0d8c64ddc1ea1",
+    "86e81b25cebf9366",
+    "1ae49abee62bb44a",
+    "2dfc78db4541ad57",
+    "a74941f5157740a9",
+    "5e62604d823a85ca"
+   ]
+  },
+  {
+   "text": "otpauth://totp/OSCAR:admin%40example.org?secret=JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP&issuer=OSCAR&algorithm=SHA1&digits=6&period=30",
+   "version": 8,
+   "masks": [
+    "a10fb5ea066cf0a3",
+    "4e6b3ebc54e8221b",
+    "ba68977f02e7dd3b",
+    "06c4844815b81662",
+    "4ba95589cbbc9ed2",
+    "8ae348301964e093",
+    "1a65d0adc8ba8471",
+    "c568b2755287330e"
+   ]
+  },
+  {
+   "text": "otpauth://totp/OSCAR:%C3%A9lodie.d%C3%BCrr%40operator.example?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=OSCAR&algorithm=SHA1&digits=6&period=30",
+   "version": 8,
+   "masks": [
+    "b6918c21d2a1b5ea",
+    "3820a558c1649f76",
+    "2efabd779009ef07",
+    "7a36200cb474c3d8",
+    "40963c3259ae297b",
+    "74c4db3d1b3efddd",
+    "8b05272e1b8a121a",
+    "aa8dc75f9c7a991b"
+   ]
+  },
+  {
+   "text": "Gare de Lyon — Zürich HB → 東京",
+   "version": 3,
+   "masks": [
+    "9a24bb68a7730efd",
+    "76f314264bd662e2",
+    "686bdc6c01b87bd4",
+    "26291bb6f24a6a59",
+    "adb6fc213832cd0d",
+    "58c37d8951b28d1a",
+    "29a768a902a4b5f1",
+    "5e032209041535d9"
+   ]
+  },
+  {
+   "text": "A",
+   "version": 1,
+   "masks": [
+    "2bae48594b732587",
+    "43f688a881761c91",
+    "1df28de52a4a3bd0",
+    "bc9009ae87ca68f1",
+    "177b3a1897a152ae",
+    "a6fca46e028f9962",
+    "90e985ca4eb58895",
+    "23eee31305a65603"
+   ]
+  }
+ ]
+}

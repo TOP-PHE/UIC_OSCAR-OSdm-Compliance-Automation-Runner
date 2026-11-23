@@ -4,6 +4,17 @@
   "current_release": "2026.617",
   "releases": [
     {
+      "release": "2026.618",
+      "date": "2026-11-23",
+      "server": "1.11.577",
+      "collection": "OTST_V2.0.270",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.577 (#1414, part 1 of two-factor authentication): utils/totp.js (the codes of an authenticator app, RFC 6238, base32 and the otpauth:// address) and utils/qrCode.js (a QR code encoder in byte mode, level M, versions 1 to 40, drawn as SVG), both pure and without dependency. Nothing uses them yet: no behaviour changes. Checked against the RFC 4226 and 6238 test vectors, the tables of ISO/IEC 18004, a reader written apart in the test, and another encoder (segno) module by module for every version and mask. Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.617",
       "date": "2026-11-23",
       "server": "1.11.576",
