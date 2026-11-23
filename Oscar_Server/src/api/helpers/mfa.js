@@ -95,7 +95,9 @@ function readChallenge(token, purpose) {
   const row = get(USER_SQL, [payload.sub]);
   if (row?.status !== 'active') return null;
   const validAfter = Number(row.sessions_valid_after) || 0;
-  if (validAfter && !(Number(payload.iat) >= validAfter)) return null;
+  const issuedAt = Number(payload.iat);
+  // A challenge without a numeric iat is refused too, as sessionUser() does.
+  if (validAfter && (!Number.isFinite(issuedAt) || issuedAt < validAfter)) return null;
   return row;
 }
 
