@@ -293,6 +293,11 @@ run is in progress (a `restart` keeps the container and its old values):
 cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose up -d oscar
 ```
 
+With the monitoring stack, name both compose files instead, or the server
+comes back without the volume it shares with Alertmanager: the
+*installation-guide*, section 3, gives two lines that read them from the
+running container.
+
 Then *Server Config* → **Send test email**, and, with the alerting stack,
 **Apply alerting config** so that Alertmanager gets the new settings. On
 Kubernetes: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_FROM` in the
