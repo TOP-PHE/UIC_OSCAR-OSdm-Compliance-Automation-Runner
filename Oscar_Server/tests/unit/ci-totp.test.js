@@ -21,14 +21,15 @@ const { spawnSync } = require('node:child_process');
 const T = require('../../src/utils/totp');
 
 const CI = path.resolve(__dirname, '../../../OSCAR_Deploy/kubernetes/ci');
-const TOTP_SH = path.join(CI, 'totp.sh');
 const hasTools = process.platform !== 'win32'
   && spawnSync('bash', ['-c', 'command -v base32 && command -v openssl && command -v od'], { encoding: 'utf8' }).status === 0;
 const toolTest = hasTools ? test : test.skip;
 
+// The script is sourced from the CI folder, given as the working directory:
+// no path is part of the command (CodeQL js/shell-command-constructed-from-input).
 function bashTotp(secret, time, offset = 0) {
-  const out = spawnSync('bash', ['-c', `. "$1"; totp "$2" "$3"`, 'totp-test', TOTP_SH, secret, String(offset)],
-    { env: { ...process.env, TOTP_TIME: String(time) }, encoding: 'utf8' });
+  const out = spawnSync('bash', ['-c', '. ./totp.sh; totp "$1" "$2"', 'totp-test', secret, String(offset)],
+    { cwd: CI, env: { ...process.env, TOTP_TIME: String(time) }, encoding: 'utf8' });
   expect(out.stderr).toBe('');
   return out.stdout.trim();
 }
