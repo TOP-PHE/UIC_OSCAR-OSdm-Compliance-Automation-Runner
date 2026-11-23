@@ -1256,7 +1256,10 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   line). **`access-token.js` held a raw NUL**: an editing tool had stored the
   typed escape as the character, git read the file as binary and showed no
   diff. Make such a character with `String.fromCodePoint()`;
-  `credential-fingerprint.test.js` refuses a NUL in any source file. **In Git
+  `credential-fingerprint.test.js` refuses a NUL in any source file, and a raw
+  replacement character (U+FFFD, #1412): SonarCloud's scanner takes one for a
+  wrongly decoded file and shows "problems with file encoding" on the project;
+  its log names the file (`Invalid character encountered in file …`). **In Git
   Bash an argument that starts with `//` loses a slash** (MSYS path
   conversion): `export MSYS_NO_PATHCONV=1` before passing a comment line as an
   anchor. **On a pull request CodeQL reports on the changed lines only**

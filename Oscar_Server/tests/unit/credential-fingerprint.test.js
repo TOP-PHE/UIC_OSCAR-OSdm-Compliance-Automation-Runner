@@ -138,4 +138,16 @@ describe('no source file holds a NUL character', () => {
     const withNul = files.filter(file => fs.readFileSync(file).includes(0)).map(file => path.relative(REPO, file));
     expect(withNul).toEqual([]);
   });
+
+  // #1412: SonarCloud's scanner takes a replacement character (U+FFFD) in a
+  // source file for a file that was decoded wrongly, and warns at every
+  // analysis ("There are problems with file encoding in the source code"). A
+  // test that needs the character writes it by its code. Read as UTF-8, a file
+  // that is not valid UTF-8 holds the character too, and is refused as well.
+  test('nor a replacement character written as it is, nor bytes that are not UTF-8', () => {
+    const mark = String.fromCodePoint(0xFFFD);
+    const files = FOLDERS.flatMap(folder => sourceFiles(path.join(REPO, folder)));
+    const withMark = files.filter(file => fs.readFileSync(file, 'utf8').includes(mark)).map(file => path.relative(REPO, file));
+    expect(withMark).toEqual([]);
+  });
 });
