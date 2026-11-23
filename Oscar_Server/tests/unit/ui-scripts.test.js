@@ -2841,7 +2841,7 @@ describe('scenarios.js — a change is looked up in a table of actions (#1403)',
     const refused = delegate({ fwMaxPassengers: undefined }, { wizData: { framework: { maxPassengers: 6 } } });
     const field = { dataset: { action: 'fw-max-pax' }, value: 'x' };
     refused.change(field);
-    expect(field.value).toBe(6);
+    expect(String(field.value)).toBe('6');   // the stored number; a real field keeps it as text
     expect(refused.names().slice(HEAD.length)).toEqual(['fwMaxPassengers']);
     // A value it takes is stored and saved; an empty field removes the declaration.
     const wizData = { framework: { maxPassengers: 6 } };
