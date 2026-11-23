@@ -690,7 +690,10 @@ unset ADMIN_PASSWORD BOOTSTRAP_TOKEN
 ```
 
 - `HTTP 201` and the account (`"role":"administrator"`): it is made. Sign in
-  with it at `https://$HOST`.
+  with it at `https://$HOST`, your phone at hand: an administrator's first
+  sign-in sets up its second factor (a QR code to scan with an authenticator
+  app, then its first code; server 1.11.578). A lost phone, and the command
+  for the last administrator: *OSCAR - Server Admin Guide*, section 13.5.
 - `HTTP 400`: the e-mail or the password does not meet the rules; the answer
   says which. Type the password again and rerun.
 - `HTTP 409`: an administrator already exists (the route creates the first

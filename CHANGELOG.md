@@ -654,6 +654,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.578] — 2026-11-23
+
+Two-factor authentication, part 2 of 2 (#1414): an administrator signs in with a second factor, the code of an authenticator app; every other account may turn one on. Not released on its own: listed in `compatibility.json` (2026.619) without moving `current_release`. Collection unchanged.
+
+**What to do with the release that holds it.** Each administrator, at the next sign-in, sets the factor up: a QR code to scan with an authenticator app (Google or Microsoft Authenticator, 1Password…), then its first code. Have the phone at hand. The server's clock must be right (NTP): a code is taken one 30-second step either side of it.
+
+### Added
+- **The sign-in asks for the code** (maintainer's decisions of 2026-11-23: required for administrators, offered to every other account, TOTP, no recovery codes, a QR code without dependency). After a right password, an account with a factor, or an administrator without one, gets no session: `POST /v1/auth/login` answers `{ mfa: "verify" | "setup", mfa_token }`.
+  - `POST /v1/auth/mfa/verify` `{ mfa_token, code }` gives the session.
+  - `POST /v1/auth/mfa/setup` gives a new secret, its `otpauth://` address and QR code (the secret kept pending, encrypted).
+  - `POST /v1/auth/mfa/setup/confirm` turns it on with its first code, ends every other session of the account, and gives the session.
+  - The sign-in page draws each step (`public/js/mfa-setup.js`, DOM elements only: the QR code is used only as an SVG `data:` URL of base64).
+- **The challenge never opens a session.** `mfa_token` is a JWT of 5 minutes (10 to set up) signed with a key derived from the session secret, under an audience of its own: it is no session, and a session is no challenge. It names its step, and is refused once the account's sessions were ended after it was made.
+- **A session says it went through the factor** (`mfa: true`), and `sessionUser()` refuses one that does not for an account whose factor is on, whatever path a token came by. Migration 62 adds the columns and ends the administrators' sessions open before the update.
+- **Codes:**
+  - one step either side of the server's clock, never the same step twice (the last one is kept);
+  - ten wrong codes in 15 minutes stop the account's codes until the window ends (429 with `Retry-After`);
+  - a text that is not six digits does not count;
+  - the steps share the sign-in's limit per address (`AUTH_RATE_LIMIT_MAX`), in a bucket of their own.
+- **My account** (`public/account.html`, the e-mail in the menu bar opens it): `GET /v1/me/mfa`, `POST /v1/me/mfa/setup` (the password asked again), `POST /v1/me/mfa/confirm`, `DELETE /v1/me/mfa` (password and a code; an administrator's is required, 403).
+  - Turning it on or off ends every session of the account, and the answer carries the new one.
+  - A wrong password or code is a 403, never a 401, which the pages read as a session that ended.
+- **A lost phone:**
+  - **Another administrator** resets it: `POST /v1/admin/users/:id/mfa/reset`, the *Reset 2FA* button and a *2FA* badge on *Manage Users*. The factor goes, the account's sessions end, an audit line is written, and the owner gets an e-mail (`sendAccountNotice()`).
+  - **For the last administrator,** `node src/cli/reset-mfa.js <e-mail>` in the server's container (`docker compose exec`, `kubectl exec`). It opens the database by itself, loads none of the server's modules and runs beside the server. The authentication log keeps `mfa_reset_by_command`.
+  - The SQL that removes a factor is one constant, `utils/mfaReset.js`, shared by both.
+- **`/v1/auth/me`** says `user.mfa: { enabled, required, enabled_at }`.
+
+### Changed
+- **`api/helpers/sessions.js`**: the token, the cookie and the authentication log line moved out of `routes/auth.js`. The sign-in, the second factor's steps and *My account* hand out sessions the same way.
+- **Scripts that sign in as an administrator:**
+  - `OSCAR_Deploy/scripts/oscar-user-management.ps1` asks for the code.
+  - The Kubernetes CI computes it: `ci/totp.sh` is RFC 6238 in bash (base32, openssl, od). `smoke.sh` sets the first administrator's factor up and keeps its secret in the account file, and `check-monitoring.sh` signs in with it.
+- **Documentation:** *OSCAR - Server Admin Guide* 13.1 and a new 13.5 (sign-in, a lost phone, the command, the clock, the limits); the first sign-in in *Self-Hosted Quick Start* (step 6) and *k3s on one VPS* (section 7); *Security Operations Policy* 2.2 (it named a 2FA "via the password reset / SMTP flow" that was never one); *Tester User Guide* 2.5; a news entry.
+
+### How it was checked
+- **In a browser, on a server of the branch:**
+  - an administrator's first sign-in (QR code, key, a wrong then a right code), then *My account* (on, required);
+  - the *2FA* badges and *Reset 2FA*;
+  - a tester signing in with the password alone, turning the factor on (a wrong password stays signed in), signing out and back in with a code (a wrong one first);
+  - the command run while the server ran, then the administrator's new set-up.
+  - Codes were computed in the page with Web Crypto. No server error was logged.
+- **The QR code was not read by a camera here** (the browser has no barcode reader); part 1 compares the encoder with segno module by module.
+
+### Tests
+- `two-factor.test.js` (19): set-up at sign-in, a wrong code, the factor on, replay, a session without the claim refused, the lock after ten wrong codes, a malformed code not counted, the challenge (not a session, a session not a challenge, one signed with the session secret refused, one step only, refused after the sessions ended), an account turning it on (wrong password, other sessions end) and off, an administrator unable to turn it off, the reset (sessions end, audited, 409, 404, administrators only), the list's badge, the command (arguments, unknown account, no database), `/v1/auth/me`.
+- `db-migrations.test.js`: migration 62 on an existing database, only the administrators' sessions ended.
+- `mfa-pages.test.js` (7): the shared page script (groups, only an SVG data: URL of base64 drawn, nothing as markup) and the note of *My account*.
+- `ci-totp.test.js`: `ci/totp.sh` gives the RFC's codes and the server's on 20 drawn secrets (Linux; skipped on Windows, where it was compared by hand), and the two scripts use it.
+- The tests that sign in or read the users list pass unchanged. Locally the known Windows-only failures stay (`/metrics`, MCP, the runner agent, two timing tests); CI runs them on Linux.
+
+---
+
 ## [server-1.11.577] — 2026-11-23
 
 Two-factor authentication, part 1 of 2 (#1414): the codes of an authenticator app and a QR code encoder, both pure, without dependency and not used yet. No behaviour changes. Not released on its own: listed in `compatibility.json` (2026.618) without moving `current_release`; the release comes once part 2 (the sign-in, the pages) is merged. Collection unchanged.

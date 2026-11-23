@@ -351,7 +351,9 @@
       + tzChip
       + '<span class="nav-user" id="nav-company">' + companyLabel + '</span>'
       + sep
-      + '<span class="nav-user">' + esc(user.email || '') + inlineBadge(meta) + '</span>'
+      // The e-mail opens "My account" (#1414): the person's own second factor.
+      + '<span class="nav-user"><a href="/account.html" title="My account: two-factor authentication"'
+      + (activePage === 'account' ? ' class="active"' : '') + '>' + esc(user.email || '') + '</a>' + inlineBadge(meta) + '</span>'
       + sep
       + '<a href="#" id="nav-signout">Sign Out</a>';
     setTimeout(function() {

@@ -32,6 +32,8 @@ const { resolveRole, ensurePlatformCompany } = require('../helpers/shared');
 const bootstrapToken = require('../../utils/bootstrapToken');
 const { loginAttempts } = require('../../utils/metrics');
 const { validate, v } = require('../middleware/validate');
+const Mfa = require('../helpers/mfa');
+const { authClientMeta, logAuthEvent, logUserEvent, issueSession } = require('../helpers/sessions');
 const log = require('../../utils/logger').child({ module: 'auth' });
 
 const rateLimit = require('express-rate-limit');
@@ -40,27 +42,6 @@ const router = express.Router();
 const SALT_ROUNDS = 12;
 // A hash of no one's password, compared when the e-mail is unknown.
 const UNKNOWN_USER_HASH = bcrypt.hashSync(require('node:crypto').randomBytes(24).toString('hex'), SALT_ROUNDS);
-const JWT_EXPIRY     = '8h';
-const JWT_EXPIRY_SEC = 8 * 60 * 60;   // same as JWT_EXPIRY in seconds
-
-// ── Session cookie helper ─────────────────────────────────────────────────────
-// Sets an httpOnly, Secure, SameSite=Strict cookie named oscar_session with
-// the JWT so the token never touches JavaScript-accessible storage.
-// The legacy token field is kept in the JSON body so CLI / API clients that
-// rely on Bearer tokens continue to work.
-function setSessionCookie(res, token) {
-  res.cookie('oscar_session', token, {
-    httpOnly: true,
-    // Only enforce Secure in production. On dev/local-testing we run on
-    // plain http://localhost and browsers reject Secure cookies on http,
-    // which would prevent login from "sticking". `test` was previously
-    // the only exemption — broaden it to "anything that isn't production".
-    secure:   process.env.NODE_ENV === 'production',
-    sameSite: 'Strict',
-    maxAge:   JWT_EXPIRY_SEC * 1000,
-    path:     '/',
-  });
-}
 
 // ── Rate limiting for auth endpoints (brute-force protection) ────────────────
 // Brute-force protection on credential-bearing auth endpoints (CodeQL
@@ -116,35 +97,12 @@ const registerConfirmLimiter = rateLimit({
 // usable headroom for legitimate testers at no security cost.
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function signToken(user, company) {
-  const role = normalizeRole(user.role);
-  const jti  = uuidv4();
-  return jwt.sign(
-    { sub: user.id, email: user.email, companyId: company.id, role, jti },
-    process.env.JWT_SECRET,
-    { expiresIn: JWT_EXPIRY }
-  );
-}
-
+// The session itself (token, cookie, log line) is api/helpers/sessions.js.
 function createUser({ companyId, email, passwordHash, role }) {
   const userId = uuidv4();
   run(`INSERT INTO users (id, company_id, email, password_hash, role) VALUES (?, ?, ?, ?, ?)`,
     [userId, companyId, email.toLowerCase(), passwordHash, role]);
   return get('SELECT id, company_id, email, role, created_at FROM users WHERE id = ?', [userId]);
-}
-
-function authClientMeta(req) {
-  return {
-    // req.ip: the address the trusted proxy saw (trust proxy), never the
-    // leftmost X-Forwarded-For entry, which the client writes.
-    ip: req.ip || req.socket?.remoteAddress || null,
-    userAgent: (req.headers['user-agent'] || '').toString() || null
-  };
-}
-
-function logAuthEvent({ userId = null, companyId = null, email = null, eventType, ip = null, userAgent = null }) {
-  run(`INSERT INTO auth_events (user_id, company_id, email, event_type, ip, user_agent) VALUES (?, ?, ?, ?, ?, ?)`,
-    [userId, companyId, email, eventType, ip, userAgent]);
 }
 
 // ── Access requests (decision 3, 2026-11-05) ─────────────────────────────────
@@ -496,18 +454,69 @@ router.post('/login',
     return res.status(403).json({ status: 403, title: 'Forbidden', detail: 'Your account is awaiting approval from your company\'s Test Manager.' });
   }
 
-  const company = get('SELECT * FROM companies WHERE id = ?', [user.company_id]);
-  const token   = signToken(user, company);
+  // A second factor (#1414): an account that has one, or must have one (an
+  // administrator), gets the next step of the sign-in instead of a session.
+  const next = Mfa.stepAfterPassword(user, normalizeRole(user.role));
+  if (next) {
+    logAuthEvent({ userId: user.id, companyId: user.company_id, email: user.email, eventType: `login_password_ok_${next}`, ip: clientMeta.ip, userAgent: clientMeta.userAgent });
+    return res.json({ mfa: next, mfa_token: Mfa.signChallenge(user.id, next) });
+  }
+  return res.json(issueSession(req, res, user));
+});
 
-  logAuthEvent({ userId: user.id, companyId: user.company_id, email: user.email, eventType: 'login_success', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
-  loginAttempts.inc({ result: 'success' });
+// ── The second factor's steps of a sign-in (#1414) ──────────────────────────
+// No session: the challenge the sign-in answered stands for the account. Ten
+// wrong codes in 15 minutes stop the account's codes (api/helpers/mfa.js);
+// this limit is per address, before anything is read, with the sign-in's
+// setting (AUTH_RATE_LIMIT_MAX, 50 by default) in a bucket of its own.
+const mfaLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: AUTH_RATE_LIMIT_MAX,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { status: 429, title: 'Too Many Requests', detail: 'Too many attempts. Please try again later.' }
+});
+const EXPIRED_SIGN_IN = 'This sign-in has expired. Sign in again with your password.';
+const mfaToken = v.body('mfa_token').isString().withMessage('mfa_token is required').isLength({ max: 2048 }).withMessage('mfa_token is too long');
+const mfaCode  = v.body('code').isString().withMessage('code is required').isLength({ max: 20 }).withMessage('code is too long');
 
-  setSessionCookie(res, token);
-  return res.json({
-    token,
-    user:    { id: user.id, email: user.email, role: normalizeRole(user.role) },
-    company: { id: company.id, name: company.name, slug: company.slug }
-  });
+function refuseCode(req, res, user, result) {
+  logUserEvent(req, user, 'login_failed_mfa');
+  loginAttempts.inc({ result: 'failure' });
+  const [status, detail, headers] = Mfa.refusalOf(result);
+  return res.status(status).set(headers).json({ status, title: status === 429 ? 'Too Many Requests' : 'Forbidden', detail });
+}
+
+// ── POST /v1/auth/mfa/verify ──────────────────────────────────────────────────
+router.post('/mfa/verify', mfaLimiter, validate([mfaToken, mfaCode]), (req, res) => {
+  const user = Mfa.readChallenge(req.body.mfa_token, 'verify');
+  if (!Mfa.isOn(user)) return res.status(401).json({ status: 401, title: 'Unauthorized', detail: EXPIRED_SIGN_IN });
+  const result = Mfa.checkCode(user.id, req.body.code);
+  if (!result.ok) return refuseCode(req, res, user, result);
+  return res.json(issueSession(req, res, user, { mfa: true }));
+});
+
+// ── POST /v1/auth/mfa/setup ───────────────────────────────────────────────────
+// An administrator without a factor: a new secret, its address and QR code.
+router.post('/mfa/setup', mfaLimiter, validate([mfaToken]), (req, res) => {
+  const user = Mfa.readChallenge(req.body.mfa_token, 'setup');
+  if (!user || Mfa.stepAfterPassword(user, normalizeRole(user.role)) !== 'setup') {
+    return res.status(401).json({ status: 401, title: 'Unauthorized', detail: EXPIRED_SIGN_IN });
+  }
+  logUserEvent(req, user, 'mfa_setup_started');
+  return res.json(Mfa.startSetup(user));
+});
+
+// ── POST /v1/auth/mfa/setup/confirm ───────────────────────────────────────────
+// The first code turns the factor on; every other session of the account
+// ends, and this answer is the new one.
+router.post('/mfa/setup/confirm', mfaLimiter, validate([mfaToken, mfaCode]), (req, res) => {
+  const user = Mfa.readChallenge(req.body.mfa_token, 'setup');
+  if (!user || Mfa.isOn(user)) return res.status(401).json({ status: 401, title: 'Unauthorized', detail: EXPIRED_SIGN_IN });
+  const result = Mfa.confirmSetup(user.id, req.body.code);
+  if (!result.ok) return refuseCode(req, res, user, result);
+  logUserEvent(req, user, 'mfa_enabled');
+  return res.json(issueSession(req, res, get('SELECT * FROM users WHERE id = ?', [user.id]), { mfa: true }));
 });
 
 // ── GET /v1/auth/me ───────────────────────────────────────────────────────────
@@ -521,10 +530,12 @@ const sessionReadLimiter = rateLimit({
   message: { status: 429, title: 'Too Many Requests', detail: 'Too many requests in a short window. Please try again in a minute.' }
 });
 router.get('/me', sessionReadLimiter, requireAuth, (req, res) => {
-  const user    = get('SELECT id, email, role, created_at FROM users    WHERE id = ?', [req.user.id]);
+  const user    = get('SELECT id, email, role, created_at, mfa_enabled_at, mfa_secret_enc FROM users WHERE id = ?', [req.user.id]);
   const company = get('SELECT id, name, slug, auth_mode, api_base, datafile_updated_at FROM companies WHERE id = ?', [req.user.companyId]);
   if (!user) return res.status(404).json({ status: 404, title: 'Not Found' });
-  return res.json({ user: { ...user, role: normalizeRole(user.role) }, company });
+  const role = normalizeRole(user.role);
+  const mfa = Mfa.stateOf(user, role);
+  return res.json({ user: { id: user.id, email: user.email, role, created_at: user.created_at, mfa }, company });
 });
 
 // ── POST /v1/auth/logout ──────────────────────────────────────────────────────

@@ -73,8 +73,13 @@ is enforced in code since v1.10.0 (issue #60 Phase 1).
 **Authorized count:** at most three named individuals. Reviewed twice
 yearly to remove inactive admins.
 
-**Access mechanism:** OSCAR username + password + 2FA via the password
-reset / SMTP flow.
+**Access mechanism:** OSCAR e-mail and password, then the code of an
+authenticator app (TOTP, RFC 6238), required for every administrator since
+server 1.11.578 (#1414). A lost phone is reset by another administrator
+(*Manage Users* → *Reset 2FA*, audited, the owner told by e-mail), or, for
+the last administrator, by `node src/cli/reset-mfa.js <e-mail>` run in
+OSCAR's container by the Tier A operator (*OSCAR - Server Admin Guide*,
+13.5). There are no recovery codes.
 
 ### 2.3 Tier C — UIC Certification Reviewer (certifier role)
 

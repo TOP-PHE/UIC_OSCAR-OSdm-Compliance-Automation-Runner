@@ -12,11 +12,14 @@
 #
 #   NODE_IP             the runner's address, where Traefik listens
 #   SMOKE_ACCOUNT_FILE  what ci/smoke.sh wrote: the administrator's and the
-#                       Test Manager's sign-in
+#                       Test Manager's sign-in, the administrator's second
+#                       factor (#1414)
 set -euo pipefail
 
 : "${NODE_IP:?}" "${SMOKE_ACCOUNT_FILE:?}"
 root=$(cd "$(dirname "$0")/../../.." && pwd)
+# shellcheck source=totp.sh
+. "$(dirname "$0")/totp.sh"
 host=oscar.example.org
 svc=monitoring.svc.cluster.local
 work=$(mktemp -d)
@@ -156,12 +159,25 @@ step "Grafana, at /grafana/, for OSCAR's administrators only"
 grafana() { curl -sk -o "$work/grafana.out" -w '%{http_code}' --resolve "$host:443:$NODE_IP" "$@"; }
 sign_in() {
   jq -n --arg e "$1" --arg p "$2" '{email: $e, password: $p}' > "$work/login.json"
-  curl -fsSk -o /dev/null -c "$3" --resolve "$host:443:$NODE_IP" -H 'Content-Type: application/json' \
+  curl -fsSk -o "$work/login.out" -c "$3" --resolve "$host:443:$NODE_IP" -H 'Content-Type: application/json' \
     --data-binary "@$work/login.json" "https://$host/v1/auth/login"
   rm "$work/login.json"
 }
+# An administrator's sign-in asks for a code (#1414): the password gives a
+# challenge, the code of the next step the session (smoke.sh used the step
+# it set the factor up in, and a code is never taken twice).
+sign_in_with_code() {
+  sign_in "$1" "$2" "$4"
+  local token
+  token=$(jq -r .mfa_token "$work/login.out")
+  test "$token" != null || fail "an administrator's password alone opened a session"
+  jq -n --arg t "$token" --arg c "$(totp "$3" 1)" '{mfa_token: $t, code: $c}' > "$work/code.json"
+  curl -fsSk -o /dev/null -c "$4" --resolve "$host:443:$NODE_IP" -H 'Content-Type: application/json' \
+    --data-binary "@$work/code.json" "https://$host/v1/auth/mfa/verify"
+  rm "$work/code.json"
+}
 admin=$(jq -r .admin_email "$SMOKE_ACCOUNT_FILE")
-sign_in "$admin" "$(jq -r .admin_password "$SMOKE_ACCOUNT_FILE")" "$work/admin.jar"
+sign_in_with_code "$admin" "$(jq -r .admin_password "$SMOKE_ACCOUNT_FILE")" "$(jq -r .admin_mfa_secret "$SMOKE_ACCOUNT_FILE")" "$work/admin.jar"
 sign_in "$(jq -r .tm_email "$SMOKE_ACCOUNT_FILE")" "$(jq -r .tm_password "$SMOKE_ACCOUNT_FILE")" "$work/tm.jar"
 # No session: Traefik sends the browser to OSCAR's sign-in page (authSigninURL, #1199).
 signin_of() { curl -sk -o /dev/null -w '%{redirect_url}' --resolve "$host:443:$NODE_IP" "$@"; }

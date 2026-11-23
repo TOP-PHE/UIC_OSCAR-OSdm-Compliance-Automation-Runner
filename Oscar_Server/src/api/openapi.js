@@ -186,14 +186,18 @@ module.exports = {
       post: {
         tags: ['Auth'],
         summary: 'Authenticate with email + password',
+        description: 'An account with a second factor, or an administrator who must set one up (#1414), gets no session yet: the answer is { mfa: "verify" | "setup", mfa_token }, and the sign-in goes on at /v1/auth/mfa/verify or /v1/auth/mfa/setup.',
         requestBody: { required: true, content: { 'application/json': { schema: {
           type: 'object', required: ['email', 'password'],
           properties: { email: { type: 'string' }, password: { type: 'string' } },
         } } } },
         responses: {
-          200: { description: 'JWT issued', content: { 'application/json': { schema: {
+          200: { description: 'JWT issued, or the second factor asked ({ mfa, mfa_token })', content: { 'application/json': { schema: {
             type: 'object',
-            properties: { token: { type: 'string' }, user: { $ref: '#/components/schemas/User' }, company: { type: 'object' } },
+            properties: {
+              token: { type: 'string' }, user: { $ref: '#/components/schemas/User' }, company: { type: 'object' },
+              mfa: { type: 'string', enum: ['verify', 'setup'] }, mfa_token: { type: 'string' },
+            },
           } } } },
           401: { description: 'Invalid credentials' },
         },

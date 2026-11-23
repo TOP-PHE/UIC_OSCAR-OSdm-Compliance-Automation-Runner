@@ -16,6 +16,7 @@
    - 2.2 Downloading and uploading the data file
    - 2.3 API keys (Test Managers)
    - 2.4 AI analysis of results (Test Managers)
+   - 2.5 Two-factor authentication (optional)
 3. [Provider setup — Framework, Test data & Discovery](#3-provider-setup--framework-test-data--discovery)
    - [3.0 Setting up a provider from its checklist and the scenario catalogue](#30-setting-up-a-provider-from-its-checklist-and-the-scenario-catalogue) (start here)
    - 3.1 Test Framework (capabilities) · 3.2 Train sets · 3.3 Journeys · 3.4 Timetable Discovery
@@ -355,6 +356,24 @@ access. Two analyses of the same input with different models can be compared
 side by side. Your monthly token limit (Connection tab) refuses an analysis
 of yours that would go past it; with one AI service for all, it counts your
 analyses of the company and of all its providers together.
+
+### 2.5 Two-factor authentication (optional)
+
+Since server 1.11.578 (#1414) you can protect your account with a second
+factor: after your password, OSCAR asks for the six-digit code of an
+authenticator app on your phone (Google or Microsoft Authenticator,
+1Password…). Someone who learns your password still cannot sign in as you.
+It is required for OSCAR's administrators, and your choice for every other
+account.
+
+- **Turn it on:** click your e-mail at the right of the menu bar (*My
+  account*), type your password, scan the QR code with the app (or type the
+  key shown under it), then type the first code the app shows. Your other
+  sessions are signed out.
+- **Sign in:** your password, then the code the app shows at that moment.
+- **Turn it off:** on *My account*, your password and a code.
+- **Lost your phone:** ask an OSCAR administrator to reset it; you then sign
+  in with your password alone and can turn it on again.
 
 ## 3. Provider setup — Framework, Test data & Discovery
 

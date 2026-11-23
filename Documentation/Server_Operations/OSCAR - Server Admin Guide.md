@@ -742,6 +742,7 @@ Once you log in as **administrator**, the top navigation exposes a set of admin-
 
 - **Reset password** for any user (since v1.6) — choose between sending an email reset link (requires SMTP configured) or generating an out-of-band link you copy-paste into Slack/Teams (works even when SMTP is down — issue #15 workaround).
 - **Privacy toggle** on each company (`share_reports_with_certifier`) controls whether `certification_user` accounts can see that company's runs. Default = on, matching legacy behaviour.
+- **2FA badge and Reset 2FA** (server 1.11.578): a badge marks the accounts whose two-factor authentication is on; *Reset 2FA* removes it (a lost phone), see 13.5.
 
 ### 13.2 Server Activity
 
@@ -785,6 +786,31 @@ sudo docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d
 Full setup notes: [`metrics-and-monitoring.md`](metrics-and-monitoring.md).
 
 ---
+
+### 13.5 Two-factor authentication (server 1.11.578, #1414)
+
+**Every administrator signs in with a second factor**: the password, then the six-digit code of an authenticator app (Google or Microsoft Authenticator, 1Password and the like, TOTP as RFC 6238 defines it). Every other account may turn it on from *My account* (the e-mail at the right of the menu bar).
+
+- **The first sign-in after the update** (and the first sign-in of a new administrator) asks to set it up: scan the QR code with the app, or type the key shown under it, then type the first code. Have the phone at hand. The update ends the administrators' sessions open before it, so each administrator meets this page at the next sign-in.
+- **A lost phone:** another administrator opens *Manage Users* and clicks *Reset 2FA* on the account. The account is signed out everywhere and its owner receives an e-mail; at the next sign-in an administrator sets up a new factor. There are no recovery codes, by decision.
+- **No other administrator can do it** (the last one lost their phone): from a shell on the server, with the account's e-mail.
+
+  VPS (Docker):
+
+  ```bash
+  cd /opt/OSCAR/OSCAR_Deploy && docker compose exec oscar node src/cli/reset-mfa.js admin@example.org
+  ```
+
+  Kubernetes (k3s):
+
+  ```bash
+  kubectl -n oscar exec deploy/oscar -c oscar -- node src/cli/reset-mfa.js admin@example.org
+  ```
+
+  The command opens the database by itself, while the server runs; it says what it did, and the authentication log keeps a line `mfa_reset_by_command`.
+- **The server's clock must be right.** A code is accepted one 30-second step either side of the server's time; a clock several minutes off refuses every code. The VPS and k3s machines keep their time with the system's NTP client (`timedatectl` shows *System clock synchronized: yes*).
+- **Limits:** ten wrong codes in 15 minutes stop the account's codes until the window ends; a code is never accepted twice; the steps of the sign-in share the sign-in's limit per address (`AUTH_RATE_LIMIT_MAX`).
+- **Scripts that sign in as an administrator** must send the code: `OSCAR_Deploy/scripts/oscar-user-management.ps1` asks for it; an administrator without a factor yet must first sign in once on the page.
 
 ## 14. Operational Monitoring & Alerting (v1.8)
 

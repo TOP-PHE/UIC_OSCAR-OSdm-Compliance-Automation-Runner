@@ -290,6 +290,33 @@ describe('DB migrations — upgrade from an existing DB (the #208 regression cla
       expect([file, fs.readFileSync(path.resolve(__dirname, '../../src', file), 'utf8').includes(countQuery)]).toEqual([file, true]);
     }
   });
+
+  // #1414: the second factor's columns, and the administrators' sessions
+  // ended, so that their next sign-in asks for a factor they do not have yet.
+  test('two-factor columns on an existing DB; only the administrators\' sessions end (migration 62)', () => {
+    const dbFile = tempDbPath();
+    bootDbAgainst(dbFile);
+    const MFA_COLUMNS = ['mfa_secret_enc', 'mfa_pending_enc', 'mfa_enabled_at', 'mfa_last_step', 'mfa_failures', 'mfa_failures_since'];
+    {
+      const d = new DatabaseSync(dbFile);
+      for (const column of MFA_COLUMNS) d.exec(`ALTER TABLE users DROP COLUMN ${column}`);
+      d.exec(`DELETE FROM schema_version WHERE version >= 62;
+              INSERT INTO companies (id, name, slug) VALUES ('mig62-co', 'Mig 62', 'mig-62');
+              INSERT INTO users (id, company_id, email, password_hash, role) VALUES
+                ('mig62-admin', 'mig62-co', 'admin@mig62.example', 'x', 'administrator'),
+                ('mig62-tester', 'mig62-co', 'tester@mig62.example', 'x', 'company_user');`);
+      d.close();
+    }
+    bootDbAgainst(dbFile);
+    expect(columnsOf(dbFile, 'users')).toEqual(expect.arrayContaining(MFA_COLUMNS));
+    const d = new DatabaseSync(dbFile);
+    try {
+      const after = d.prepare('SELECT id, sessions_valid_after AS v, mfa_failures FROM users WHERE id LIKE ? ORDER BY id').all('mig62-%');
+      expect(after.map(r => [r.id, typeof r.v, r.mfa_failures])).toEqual([['mig62-admin', 'number', 0], ['mig62-tester', 'object', 0]]);
+    } finally {
+      d.close();
+    }
+  });
 });
 
 function readExtraHeaders(dbFile) {

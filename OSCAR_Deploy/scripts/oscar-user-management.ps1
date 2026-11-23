@@ -96,6 +96,15 @@ $loginBody = @{
 } | ConvertTo-Json
 
 $loginResp = Invoke-RestMethod -Method Post -Uri "$ServerBaseUrl/v1/auth/login" -ContentType "application/json" -Body $loginBody
+# An administrator's sign-in asks for a code of their authenticator app (#1414).
+if ($loginResp.mfa -eq "setup") {
+  throw "This administrator has no second factor yet: sign in once on the OSCAR page to set it up, then run this script again."
+}
+if ($loginResp.mfa -eq "verify") {
+  $mfaCode = Read-Host "Six-digit code of your authenticator app for $PermanentAdminEmail"
+  $codeBody = @{ mfa_token = $loginResp.mfa_token; code = $mfaCode.Trim() } | ConvertTo-Json
+  $loginResp = Invoke-RestMethod -Method Post -Uri "$ServerBaseUrl/v1/auth/mfa/verify" -ContentType "application/json" -Body $codeBody
+}
 $adminToken = $loginResp.token
 if (-not $adminToken) { throw "Admin login failed: no token returned" }
 

@@ -70,7 +70,7 @@ function parseCookies(cookieHeader) {
 }
 
 const SESSION_ROW_SQL =
-  'SELECT id, email, role, company_id, status, sessions_valid_after FROM users WHERE id = ?';
+  'SELECT id, email, role, company_id, status, sessions_valid_after, mfa_enabled_at FROM users WHERE id = ?';
 
 /**
  * The user a verified token stands for, read from the database now, or null
@@ -90,6 +90,10 @@ function sessionUser(payload) {
   const validAfter = Number(row.sessions_valid_after) || 0;
   // Written as "not at or after" so that a token without a numeric iat (NaN) is refused too.
   if (validAfter && !(Number(payload.iat) >= validAfter)) return null;
+  // An account whose second factor is on (#1414) has no session that did not
+  // go through it. Turning the factor on ends the account's sessions as well;
+  // this holds whatever path a token came by.
+  if (row.mfa_enabled_at && payload.mfa !== true) return null;
   return { id: row.id, email: row.email, companyId: row.company_id, role };
 }
 

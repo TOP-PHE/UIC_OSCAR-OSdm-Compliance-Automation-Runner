@@ -1107,6 +1107,37 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   (`8 - length % 8` without `% 8`); the script puts that right, so regenerate
   through it, never with plain segno. The auto-chosen mask is not compared:
   encoders read penalty rule N3 differently.
+  **PR 2 (1.11.578): the flow.** `api/helpers/mfa.js`: after a right
+  password `/v1/auth/login` answers `{ mfa: 'verify' | 'setup', mfa_token }`
+  for an account with a factor or a role in `REQUIRED_ROLES`
+  (administrator); `/v1/auth/mfa/verify`, `/mfa/setup`, `/mfa/setup/confirm`
+  go on. **The challenge is signed with an HMAC of `JWT_SECRET`
+  (`oscar-mfa-challenge-v1`) under audience `oscar-mfa`**: never a session,
+  and a session never a challenge. Sessions are made by
+  `api/helpers/sessions.js` `issueSession()` only (moved out of
+  `routes/auth.js`); one that went through the factor carries `mfa: true`,
+  and **`sessionUser()` refuses a session without it when
+  `users.mfa_enabled_at` is set**. It is not checked by role on purpose: 34
+  test files sign administrator tokens without it. Migration 62 ended the
+  administrators' sessions instead, and the sign-in is the only path to one.
+  `checkCode()` reads the row again and keeps `mfa_last_step` (no code
+  twice); ten wrong codes in 15 minutes lock the account's codes (429). A
+  malformed code does not count. `/v1/me/mfa` (+ `/setup` with the
+  password, `/confirm`, `DELETE` with password and code). Turning the factor
+  on or off ends the sessions and answers a new one. **A wrong password or
+  code answers 403, never 401** (nav.js signs out on 401). Admin
+  `POST /v1/admin/users/:id/mfa/reset` (audit `mfa_reset:<email>`, e-mail
+  `sendAccountNotice()`). `src/cli/reset-mfa.js` for the last administrator
+  opens the database alone (`utils/mfaReset.js` holds the SQL both use).
+  Pages: `public/js/mfa-setup.js` (DOM only, a QR used only when it is an
+  SVG `data:` URL of base64), the sign-in steps in `index.html`,
+  `account.html` (the e-mail in the menu bar), the *2FA* badge and *Reset
+  2FA* in `admin.html`. **Ending sessions works to the second**: a token
+  signed in the second they end stays valid, as for a password change. The
+  tests wait for the next second (`nextSecond()` in `two-factor.test.js`).
+  CI: `OSCAR_Deploy/kubernetes/ci/totp.sh` (RFC 6238 in bash) lets
+  `smoke.sh` set up the first administrator's factor (its secret goes in the
+  account file) and `check-monitoring.sh` sign in with it.
 - **A run's secret works from the run only; an answer meant to attack OSCAR
   stops the run** (1.11.458 / OTST_V2.0.249, 1.11.460 / OTST_V2.0.250).
   `fromThisMachine()` (`server.js`): the two loopback routes take

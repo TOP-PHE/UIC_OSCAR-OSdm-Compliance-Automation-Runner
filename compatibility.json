@@ -4,6 +4,17 @@
   "current_release": "2026.617",
   "releases": [
     {
+      "release": "2026.619",
+      "date": "2026-11-23",
+      "server": "1.11.578",
+      "collection": "OTST_V2.0.270",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.578 (#1414, part 2 of two-factor authentication): an administrator signs in with a second factor, the six-digit code of an authenticator app (TOTP); every other account may turn one on from My account (the e-mail in the menu bar). Migration 62 adds the columns and ends the administrators' sessions open before the update: each administrator sets the factor up at the next sign-in (a QR code, then the first code), phone at hand. A lost phone: another administrator clicks Reset 2FA on Manage Users (audited, the owner told by e-mail); for the last administrator, node src/cli/reset-mfa.js <e-mail> in the server's container (Server Admin Guide, 13.5). The server's clock must be right (NTP). oscar-user-management.ps1 asks for the code. The Kubernetes CI scripts compute it (ci/totp.sh). Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.618",
       "date": "2026-11-23",
       "server": "1.11.577",
