@@ -1232,7 +1232,7 @@ describe('Test Config return model and fulfillments (#594)', () => {
   });
 
   test('#619: the framework editor stores the declaration and keeps the note current', () => {
-    expect(source).toContain("case 'fw-return-model':\n      fwToggleSimplePill(el, 'returnModels', el.dataset.val); refreshReturnVersionNote(); saveFrameworkDebounced(); break;");
+    expect(source).toContain("\n  'fw-return-model': (el) => { fwToggleSimplePill(el, 'returnModels', el.dataset.val); refreshReturnVersionNote(); saveFrameworkDebounced(); },\n");
     expect(source).toContain("wizData.framework.osdmVersion = v;\n      refreshReturnVersionNote();");
     const fwModels = vm.runInNewContext(`(${/^const FW_RETURN_MODELS = (\[[\s\S]*?\]);$/m.exec(source)[1]})`);
     expect(fwModels.map(([v]) => v)).toEqual(context.RETURN_MODEL_OPTIONS.map(([v]) => v));
@@ -1495,7 +1495,7 @@ describe('js/scenarios.js — the Distribution section (#936)', () => {
     expect(saved).toHaveLength(1);
   });
 
-  test('the click is handled before the click switch, and the section is drawn after the OSDM version', () => {
+  test('the click is handled before the table of click actions, and the section is drawn after the OSDM version', () => {
     const source = read(page);
     expect(source).toContain('if (clickDistributionMode(action, el)) return;');
     expect(source.indexOf('${distributionPanelHtml(fw)}')).toBeGreaterThan(source.indexOf('data-action="wiz-osdm-version"'));
@@ -2601,7 +2601,7 @@ describe('scenarios.js — searching the scenario list (#1314)', () => {
     expect(calls).toEqual(['renderAll', 'markDirty', 'renderAll', 'markDirty']);
   });
 
-  test('the search controls never mark the page as changed, and are handled before the switches', () => {
+  test('the search controls never mark the page as changed, and are handled before the table and the switches', () => {
     const src = read(page);
     for (const name of ['scenarioSearchHtml', 'applyScenarioSearch', 'showRunListCounts', 'inputScenarioSearch', 'changeScenarioSearch', 'clickScenarioSearch']) {
       const body = loadFunction(page, name, {}).toString();
@@ -2619,5 +2619,136 @@ describe('scenarios.js — searching the scenario list (#1314)', () => {
     const bar = src.indexOf('${scenarioSearchHtml()}');
     expect(bar).toBeGreaterThan(src.indexOf('data-action="select-all" data-checked="false"'));
     expect(bar).toBeLessThan(src.indexOf('<div id="scenario-list"></div>'));
+  });
+});
+
+describe('scenarios.js — a click is looked up in a table of actions (#1396)', () => {
+  const src = read('js/scenarios.js');
+  const from = src.indexOf('\nfunction findAction(target) {');
+  const to = src.indexOf('\n// ── Change event delegation');
+  const HEAD = ['isLockedControl', 'clickFwList', 'clickDistributionMode', 'clickFarePanel', 'clickScenarioSearch'];
+
+  // The page's own text from findAction() to the end of the click delegate,
+  // run as it is. Every name it does not declare is a recorder: the call is
+  // written down and the answer is the one given for that name, if any.
+  function delegate(answers = {}) {
+    const calls = [];
+    let listener = null;
+    const document = { body: { addEventListener(type, fn) { if (type === 'click') listener = fn; } } };
+    const scope = new Proxy({}, {
+      has: (_, name) => typeof name === 'string' && !['Object', 'Number', 'String', 'Array', 'Math', 'structuredClone', 'undefined'].includes(name),
+      get(_, name) {
+        if (typeof name === 'symbol') return undefined;
+        if (name === 'document') return document;
+        return (...args) => { calls.push([name, ...args]); return answers[name]; };
+      },
+    });
+    vm.runInNewContext(`(function (scope) { with (scope) {${src.slice(from, to)}\n} })`)(scope);
+    const click = (target) => {
+      const e = { target, prevented: 0, stopped: 0, preventDefault() { this.prevented += 1; }, stopPropagation() { this.stopped += 1; } };
+      listener(e);
+      return e;
+    };
+    return { calls, click, names: () => calls.map((c) => c[0]) };
+  }
+
+  test('the text run is the click delegate and what it needs, nothing of the next delegate', () => {
+    expect(from).toBeGreaterThan(-1);
+    expect(to).toBeGreaterThan(from);
+    const text = src.slice(from, to);
+    expect(text.split('document.body.addEventListener(')).toHaveLength(2);
+    expect(text).toContain("document.body.addEventListener('click', function(e) {");
+    expect(text).toContain('\nconst CLICK_ACTIONS = {\n');
+    expect(text).not.toContain('switch (action)');
+  });
+
+  test('an action of the table runs with the values of its element, after the refusal and the handlers tried first', () => {
+    const page = delegate();
+    const el = { dataset: { action: 'toggle-section', section: 'framework' } };
+    const e = page.click(el);
+    expect(page.calls).toEqual([
+      ['isLockedControl', el],
+      ['clickFwList', 'toggle-section', el],
+      ['clickDistributionMode', 'toggle-section', el],
+      ['clickFarePanel', 'toggle-section', el],
+      ['clickScenarioSearch', 'toggle-section'],
+      ['toggleSection', 'framework'],
+    ]);
+    expect([e.prevented, e.stopped]).toEqual([0, 0]);
+  });
+
+  test('a click inside a control is the control\'s; one outside any control does nothing', () => {
+    const page = delegate();
+    const el = { dataset: { action: 'toggle-section', section: 'data' } };
+    page.click({ dataset: {}, parentElement: { parentElement: el } });
+    expect(page.calls.at(-1)).toEqual(['toggleSection', 'data']);
+    const none = delegate();
+    none.click({ dataset: {}, parentElement: { dataset: {}, parentElement: null } });
+    expect(none.calls).toEqual([]);
+  });
+
+  test('an action that has a function of its own gets the element, and the event when it uses it', () => {
+    const page = delegate();
+    const row = { dataset: { action: 'train-remove-service' }, closest: (sel) => (sel === 'tbody' ? { id: 'tf-3-services' } : null) };
+    page.click(row);
+    expect(page.calls.at(-1)).toEqual(['trainRemoveService', 3, row]);
+    const elsewhere = delegate();
+    elsewhere.click({ dataset: { action: 'train-remove-service' }, closest: () => ({ id: 'other' }) });
+    expect(elsewhere.names()).toEqual(HEAD);
+
+    const remove = delegate();
+    const e = remove.click({ dataset: { action: 'delete-scenario', idx: '2' } });
+    expect(remove.calls.at(-1)).toEqual(['deleteScenario', 2]);
+    expect(e.stopped).toBe(1);
+    const again = delegate();
+    expect(again.click({ dataset: { action: 'goto-section2' } }).prevented).toBe(1);
+    expect(again.names().slice(HEAD.length)).toEqual(['renderWizardStep2InSection', 'toggleSection']);
+  });
+
+  // A table is an object, and every object answers to these names: none of
+  // them is an action. `__proto__` would be called as a function and throw.
+  test.each(['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf', 'no-such-action', 'change-pax-category'])(
+    'a click named %s does nothing', (action) => {
+      const page = delegate();
+      const el = { dataset: { action } };
+      const e = page.click(el);
+      expect(page.names()).toEqual(HEAD);
+      expect([e.prevented, e.stopped]).toEqual([0, 0]);
+    });
+
+  test('a locked control is refused before anything else; a handler that takes the action ends the click', () => {
+    const locked = delegate({ isLockedControl: true });
+    const e = locked.click({ dataset: { action: 'toggle-section', section: 'framework' } });
+    expect(locked.names()).toEqual(['isLockedControl']);
+    expect(e.prevented).toBe(1);
+    for (const [n, name] of HEAD.slice(1).entries()) {
+      const page = delegate({ [name]: true });
+      page.click({ dataset: { action: 'toggle-section', section: 'framework' } });
+      expect(page.names()).toEqual(HEAD.slice(0, n + 2));
+    }
+  });
+
+  test('each entry is one line that calls, or the name of a function laid out as the others', () => {
+    const start = src.indexOf('\nconst CLICK_ACTIONS = {\n');
+    const lines = src.slice(start + '\nconst CLICK_ACTIONS = {\n'.length, src.indexOf('\n};\n', start)).split('\n');
+    const actions = [];
+    for (const line of lines) {
+      if (line.startsWith('  //')) continue;
+      const entry = /^ {2}'([a-z0-9-]+)': (?:(\(\)|\(el\)|\(el, e\)) => \{ \S.* \}|(click[A-Za-z0-9]+)),$/.exec(line);
+      expect([line, entry === null]).toEqual([line, false]);
+      actions.push(entry[1]);
+      if (entry[2] === '()') expect(line).not.toMatch(/\bel\b|\be\./);
+      if (entry[2] === '(el)') expect(line).not.toMatch(/\be\./);
+      if (entry[3]) expect(typeof loadFunction('js/scenarios.js', entry[3], {})).toBe('function');
+    }
+    expect(new Set(actions).size).toBe(actions.length);
+    expect(actions.length).toBeGreaterThan(90);
+    // The table holds no action the page never draws, in its script or in
+    // its HTML. One was in the switch before the table and is drawn nowhere:
+    // it is kept as it was, and named here so that a second one shows.
+    const NEVER_DRAWN = ['refresh-sections'];
+    const html = read('scenarios.html');
+    const drawn = (action) => src.includes(`data-action="${action}"`) || html.includes(`data-action="${action}"`);
+    expect(actions.filter((action) => !drawn(action))).toEqual(NEVER_DRAWN);
   });
 });

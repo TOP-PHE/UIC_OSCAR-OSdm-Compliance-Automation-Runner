@@ -310,7 +310,7 @@ describe('#748 — the Test Framework page', () => {
     expect(text('SEARCH', {})).toBe('SEARCH');
     expect(text('SEARCH', { offerRequestForms: ['SPECIFICATION'] })).toBe('⚠ SEARCH — not declared in the Test Framework (Offer requests)');
     expect(page).toContain("${esc(tripTypeOptionText(t, wizData?.framework || {}))}");
-    expect(page).toContain("case 'fw-offer-request-form':");
+    expect(page).toContain("\n  'fw-offer-request-form': (el) => { fwToggleOfferRequestForm(el, el.dataset.val); saveFrameworkDebounced(); },\n");
     expect(page).toContain('${offerRequestPanelHtml(fw)}');
   });
 });

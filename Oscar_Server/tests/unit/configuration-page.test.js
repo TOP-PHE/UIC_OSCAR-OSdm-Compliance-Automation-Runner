@@ -73,7 +73,7 @@ test('the upload sends a full configuration to the import panel, before the data
 test('every action of the two panels is handled, and every choice has a label', () => {
   for (const action of ['download-scenarios', 'download-configuration', 'config-import-run', 'close-config-panel']) {
     expect(html).toContain(`data-action="${action}"`);
-    expect(source).toContain(`case '${action}':`);
+    expect(source).toContain(`\n  '${action}': () => {`);   // its entry in CLICK_ACTIONS (#1396)
   }
   for (const id of ['ci-scenarios', 'ci-framework', 'ci-test-data']) {
     expect(html).toContain(`<label for="${id}">`);

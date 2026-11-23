@@ -184,7 +184,7 @@ describe('the Test Framework page', () => {
     expect([ctx.saves, ctx.renders]).toEqual([4, 2]);
   });
 
-  test('wired: drawn under Passenger Types, the click before the switch, the change in the chain', () => {
+  test('wired: drawn under Passenger Types, the click before the table of actions, the change in the chain', () => {
     expect(src).toContain('${fwReductionCardsHtml(fw)}');
     expect(src).toContain("if (clickFwList(action, el)) return;");
     expect(src).toContain('changePassengerUpdate(action, el) || changeFwList(action, el)');
