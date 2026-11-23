@@ -46,6 +46,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The guides say how to create the server again when the monitoring stack is installed** (#1397). Documentation only. For a changed `.env` the installation guide gave `docker compose up -d oscar`; a server started with the monitoring file too and created again that way comes back without the volume it shares with Alertmanager. The guide now gives two lines that read, from the running container, the compose files that made it, and name the same ones. Used on production on 2026-11-22, where two files made the server.
+
 - **The guide's way to turn compression on, for an nginx already installed, is a file of its own** (#1393). Documentation only. The guide said to add the `gzip` lines to the site's file; on production that file was not shaped as the guide assumed. A file in `/etc/nginx/conf.d/` with the `gzip_*` lines, checked by `nginx -t` and removed when refused, did it: the Test Config script went from 555,602 to 150,043 bytes on the wire.
 
 - **The set-up page gives the quality gate coverage floor as it now is: 83 %** (#1391). Documentation only. The maintainer set it in SonarCloud on 2026-11-22; it had stayed at 35 % while the repository documented 83 %. The page also says that a changed gate shows in the answer of the API only after the next analysis.

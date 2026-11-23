@@ -328,7 +328,8 @@ cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose up -d oscar
 > and creates the container again. An image update by Watchtower does not
 > read `.env` either. If you start OSCAR with more than one compose file
 > (`-f docker-compose.yml -f docker-compose.metrics.yml`), name the same
-> files here.
+> files here: the *installation-guide*, section 3, gives two lines that read
+> them from the running container.
 
 Then check that the running server no longer has it. The same call as
 above, with any token, must answer `503` ("PLATFORM_BOOTSTRAP_TOKEN is not

@@ -141,6 +141,23 @@ cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose exec oscar printenv JSON_SCHEM
 > environment — so an explicit `up -d` is the only path.) If `printenv`
 > still shows the old URL, the container was not recreated.
 
+**With the monitoring stack, name both compose files.** Compose builds a
+service from the files it is given. A server started with
+`-f docker-compose.yml -f docker-compose.metrics.yml` and created again with
+the base file alone comes back without the volume it shares with
+Alertmanager: *Apply alerting config* no longer reaches Alertmanager's file.
+The running container says which files made it. These two lines read them
+and name the same ones, whatever they are:
+
+```bash
+FILES=$(sudo docker inspect oscar --format '{{ index .Config.Labels "com.docker.compose.project.config_files" }}')
+cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose $(printf -- '-f %s ' ${FILES//,/ }) up -d oscar
+```
+
+Use them in place of every `docker compose up -d oscar` of this guide once
+the monitoring stack is installed (`echo "$FILES"` shows what they read).
+Done this way on production on 2026-11-22, where two files made the server.
+
 The route is public, no auth, served from the bind-mounted `/collection`
 volume inside the oscar container. There is no per-company schema — this
 is a single server-wide setting.
@@ -349,7 +366,7 @@ you created in step 5, and start onboarding companies.
 | -------------------------- | ----------------------------------------------------------- |
 | Tail logs                  | `sudo docker compose logs -f oscar`                         |
 | Restart                    | `sudo docker compose restart oscar`                         |
-| Apply a change of `.env`   | `sudo docker compose up -d oscar` (a `restart` keeps the container, and its old values: see the note in section 3) |
+| Apply a change of `.env`   | `sudo docker compose up -d oscar` (a `restart` keeps the container, and its old values; with the monitoring stack, name both compose files: see the notes in section 3) |
 | Upgrade to a new release   | `cd /opt/OSCAR && sudo git pull && cd OSCAR_Deploy && sudo docker compose up -d --build` |
 | Update collection only     | `cd /opt/OSCAR && sudo git pull` (no rebuild needed — collection is bind-mounted) |
 | Backup DB + artifacts      | `sudo docker compose stop oscar && sudo tar czf oscar-backup-$(date +%F).tar.gz data/ && sudo docker compose start oscar` |

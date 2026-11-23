@@ -4562,6 +4562,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   without `gzip on;` (Ubuntu's `nginx.conf` has it at the http level, and a
   second one there is a duplicate): the guide gives that command. A `grep -r`
   over `sites-enabled` reads nothing: it does not follow the links there.
+  **Production's `oscar` container is made from two compose files** (the base
+  one and the metrics overlay, which gives it the volume it shares with
+  Alertmanager): create it again with both, never a bare `docker compose up -d
+  oscar`. The container's label `com.docker.compose.project.config_files`
+  names them; the installation guide's two lines read it (#1397).
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image**. **The VPS checkout follows the
   newest `release-*` tag on `main`, never `main`'s head** (2026-11-06):
