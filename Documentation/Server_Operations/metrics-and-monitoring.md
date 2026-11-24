@@ -69,12 +69,13 @@ Admin → OSDM Simulator holds its address and key:
 
 All metrics scraped from OSCAR's `/metrics` at 15s intervals (15-day retention);
 the simulator's every 30 s, see *The OSDM simulator* below.
-All logs shipped via Promtail from container stdout/stderr (indefinite retention by
+All logs shipped via Promtail from the log files Docker writes for each container
+(no Docker socket, #1434; indefinite retention by
 default — adjust in `OSCAR_Deploy/loki/loki-config.yaml` if disk pressure).
 
 **Plus, since v1.8.0, an end-to-end watchdog stack:**
 
-- **Autoheal sidecar** restarts any container that fails its Docker healthcheck (3× in 90s). Self-healing for the common transient hangs — no human action needed.
+- **Restarts from the host** (`oscar-autoheal`, a systemd timer, every 30 s; the sidecar until #1434) restart any container labelled `autoheal=true` that fails its Docker healthcheck (3× in 90s). Self-healing for the common transient hangs — no human action needed.
 - **Alertmanager** routes Prometheus alerts to email, with deduping, grouping, and re-paging. Hooks into the same SMTP relay you set up for OSCAR's own emails (Brevo, etc.).
 - **Pre-defined alert ruleset** covers OSCAR down, restart loops, queue stuck, sustained run failure, SMTP degradation, login attack burst, memory leak, event-loop lag.
 
@@ -777,8 +778,7 @@ Steady state on a small VPS:
 | Loki | ~80 MB | grows ~5-50 MB/day depending on log volume |
 | Promtail | ~30 MB | minimal (positions file) |
 | Alertmanager (v1.8) | ~30 MB | minimal (silences, notification log) |
-| Autoheal (v1.8) | ~5 MB  | none |
-| **Total added** | **~415 MB** | **~600 MB after 30d typical** |
+| **Total added** | **~410 MB** | **~600 MB after 30d typical** |
 
 ### Where data lives
 
@@ -838,7 +838,7 @@ Three steps:
 | **Alertmanager won't start — `error loading config: yaml: did not find expected key`** | `alertmanager.yml` not created on host (gitignored — only `.example` ships) | `cp alertmanager/alertmanager.yml.example alertmanager/alertmanager.yml` then edit + `docker compose up -d alertmanager` |
 | **Alerts fire in Prometheus but no email arrives** | Alertmanager SMTP credentials wrong | `docker logs oscar-alertmanager --tail 50` shows the SMTP error verbatim. Note: Alertmanager has its OWN config file — it doesn't reuse OSCAR's Server Config DB |
 | **Autoheal restarts oscar repeatedly** | Healthcheck failing because OSCAR can't actually reach DB / disk | `docker exec oscar node -e "fetch('http://127.0.0.1:3001/health').then(r=>r.json()).then(console.log)"` — shows which subsystem is unhealthy |
-| **`oscar` container shows `(unhealthy)` but autoheal didn't restart it** | Container missing the `autoheal=true` label | Recreate with `docker compose up -d --force-recreate oscar` (label only applies on create, not start) |
+| **`oscar` container shows `(unhealthy)` but it was not restarted** | The host's timer is not installed (`systemctl list-timers oscar-autoheal.timer`; *Server Admin Guide*, 13.8), or the container is missing the `autoheal=true` label | Recreate with `docker compose up -d --force-recreate oscar` (label only applies on create, not start) |
 
 ### Operator note: dirty-tree on the host
 
