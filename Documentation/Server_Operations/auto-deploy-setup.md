@@ -13,26 +13,31 @@ SonarCloud) is recorded in *OSCAR - GitHub and CI set-up*.
 | ------------------------------------------- | ------------------------------------------------------------------- |
 | Push to `main` touching `Oscar_Server/**`   | CI builds image and pushes to GHCR as `:edge` and `:sha-XXXXX`      |
 | Push of `server-vX.Y.Z` Git tag             | CI tags the image with `:server-vX.Y.Z` (immutable per-server-version) |
-| Push of `release-YYYY.NNN` Git tag          | Once a reviewer approves the `production` environment: CI checks the tag is on `main`, rebuilds at that ref and pushes as `:stable` and `:release-YYYY.NNN`, then moves the VPS checkout (collection, `compatibility.json`) to that tag. Watchtower picks the image up within 5 min |
+| Push of `release-YYYY.NNN` Git tag          | Once a reviewer approves the `production` environment: CI checks the tag is on `main`, rebuilds at that ref, pushes as `:stable` and `:release-YYYY.NNN`, then sends the digest it built to the VPS, which moves its checkout (collection, `compatibility.json`) to that tag and starts the server on that digest |
 
 Production therefore only changes with a release tag, and only once the
 `production` environment is approved. A merge to `main`, collection changes
 included, deploys nothing by itself: the VPS checkout follows the newest
 release tag on `main`, never `main`'s head.
 
+Production runs the image digest that the approved promotion built
+(`OSCAR_IMAGE_DIGEST` in `/opt/OSCAR/OSCAR_Deploy/.env`). A tag in the
+registry, `:stable` included, decides nothing: nothing on the VPS follows one.
+
 ---
 
 ## One-time setup
 
-There are three pieces to wire up: GHCR pull credentials on the VPS, the
-SSH deploy key for the collection-refresh workflow, and switching the
-`docker-compose.yml` over to use the published image.
+There are three pieces to wire up: GHCR pull credentials on the VPS (only
+for a private package), the SSH deploy key the promotion uses, and the first
+image digest in `.env`.
 
 ### 1. Create a GHCR pull token
 
 GitHub Container Registry treats packages as private by default (matching
-the source repo's visibility). Watchtower on the VPS needs credentials
-to pull.
+the source repo's visibility). Docker on the VPS needs credentials to pull a
+private package. The `oscar-server` package is public: this step and the
+next are needed only if you make it private.
 
 1. https://github.com/settings/personal-access-tokens/new
 2. Token name: `vps-ghcr-pull`
@@ -49,9 +54,8 @@ to pull.
 docker login ghcr.io -u <your-github-username> -p <ghcr-pull-token>
 ```
 
-This writes `~/.docker/config.json` containing the credentials. The
-`docker-compose.yml` bind-mounts that file into the Watchtower container
-so it can authenticate when pulling.
+This writes `~/.docker/config.json` containing the credentials, which
+`docker pull` uses when the deploy script, run as `ubuntu`, pulls an image.
 
 Verify:
 ```bash
@@ -100,6 +104,64 @@ chmod 600 ~/.ssh/authorized_keys
 Now even if someone gets the private key, they cannot get a shell — only
 that one script runs, and a merge to `main` cannot change it.
 
+What the workflow sends after the script's name is read as data, never run:
+nothing, or one image digest (`sha256:` and 64 hex digits). Anything else is
+refused before anything moves. With a digest (`promote-release.yml` sends the
+one its build gave), the script, after moving the checkout:
+
+- pulls `ghcr.io/top-phe/oscar-server@<digest>`;
+- writes it as `OSCAR_IMAGE_DIGEST` in `/opt/OSCAR/OSCAR_Deploy/.env`;
+- creates `oscar` (and `oscar-runner` when it runs) again with
+  `docker compose up -d`, from the compose files and project the running
+  server was made from (its `com.docker.compose.*` labels), so the
+  monitoring overlay's additions stay;
+- waits up to five minutes for `oscar` to be healthy on that image, and fails
+  otherwise: the promotion then goes red.
+
+It uses docker and `.env` as `ubuntu` when `ubuntu` may (the `docker` group,
+and `.env` readable and writable by it), else through `sudo -n`; with
+neither, it says so and deploys nothing. Each step is in
+`journalctl -t oscar-deploy`.
+
+**Moving an existing VPS to deploy by digest** (once). Before it, Watchtower
+followed `:stable`. On the VPS as `ubuntu`:
+
+```bash
+cd /opt/OSCAR && git fetch origin main
+# 1. Read the new script, then install it as the key's command.
+git show origin/main:OSCAR_Deploy/scripts/refresh-collection.sh > /tmp/oscar-refresh-collection.new
+less /tmp/oscar-refresh-collection.new
+sudo install -m 0755 -o root -g root /tmp/oscar-refresh-collection.new /usr/local/sbin/oscar-refresh-collection
+rm /tmp/oscar-refresh-collection.new
+```
+
+```bash
+# 2. The deploy account may use docker and .env (prints "as ubuntu"), or sudo
+#    without a password (prints "through sudo"). Neither: fix that first.
+cd /opt/OSCAR/OSCAR_Deploy
+if docker info >/dev/null 2>&1 && [ -r .env ] && [ -w .env ]; then echo "as ubuntu"; elif sudo -n true 2>/dev/null; then echo "through sudo"; else echo "neither"; fi
+```
+
+```bash
+# 3. Name the image running now in .env, so that a "docker compose up" by
+#    hand before the next promotion starts the same one.
+cd /opt/OSCAR/OSCAR_Deploy
+D=$(sudo docker inspect --format '{{index .RepoDigests 0}}' "$(sudo docker inspect --format '{{.Image}}' oscar)" | cut -d@ -f2)
+echo "$D"
+sudo grep -q '^OSCAR_IMAGE_DIGEST=' .env || echo "OSCAR_IMAGE_DIGEST=$D" | sudo tee -a .env >/dev/null
+sudo grep '^OSCAR_IMAGE_DIGEST=' .env
+```
+
+```bash
+# 4. Remove the Watchtower container: nothing follows a tag any more.
+sudo docker rm -f watchtower
+```
+
+The next promotion's step *Refresh host repo and start the image on VPS* then
+ends with `deployed ghcr.io/top-phe/oscar-server@sha256:…: oscar is healthy`.
+An installed script older than the workflow ignores the digest: the step
+warns about it.
+
 **Moving an existing VPS to the installed copy:** run the `install` line
 above, then edit the deploy key's line in `~/.ssh/authorized_keys` so that
 `command="…"` names `/usr/local/sbin/oscar-refresh-collection` (keep the
@@ -121,8 +183,8 @@ secret only by the jobs its rules admit.
 | Environment  | Deployment branches and tags                     | Required reviewers | Used by |
 | ------------ | ------------------------------------------------ | ------------------ | ------- |
 | `production` | Selected: tag rule `release-*`, branch `main`    | Yes: the maintainers who may ship; tick *Prevent self-review* if there are two or more | `promote-release.yml`, `refresh-collection.yml` |
-| `release`    | Selected: branch `main`                          | No (it runs on every merge that bumps a version) | `auto-tag-on-release.yml` |
-| `simulator`  | Selected: branch `main`                          | Optional           | `simulator-deploy.yml` |
+| `release`    | Selected: branch `main`                          | Yes: the maintainer (it runs on every merge that bumps a version, and waits for that approval) | `auto-tag-on-release.yml` |
+| `simulator`  | Selected: branch `main`                          | Yes: the maintainer | `simulator-deploy.yml` |
 
 **5b. Put each secret in its environment** (the environment's page →
 **Environment secrets** → **Add secret**):
@@ -149,18 +211,35 @@ After adding the deploy key, **delete `oscar-deploy-key` from your laptop** — 
 
 ### 6. Switch the VPS to image-based deploy
 
-Edit `/opt/OSCAR/OSCAR_Deploy/docker-compose.yml` so the `oscar` service
-uses `image:` (already done in the committed version of this file).
+The `oscar` service names its image by the digest in `.env`
+(`OSCAR_IMAGE_DIGEST`); compose starts nothing without it. Before the first
+promotion, set it to the image you start with (*Which image to run*, below).
 Then on the VPS:
 
 ```bash
 cd /opt/OSCAR/OSCAR_Deploy
-sudo docker compose pull oscar       # pull the current :stable image
+sudo docker compose pull oscar       # pull the image named by its digest
 sudo docker compose up -d            # recreate without rebuild
 sudo docker compose logs -f oscar    # confirm it boots cleanly
 ```
 
-After this, no more `--build` on production — Watchtower handles upgrades.
+After this, no more `--build` on production — each promotion starts its own
+image.
+
+### Which image to run
+
+A release's image is `ghcr.io/top-phe/oscar-server:release-YYYY.NNN`; what
+runs is its digest. To read it (a first install, another host):
+
+```bash
+R=release-2026.621   # ← the release you install
+docker pull -q ghcr.io/top-phe/oscar-server:$R >/dev/null
+docker inspect --format '{{index .RepoDigests 0}}' ghcr.io/top-phe/oscar-server:$R | cut -d@ -f2
+```
+
+Compare it with the digest in the summary of that release's *Promote* run
+(GitHub → Actions): a tag can be moved, the run's summary says what was built.
+Then put it in `.env` as `OSCAR_IMAGE_DIGEST=sha256:…`.
 
 ---
 
@@ -184,7 +263,7 @@ git push origin main
 git tag server-v1.3.0
 git tag release-2026.05
 git push origin server-v1.3.0 release-2026.05
-# → promote-release.yml runs, pushes :stable. Watchtower picks it up in <5 min.
+# → promote-release.yml waits for approval, then builds the image and starts it on the VPS by digest.
 ```
 
 ### Collection change you want in production
@@ -235,24 +314,23 @@ After this, the next release-tagged push will auto-refresh the host normally.
 
 ### Rolling back production
 
-If the latest `:stable` image is broken, on the VPS:
+If the image just deployed is broken, start the one before it again. The
+digests deployed are in the deploy log, newest last. On the VPS:
 
 ```bash
+journalctl -t oscar-deploy | grep deployed
+```
+
+```bash
+D=sha256:...   # ← the known-good digest, from the log above
 cd /opt/OSCAR/OSCAR_Deploy
-# Edit docker-compose.yml — change `image:` to a specific known-good tag, e.g.:
-#   image: ghcr.io/top-phe/oscar-server:server-v1.2.0
-sudo docker compose up -d
+sudo sed -i "s/^OSCAR_IMAGE_DIGEST=.*/OSCAR_IMAGE_DIGEST=$D/" .env
+FILES=$(sudo docker inspect oscar --format '{{ index .Config.Labels "com.docker.compose.project.config_files" }}')
+sudo docker compose $(printf -- '-f %s ' ${FILES//,/ }) up -d oscar
 ```
 
-You can also temporarily disable Watchtower:
-
-```bash
-sudo docker compose stop watchtower
-```
-
-…investigate and fix in CI, push a corrected `release-YYYY.MM` tag, then
-restore `image: …:stable` and `docker compose up -d watchtower` to resume
-auto-updates.
+The collection stays at the newest release. Fix in CI and release again: the
+next promotion writes its own digest over this one.
 
 ### Viewing image history on GHCR
 
@@ -263,16 +341,13 @@ https://github.com/UICrail/OSCAR-OSdm-Compliance-Automation-Runner/pkgs/containe
 
 ## Operational notes
 
-- **Watchtower poll interval** is 5 minutes. Lower it via
-  `WATCHTOWER_POLL_INTERVAL` in `docker-compose.yml` if you want faster
-  rollout — at the cost of more GHCR API requests.
-- **Audit deploys** with `journalctl -t oscar-deploy` (collection refreshes)
-  or `docker logs watchtower` (image rollouts).
-- **GHCR pull token rotation**: re-issue the token, run
-  `docker login ghcr.io -u … -p …` again on the VPS. The
-  `~/.docker/config.json` is updated and Watchtower picks up the new
-  token on its next poll cycle.
-- **First production deploy** before any `:stable` exists: temporarily
-  uncomment the `build:` block in `docker-compose.yml`, run
-  `docker compose up -d --build`, then push a release tag — once `:stable`
-  is on GHCR, switch back to `image:` and `docker compose pull && up -d`.
+- **Audit deploys** with `journalctl -t oscar-deploy`: each checkout move,
+  and each image started, by digest.
+- **GHCR pull token rotation** (a private package only): re-issue the token,
+  run `docker login ghcr.io -u … -p …` again on the VPS. The
+  `~/.docker/config.json` is updated and the next deployment's
+  `docker pull` uses it.
+- **First production deploy** before any image exists: temporarily
+  uncomment the `build:` block in `docker-compose.yml` (and comment out
+  `image:`), run `docker compose up -d --build`, then restore `image:`,
+  set `OSCAR_IMAGE_DIGEST` and approve the first promotion.

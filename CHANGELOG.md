@@ -31,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Production starts the image the promotion built, by digest** (#1428). Deployment files, CI and guides, no version. *OSCAR - Server Hardening* § 4.2 listed it as still open.
+  - **Seen:** the promotion pushed `:stable` and moved the VPS checkout; Watchtower, polling `:stable` every five minutes, then pulled and started the image. The smoke test waited up to 20 minutes for the release, and a second container held the Docker socket.
+  - **Now:** `promote-release.yml` sends the digest its build gave to the VPS's forced command. `refresh-collection.sh` reads it as data (nothing, or `sha256:` and 64 hex digits; anything else is refused before anything moves), moves the checkout, pulls the image by that digest, writes it as `OSCAR_IMAGE_DIGEST` in `.env`, creates the server again from the compose files the running one was made from, and waits for it to be healthy on that image: the promotion goes red otherwise, and its summary names the digest.
+  - `docker-compose.yml` names the server image (and the runner's) by `OSCAR_IMAGE_DIGEST`; compose refuses to start without it. No Watchtower service.
+  - **On the VPS, once:** install the new script, name the running digest in `.env`, remove the Watchtower container (*auto-deploy-setup.md*, step 4). An installed script older than the workflow ignores the digest: the step warns.
+  - Guides: *auto-deploy-setup.md* (*Which image to run*, rolling back), the Self-Hosted Quick Start (Step 9 is now moving to a new release), and the pages that named Watchtower. The Quick Start's PDF is not regenerated.
+  - `deploy-by-digest.test.js` runs the script on a real git checkout with a stub docker: what it accepts and refuses, the `.env` line, the compose call, a failed pull, compose or health check.
+
 - **A new function is held to two limits** (#1385). Tooling and tests, no version: no function changes, and nothing the server runs.
   - **Seen:** 50 new functions over SonarCloud's complexity limit since the clean-up of October (#523). Nothing stopped one: the gate counts ratings, and reports after the push.
   - **Now:** `npm run lint` refuses a function of more than 15 paths (ESLint's `complexity`, a `switch` counting once) or more than 100 lines of code, in the server, the pages' scripts and the Bruno library (`Oscar_Server/eslint.size-rules.js`). Not in the tests.

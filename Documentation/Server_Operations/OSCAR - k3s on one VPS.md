@@ -976,7 +976,7 @@ On a managed cluster the provider does part of this. Here it is yours.
 ### A new OSCAR release
 
 When you choose, with no run going: OSCAR stops while its new pod starts,
-about a minute. Watchtower does not apply here. The files and the images of
+about a minute. The VPS's deployment by the promotion does not apply here. The files and the images of
 one release, then the monitoring of the same release. Each block starts again
 from the release's own files, as 6a step 4 does, so a change in them comes
 along by itself, and a block can be run again after a mistake.

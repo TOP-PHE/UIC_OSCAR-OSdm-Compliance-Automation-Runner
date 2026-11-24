@@ -39,7 +39,7 @@
 
 # ── Compatibility matrix — release manager only ──────────────────────────
 # This file decides which server↔collection combination is "tested" and
-# therefore gates Watchtower's :stable rollout. A wrong entry can ship a
+# therefore gates what a promotion deploys. A wrong entry can ship a
 # broken combo to all operators. Keep it on the maintainer's plate.
 /compatibility.json                            @TOP-PHE
 

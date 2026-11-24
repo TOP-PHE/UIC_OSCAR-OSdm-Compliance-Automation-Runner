@@ -7,12 +7,15 @@
 
 services:
   oscar:
-    # Production: pull the pre-built image from GHCR (the :stable tag is
-    # promoted by .github/workflows/promote-release.yml when a release-YYYY.MM
-    # Git tag is pushed). For local dev / first-time setup before any image
-    # has been published, comment out the `image:` line and uncomment the
-    # `build:` block below.
-    image: ghcr.io/top-phe/oscar-server:stable
+    # The image is named by its digest, never by a tag: a tag can be moved to
+    # other content, a digest cannot. OSCAR_IMAGE_DIGEST (sha256:…) is in
+    # .env. On production the promotion writes it (promote-release.yml, then
+    # refresh-collection.sh on the VPS); elsewhere, set the digest of the
+    # release you install (auto-deploy-setup.md says how to read it). Without
+    # it, compose refuses to start the server rather than guess an image.
+    # For local dev before any image has been published, comment out the
+    # `image:` line and uncomment the `build:` block below.
+    image: ghcr.io/top-phe/oscar-server@${OSCAR_IMAGE_DIGEST:?set OSCAR_IMAGE_DIGEST in .env, see auto-deploy-setup.md}
     # build:
     #   context: ../Oscar_Server
     #   dockerfile: Dockerfile
@@ -89,9 +92,6 @@ services:
       retries: 3
       start_period: 30s
     labels:
-      # Tells Watchtower (below) to monitor THIS container for new versions
-      # of the :stable tag. Containers without this label are ignored.
-      com.centurylinklabs.watchtower.enable: "true"
       # Opts this container in to the autoheal sidecar — see service below.
       autoheal: "true"
 
@@ -105,7 +105,8 @@ services:
   # http://oscar:3001, and the server takes the run's calls from this
   # container's address only (utils/runAgentPeer.js), with the run's secret.
   oscar-runner:
-    image: ghcr.io/top-phe/oscar-server:stable
+    # The server's image, by the same digest.
+    image: ghcr.io/top-phe/oscar-server@${OSCAR_IMAGE_DIGEST:?set OSCAR_IMAGE_DIGEST in .env, see auto-deploy-setup.md}
     container_name: oscar-runner
     profiles: ["isolated"]
     command: ["node", "src/runner-agent/agent.js"]
@@ -140,7 +141,6 @@ services:
       retries: 3
       start_period: 10s
     labels:
-      com.centurylinklabs.watchtower.enable: "true"
       autoheal: "true"
 
   # ── Autoheal — restart sidecar (PR — v1.8.0) ──────────────────────────────
@@ -168,36 +168,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 
-  # ── Auto-update agent ──────────────────────────────────────────────────────
-  # Watchtower polls GHCR every 5 minutes and pulls + recreates the oscar
-  # container if a new digest is available for the :stable tag. Production
-  # rollout therefore happens automatically when promote-release.yml pushes
-  # a new :stable image — i.e. only when you push a release-YYYY.MM Git tag.
-  watchtower:
-    # Active community fork. The original containrrr/watchtower image
-    # ships with an old Docker SDK that requests API v1.25 — Docker
-    # Engine 25+ rejects that as below the minimum (1.40), causing the
-    # container to spin in an error loop. nickfedor/watchtower is the
-    # maintained drop-in replacement using the same env-var contract.
-    # A version and its digest, never :latest: this container holds the
-    # Docker socket, so whatever the tag points to runs as root on the host.
-    image: nickfedor/watchtower:1.24.1@sha256:617a7d5523280cb73adac4d7977604afbe66b7ea86211f2ae0cbfa2043041d61
-    container_name: watchtower
-    restart: unless-stopped
-    environment:
-      # Pull credentials for the private GHCR repo. Set up on the host
-      # via `docker login ghcr.io` before bringing the stack up — the
-      # resulting ~/.docker/config.json is mounted in below.
-      WATCHTOWER_LABEL_ENABLE: "true"      # only update labelled containers
-      WATCHTOWER_CLEANUP: "true"           # remove old image after pull
-      WATCHTOWER_POLL_INTERVAL: "300"      # 5 minutes
-      WATCHTOWER_INCLUDE_RESTARTING: "false"
-      WATCHTOWER_NOTIFICATIONS: ""         # add slack/email here later if wanted
-      TZ: ${OSCAR_TZ:-Europe/Paris}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      # Read GHCR creds set up on the host with `docker login ghcr.io`.
-      - /home/ubuntu/.docker/config.json:/config.json:ro
+  # No auto-update agent: the release workflow starts the image it built
+  # (notes below). The Watchtower container of earlier versions is gone, and
+  # with it a second holder of the Docker socket.
 
 volumes:
   # The runs' working folders: the oscar and oscar-runner containers share
@@ -206,11 +179,13 @@ volumes:
 
 # ── Notes ─────────────────────────────────────────────────────────────────────
 # - Production rollout = a release-YYYY.NNN tag. The promote-release CI
-#   workflow (GitHub environment "production") rebuilds the image, pushes it
-#   as :stable and moves the host checkout to that tag. Watchtower picks the
-#   image up within ~5 min.
+#   workflow (GitHub environment "production", approved by a reviewer)
+#   rebuilds the image, pushes it, then sends its digest to the VPS, where
+#   refresh-collection.sh moves the host checkout to that tag, writes the
+#   digest in .env and starts the server on it.
 # - The collection is the host checkout at the latest release tag, never
 #   main's head (refresh-collection.sh): a merge alone deploys nothing.
-# - To roll back: on the VPS, edit the `image:` line above to a specific
-#   tag (e.g. ghcr.io/top-phe/oscar-server:server-v1.2.0) and `docker compose
-#   up -d`. To re-enable auto-update later, restore :stable.
+# - To roll back the server: on the VPS, put an earlier OSCAR_IMAGE_DIGEST in
+#   .env (`journalctl -t oscar-deploy` lists those deployed) and
+#   `docker compose up -d oscar` with the compose files the server was made
+#   from (auto-deploy-setup.md, "Rolling back production").

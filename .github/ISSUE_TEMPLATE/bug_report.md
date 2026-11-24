@@ -21,7 +21,7 @@ Copyright [2026] [International Union of Railways (UIC)]
 
 - [ ] Server (Node.js runner, REST API, admin UI)
 - [ ] Bruno collection (a specific scenario or library script)
-- [ ] Deployment (Docker, Watchtower, nginx, GHCR)
+- [ ] Deployment (Docker, nginx, GHCR)
 - [ ] Documentation
 - [ ] Other / unclear
 

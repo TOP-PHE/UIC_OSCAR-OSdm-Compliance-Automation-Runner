@@ -4735,6 +4735,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   is pinned by digest (Dependabot `docker-compose`); the metrics overlay puts
   Grafana, Loki and Promtail on a `monitoring` network the `oscar` container
   is not on.
+  **Production runs the digest the promotion built** (#1428): the deploy
+  step sends `steps.build.outputs.digest` to the forced command, which reads
+  it as data (nothing, or `sha256:` + 64 hex; anything else exit 2 before
+  anything moves), pulls it, writes `OSCAR_IMAGE_DIGEST` in `.env`
+  (`docker-compose.yml` requires it, `:?`), recreates `oscar` (and
+  `oscar-runner`) from the running container's `com.docker.compose.*` labels
+  and waits for healthy on that image. No Watchtower: nothing on the VPS
+  follows a tag. The step greps the script's `deployed <image>@<digest>`
+  line (`deploy-by-digest.test.js` pins both, and runs the script on a real
+  git checkout with a stub docker; Linux only, `OSCAR_TEST_BASH=1` under Git
+  Bash). A changed script reaches the VPS only when copied by hand.
 - **Kubernetes and OpenShift: one pod** (#1059, 1.11.443). `OSCAR_Deploy/kubernetes/`
   and *OSCAR - Kubernetes and OpenShift Deployment Guide*. On a cluster the
   collection is **in the image**: `build-images.sh` builds the server image

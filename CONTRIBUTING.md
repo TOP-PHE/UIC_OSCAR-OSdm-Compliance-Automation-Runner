@@ -20,7 +20,7 @@ Apply at least one label so the right person picks it up:
 |---|---|
 | Server runtime, REST API, admin UI | `server` |
 | Bruno collection (`.bru` files, new scenarios) | `collection` |
-| Docker, CI, Watchtower, deploy automation | `deploy` |
+| Docker, CI, deploy automation | `deploy` |
 | Documentation only | `docs` |
 
 For **security vulnerabilities**, please don't open a public issue —
@@ -144,8 +144,8 @@ A new Node major (`node:24-slim`) is a deliberate migration, not an update.
 OSCAR ships independently versioned subsystems with a central compatibility
 matrix. Maintainers tag releases:
 
-- `server-vX.Y.Z` — server-only (triggers Docker image rebuild + `:stable`
-  promotion + Watchtower roll-out on the canonical deployment)
+- `server-vX.Y.Z` — server-only (an image tagged with that version;
+  production changes only with a release tag)
 - `collection-v...` — Bruno collection change (no image rebuild)
 - `release-YYYY.MM` — combined known-good combination
 

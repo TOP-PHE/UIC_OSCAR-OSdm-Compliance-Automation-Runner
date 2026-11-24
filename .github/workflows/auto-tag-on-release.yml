@@ -191,7 +191,7 @@ jobs:
               echo "- No server version bump detected on this commit."
             fi
             if [[ -n "${{ steps.tags.outputs.release_tag }}" ]]; then
-              echo "- Release tag pushed: \`${{ steps.tags.outputs.release_tag }}\` → triggers \`promote-release.yml\` → updates \`:stable\` → Watchtower rolls over the VPS within ~5 min."
+              echo "- Release tag pushed: \`${{ steps.tags.outputs.release_tag }}\` → triggers \`promote-release.yml\` → once \`production\` is approved, builds the image and starts it on the VPS by digest."
             else
               echo "- No \`current_release\` change detected on this commit."
             fi

@@ -11,8 +11,8 @@ before: isolated runs that could not load their data file for a week, and the
 long poll cut by nginx with 504.
 
 After a promotion, the job first waits until `/health` shows the promoted
-release (`release_label`), at most 20 minutes, because Watchtower takes the new
-image within about five minutes. It then runs the scenarios and writes the
+release (`release_label`), at most 20 minutes. The promotion starts the image
+before it ends, so the release normally answers at once. It then runs the scenarios and writes the
 client's report in the job's summary. The exit code is the verdict: 0 passed,
 1 failed, 2 incomplete, 3 not finished, 4 an error.
 
@@ -73,7 +73,7 @@ Simulateurs, started by *GitHub production smoke*.
 
 | The summary says | Look at |
 |---|---|
-| `Release … did not answer within 20 minutes` | The promotion's own job, then Watchtower on the VPS (`docker logs watchtower`) |
+| `Release … did not answer within 20 minutes` | The promotion's own job (its deploy step), then `journalctl -t oscar-deploy` on the VPS |
 | `OSCAR refused the token request (HTTP 401)` | The account is suspended, its key revoked, or the secrets were changed |
 | `HTTP 409 — GAMMA: …` | The account's GAMMA credentials, or the simulator's endpoint (suspended?) |
 | `Nothing would run …` | A code no longer shared, or changed, in GAMMA's Test Config |
