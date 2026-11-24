@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 /**
  * simulated-errors.test.js — the simulator's deliberate errors, kept apart
@@ -148,7 +149,7 @@ describe('what leaves OSCAR', () => {
 });
 
 describe('the Report Builder page', () => {
-  const PAGE = fs.readFileSync(path.resolve(__dirname, '../../public/report-builder.html'), 'utf8').replaceAll('\r\n', '\n').split('\n');
+  const PAGE = pageSource(path.resolve(__dirname, '../../public/report-builder.html'), 'utf8').replaceAll('\r\n', '\n').split('\n');
   const ctx = { escHtml: require('../../public/js/esc.js').esc, encodeURIComponent };
   const lift = (name) => {
     const start = PAGE.findIndex((l) => l.startsWith(`function ${name}(`));

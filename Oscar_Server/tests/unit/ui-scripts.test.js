@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 /**
  * ui-scripts.test.js — the scripts under Oscar_Server/public, without a browser.
@@ -30,7 +31,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const PUBLIC_DIR = path.resolve(__dirname, '..', '..', 'public');
-const read = (rel) => fs.readFileSync(path.join(PUBLIC_DIR, rel), 'utf8').replaceAll('\r\n', '\n');
+const read = (rel) => pageSource(path.join(PUBLIC_DIR, rel), 'utf8').replaceAll('\r\n', '\n');
 
 // Walks the page the way the HTML parser does, as dashboard-pages.test.js does:
 // a script element ends at the first "</script" followed by whitespace, "/" or ">".
@@ -872,7 +873,7 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
   describe("admin.html — the mail server's settings are shown, not saved (#1363)", () => {
     const esc = require('../../public/js/esc.js').esc;
     const configFieldId = loadFunction('admin.html', 'configFieldId');
-    const mailSettingsNote = loadFunction('admin.html', 'mailSettingsNote');
+    const mailSettingsNote = loadFunction('admin.html', 'mailSettingsNote', { esc: require('../../public/js/esc.js').esc });
     const mailWarningsHtml = loadFunction('admin.html', 'mailWarningsHtml', { esc });
     const page = read('admin.html');
 
@@ -888,7 +889,7 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
     test('a read-only setting is drawn as a field that cannot be typed in', () => {
       const row = page.slice(page.indexOf('if (cfg.read_only) {'), page.indexOf('} else if (isEnum) {'));
       expect(row).toContain('readonly');
-      expect(row).toContain('id="${fieldId}"');
+      expect(row).toContain('id="$' + '{esc(fieldId)}"');   // the page's template text
       expect(row).toContain('esc(cfg.value');
     });
 
@@ -1136,15 +1137,34 @@ describe('pages — written this way on purpose (#527)', () => {
     expect(encoderChain.test(src)).toBe(false);
   });
 
-  // The tab kind is the source of an open code-scanning alert on the innerHTML
-  // a few lines below. Reading it through dataset could hide that flow from
-  // CodeQL without fixing it.
-  test('report-builder.html switchHttpTab reads the tab kind with getAttribute', () => {
+  // The tab kind comes from the page and reaches an innerHTML a few lines
+  // below. Its code-scanning alert was dismissed while the code was inline;
+  // since #1423 the flow is closed instead: only the four tabs the page draws
+  // are taken, and any other name draws nothing.
+  test('report-builder.html switchHttpTab takes only the four tabs the page draws', () => {
     const src = read('report-builder.html');
     const start = src.indexOf('function switchHttpTab(');
     const body = src.slice(start, src.indexOf('\n}\n', start));
-    expect(body).toContain("var kind = tabEl.getAttribute('data-http-tab');");
-    expect(body).not.toContain('dataset.httpTab');
+    expect(body).toContain("var kind = tabEl.getAttribute('data-http-tab');\n  if (HTTP_TAB_KINDS.indexOf(kind) < 0) return;");
+    const drawn = [...src.matchAll(/data-http-tab="([A-Za-z]+)"/g)].map(m => m[1]);
+    const kinds = vm.runInNewContext(src.match(/^var HTTP_TAB_KINDS = \[[^\]]*\];$/m)[0] + '; HTTP_TAB_KINDS');
+    expect([...kinds].sort()).toEqual([...new Set(drawn)].sort());
+
+    const written = [];
+    const tab = kind => ({
+      getAttribute: () => kind, dataset: { detailId: 'd1' }, classList: { contains: () => false, add() {} },
+      parentElement: { querySelectorAll: () => [] },
+    });
+    const ctx = {
+      HTTP_TAB_KINDS: kinds, _httpDetailCache: { d1: { request: {} } },
+      renderHttpTabBody: (r, kind) => `<b>${kind}</b>`,
+      document: { getElementById: () => ({ set innerHTML(v) { written.push(v); } }) },
+    };
+    const switchHttpTab = vm.runInNewContext(`(${body}\n})`, ctx);
+    switchHttpTab(tab('<img src=x>'));
+    expect(written).toEqual([]);
+    switchHttpTab(tab('response'));
+    expect(written).toEqual(['<b>response</b>']);
   });
 
   // Inside an inline script the closing tag has to be written with a backslash,

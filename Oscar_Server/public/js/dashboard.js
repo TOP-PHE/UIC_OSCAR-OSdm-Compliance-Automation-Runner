@@ -1,0 +1,865 @@
+/* global esc, logout, oscarReportError, oscarToast, parseServerTs */  // esc.js, nav.js, loaded before it by the page
+// Copyright [2026] [International Union of Railways (UIC)]
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//        http://www.apache.org/licenses/LICENSE-2.0
+//
+// The script of dashboard.html, moved out of the page (#1423) so that the
+// content security policy can refuse inline scripts. The page loads it
+// where its inline script stood, so it runs at the same moment as before.
+
+const token = localStorage.getItem('oscar_token') || '';
+if (!localStorage.getItem('oscar_user')) window.location.href = '/';
+const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
+const user    = JSON.parse(localStorage.getItem('oscar_user') || '{}');
+
+// logout() provided by nav.js
+
+const canDelete = user.role === 'administrator' || user.role === 'company_user' || user.role === 'test_manager';
+
+// Hide the delete-column trash icon header for roles that cannot delete
+// (certification_user). The header column itself stays in the grid so
+// columns line up with the rows; just blank the icon.
+if (!canDelete) {
+  document.addEventListener('DOMContentLoaded', () => {
+    const h = document.getElementById('hdr-delete-col');
+    if (h) h.textContent = '';
+  });
+}
+
+let selected  = new Set();   // runs selected for deletion
+let compared  = new Set();   // runs selected for comparison
+let allRuns  = [];
+// The pages read with "Show older batches", and where the next one starts.
+let olderRuns = [];
+let olderCursor = null;
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function duration(start, end) {
+  if (!start || !end) return '-';
+  const s = Math.round((new Date(end) - new Date(start)) / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`;
+}
+function fmtDate(d) {
+  if (!d) return '-';
+  // v1.11.13 — parseServerTs (defined in nav.js, loaded by this page)
+  // normalises SQLite's TZ-less UTC strings ("2026-05-16 08:44:24") so the
+  // browser converts UTC → the viewer's local TZ. Shipped together with the
+  // nav.js definition in this release (the v1.11.11 incident was caused by a
+  // caller landing without the nav.js helper — they now ship as one unit).
+  return parseServerTs(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'short' });
+}
+
+// Who shares runs with certifiers: a Test Manager, and a tester their own
+// runs (1.11.477), the only ones the Dashboard lists for them.
+function sharesWithCertifiers() {
+  return user.role === 'test_manager' || user.role === 'company_user' || user.role === 'tester';
+}
+
+// Certifier-share line for one run. The wrapping div carries a stable
+// data-share-line attribute so toggleShare() can replace just this element
+// after a share/unshare — no full re-render, so expanded batches and scroll
+// position are preserved. Default private; only terminal-status runs are
+// shareable (mirrors backend 409); non-test_manager roles see the badge
+// read-only and get no control.
+function shareLineFor(r) {
+  const isShared   = !!r.shared_with_certifier_at;
+  const isTM       = sharesWithCertifiers();
+  const isTerminal = ['COMPLETED', 'FAILED', 'CANCELLED'].includes(r.status);
+  let inner = '';
+  if (isShared) {
+    inner = `<span title="Visible to OSDM certifiers${r.shared_with_certifier_by ? ' — shared by ' + esc(r.shared_with_certifier_by) : ''}" style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;border-radius:8px;padding:1px 7px;font-weight:700">✓ Shared with certifiers</span>`
+      + (isTM ? ` <a href="#" data-action="unshare-run" data-run-id="${r.id}" style="color:#c62828;margin-left:6px;text-decoration:none">Unshare</a>` : '');
+  } else if (isTM && isTerminal) {
+    inner = `<a href="#" data-action="share-run" data-run-id="${r.id}" style="color:#0090D4;text-decoration:none">↗ Share with certifiers</a>`;
+  }
+  return `<div data-share-line="${r.id}" style="margin-top:${inner ? '3px' : '0'};font-size:11px">${inner}${operatorShareFor(r)}</div>`;
+}
+
+// #901: the company that operates each provider, when it accepted the link
+// (provider id → its name). Test Managers only; loaded before the runs.
+let operatorOf = {};
+
+async function loadOperators() {
+  if (user.role !== 'test_manager') return;
+  const res = await fetch('/v1/company/providers', {});
+  if (!res.ok) return;
+  const next = {};
+  for (const p of (await res.json()).providers || []) {
+    if (p.operator && p.operator.status === 'accepted') next[p.id] = p.operator.company_name;
+  }
+  operatorOf = next;
+}
+
+// Share / unshare one run with the company that operates its provider.
+function operatorShareFor(r) {
+  const name = operatorOf[r.company_id];
+  if (!name || user.role !== 'test_manager') return '';
+  if (r.shared_with_operator_at) {
+    return `<div style="margin-top:3px"><span title="Its Test Managers read this run, without your testers' e-mails" style="background:#ede7f6;color:#4527a0;border:1px solid #d1c4e9;border-radius:8px;padding:1px 7px;font-weight:700">✓ Shared with ${esc(name)}</span>`
+      + ` <a href="#" data-action="unshare-operator" data-run-id="${r.id}" style="color:#c62828;margin-left:6px;text-decoration:none">Unshare</a></div>`;
+  }
+  if (!['COMPLETED', 'FAILED', 'CANCELLED'].includes(r.status)) return '';
+  return `<div style="margin-top:3px"><a href="#" data-action="share-operator" data-run-id="${r.id}" style="color:#4527a0;text-decoration:none">↗ Share with ${esc(name)}</a></div>`;
+}
+
+// The batch's share action: every finished run of it, or undo.
+function batchOperatorAction(batchRuns, batchId) {
+  const name = operatorOf[batchRuns[0].company_id];
+  if (!name || user.role !== 'test_manager') return '';
+  const allShared = batchRuns.every(r => r.shared_with_operator_at);
+  const action = allShared ? 'unshare-batch-operator' : 'share-batch-operator';
+  const label = allShared ? `Unshare with ${esc(name)}` : `↗ Share with ${esc(name)}`;
+  return `<div style="margin-top:2px"><a href="#" data-action="${action}" data-batch-id="${batchId}" style="color:#4527a0;font-size:11px;font-weight:400;text-decoration:none">${label}</a></div>`;
+}
+
+// #1041: the batch's certifier share: every finished run of it, or undo once
+// they all are. Test Managers only, as the per-run line.
+function batchCertifierAction(batchRuns, batchId) {
+  if (!sharesWithCertifiers()) return '';
+  const finished = batchRuns.filter(r => ['COMPLETED', 'FAILED', 'CANCELLED'].includes(r.status));
+  if (!finished.length) return '';
+  if (finished.every(r => r.shared_with_certifier_at)) {
+    return `<div style="margin-top:2px;font-size:11px;font-weight:400"><span style="background:#e8f5e9;color:#2e7d32;border:1px solid #c8e6c9;border-radius:8px;padding:1px 7px;font-weight:700">✓ Shared with certifiers</span>`
+      + ` <a href="#" data-action="unshare-batch-certifier" data-batch-id="${esc(batchId)}" style="color:#c62828;margin-left:6px;text-decoration:none">Unshare</a></div>`;
+  }
+  return `<div style="margin-top:2px"><a href="#" data-action="share-batch-certifier" data-batch-id="${esc(batchId)}" style="color:#0090D4;font-size:11px;font-weight:400;text-decoration:none">↗ Share batch with certifiers</a></div>`;
+}
+
+// The question asked before a batch is shared with certifiers, or unshared.
+function batchCertifierQuestion(share) {
+  return share
+    ? 'Share every finished run of this batch with certifiers?\n\nCertifiers will be able to view each run\'s structured results, HTTP traffic and downloadable artifacts.'
+    : 'Stop sharing every run of this batch with certifiers?';
+}
+
+// ── Render a single run row (used for both unbatched and batch-child rows) ───
+function renderRunRow(r, opts) {
+  const isBatchChild = opts && opts.batchChild;
+  const batchAttr = isBatchChild ? ` data-batch-id="${r.batch_id}"` : '';
+  const childStyle = isBatchChild ? ' style="display:none;padding-left:30px"' : '';
+  const childClass = isBatchChild ? ' batch-child' : '';
+  const label = isBatchChild
+    ? (r.scenario_code || r.env_name_used || r.id.slice(0,8))
+    : (r.env_name_used || r.id.slice(0,8));
+
+  // Submitter subtitle. Originally rendered only for test_manager /
+  // administrator on the assumption that "testers see only their own
+  // runs" — but the list endpoint (Oscar_Server/src/api/routes/runs.js
+  // tester branch) is company-scoped, not user-scoped, so testers do
+  // see teammates' runs. Without a visible submitter they have no way
+  // to tell whose run is whose, then click Delete and get a confusing
+  // "Not the run owner" toast. v1.11.11: show it to everyone, mark the
+  // current user's own runs with "(you)" so they can still scan quickly.
+  // The submitted_by field comes from the runs.user JOIN in the LIST
+  // endpoint (already present in the response payload).
+  const showSubmitter = !!r.submitted_by;
+  const isOwnRun = r.user_id && user.id && r.user_id === user.id;
+  const submitterSuffix = isOwnRun ? ' <span style="color:#0090D4">(you)</span>' : '';
+  const submitterLine = showSubmitter
+    ? `<div style="color:#78909c;font-size:11px;margin-top:2px">👤 ${esc(r.submitted_by)}${submitterSuffix}</div>`
+    : '';
+
+  // Per-row delete authorisation. Backend rule (runs.js bulk-delete):
+  //   administrator + test_manager → may delete any run in their company
+  //   anyone else → may delete only runs they personally started
+  // The list endpoint returns r.user_id only on the tester branch (not
+  // in the certifier branch), which is fine — non-elevated certifiers
+  // already have canDelete=false at the column level.
+  const isElevated = user.role === 'administrator' || user.role === 'test_manager';
+  const canDeleteThisRow = canDelete && (isElevated || isOwnRun);
+  let checkboxCell = '';
+  if (canDeleteThisRow) {
+    const checkedAttr = selected.has(r.id) ? 'checked' : '';
+    checkboxCell = `<input type="checkbox" value="${r.id}" data-action="select" ${checkedAttr}>`;
+  } else if (canDelete) {
+    checkboxCell = `<input type="checkbox" disabled title="Only ${esc(r.submitted_by || 'the run owner')} or a test_manager can delete this run">`;
+  }
+
+  // ── Certifier sharing (v1.11.15) — per-report, test_manager-only ──────────
+  // Built via shareLineFor() so a share/unshare can update just this row in
+  // place (toggleShare) without re-rendering — and collapsing — the whole list.
+  const shareLine = shareLineFor(r);
+
+  return `
+    <div class="run-row${childClass}"${batchAttr} data-run-id="${r.id}"${childStyle}>
+      <div class="cb-cell">${checkboxCell}</div>
+      <div>
+        <div style="font-weight:600;color:#1a3a6b;font-size:13px">${esc(label)}</div>
+        ${submitterLine}
+        ${shareLine}
+      </div>
+      <div><span class="status s-${r.status}">${r.status === 'RUNNING' ? '<span class="spin">⟳</span> ' : ''}${r.status}</span></div>
+      <div class="url" title="${esc(r.api_base_used || '')}">${esc(r.api_base_used || '-')}</div>
+      <div style="color:#546e7a;font-size:12px">${fmtDate(r.queued_at)}</div>
+      <div style="color:#546e7a;font-size:12px">${duration(r.started_at, r.completed_at)}</div>
+      <div style="font-size:12px;font-weight:600;color:#0090D4;text-align:center">${r.artifact_count > 0 ? r.artifact_count : '-'}</div>
+      <div class="cb-cell">
+        <input type="checkbox" value="${r.id}" class="cmp-cb" data-action="compare" ${compared.has(r.id)?'checked':''}>
+      </div>
+    </div>`;
+}
+
+// ── What a batch ran, as chosen on New Run (#1029) ───────────────────────────
+// The server words it (selectionLabel()); a batch launched without a
+// selection, or before 1.11.433, has none and shows nothing.
+function batchLabelHtml(label) {
+  if (typeof label !== 'string' || label.trim() === '') return '';
+  return `<div class="batch-label" style="color:#455a64;font-size:11px;font-weight:600;margin-top:2px">🎯 ${esc(label)}</div>`;
+}
+
+// ── Compute summary status for a batch of runs ──────────────────────────────
+function batchSummaryStatus(runs) {
+  const statuses = runs.map(r => r.status);
+  if (statuses.includes('FAILED'))     return 'FAILED';
+  if (statuses.includes('RUNNING'))    return 'RUNNING';
+  if (statuses.every(s => s === 'COMPLETED')) return 'COMPLETED';
+  if (statuses.every(s => s === 'QUEUED'))    return 'QUEUED';
+  // mixed (some completed, some queued, etc.)
+  if (statuses.includes('COMPLETED'))  return 'RUNNING';
+  return 'QUEUED';
+}
+
+// ── Render normal runs (excludes DELETED_BY_ADMIN) ───────────────────────────
+function renderRuns(runs) {
+  const normal = runs.filter(r => r.status !== 'DELETED_BY_ADMIN');
+  const el = document.getElementById('runs-list');
+  if (!normal.length) {
+    el.innerHTML = '<div class="empty">No runs yet. <a href="/run.html">Start your first run →</a></div>';
+    return;
+  }
+
+  // Separate batched vs unbatched runs
+  const batched = {};    // batch_id → [runs]
+  const unbatched = [];  // runs without batch_id
+
+  normal.forEach(r => {
+    if (r.batch_id) {
+      batched[r.batch_id] = batched[r.batch_id] || [];
+      batched[r.batch_id].push(r);
+    } else {
+      unbatched.push(r);
+    }
+  });
+
+  let html = '';
+
+  // Render batched groups first, newest batch first
+  const batchIds = Object.keys(batched).sort((a, b) => {
+    const aTime = new Date(batched[a][0].queued_at).getTime();
+    const bTime = new Date(batched[b][0].queued_at).getTime();
+    return bTime - aTime;
+  });
+
+  batchIds.forEach(batchId => {
+    const batchRuns = batched[batchId].sort(
+      (a, b) => new Date(a.queued_at) - new Date(b.queued_at)
+    );
+    const completed = batchRuns.filter(r => r.status === 'COMPLETED').length;
+    // Issue #18 — split the single "X/Y done" status into separate
+    // success / failure / in-progress counters. The old pill ("0/1 done")
+    // was misread by users as "nothing has finished" when in fact every
+    // scenario had failed.
+    const failed = batchRuns.filter(r => ['FAILED', 'CANCELLED', 'TIMEOUT'].includes(r.status)).length;
+    const running = batchRuns.filter(r => ['QUEUED', 'RUNNING'].includes(r.status)).length;
+
+    // Compute batch duration: earliest started_at to latest completed_at
+    const starts = batchRuns.filter(r => r.started_at).map(r => new Date(r.started_at));
+    const ends   = batchRuns.filter(r => r.completed_at).map(r => new Date(r.completed_at));
+    const batchDuration = starts.length && ends.length
+      ? duration(new Date(Math.min(...starts)).toISOString(), new Date(Math.max(...ends)).toISOString())
+      : '-';
+
+    // Batch header row.
+    // Issue #34: previously had no checkbox, forcing the user to expand
+    // every batch and tick each child individually before deleting. Now
+    // includes a "select all in batch" checkbox (when canDelete) that
+    // mirrors selection state of all child runs.
+    // v1.11.11: gate the checkbox by ownership. All runs in a batch
+    // share the same submitter (batchRuns[0].user_id), so we can decide
+    // once for the whole batch. Submitter line is now visible to all
+    // roles for symmetry with the per-row change above.
+    const batchChildIds   = batchRuns.map(r => r.id);
+    const batchOwnerId    = batchRuns[0].user_id;
+    const batchIsOwn      = batchOwnerId && user.id && batchOwnerId === user.id;
+    const batchIsElevated = user.role === 'administrator' || user.role === 'test_manager';
+    const batchCanDelete  = canDelete && (batchIsElevated || batchIsOwn);
+    const batchAllSelected  = batchCanDelete && batchChildIds.every(id => selected.has(id));
+    const batchSomeSelected = batchCanDelete && !batchAllSelected && batchChildIds.some(id => selected.has(id));
+    const batchSubmitterSuffix = batchIsOwn ? ' <span style="color:#0090D4">(you)</span>' : '';
+    const batchCheckedAttr = batchAllSelected ? 'checked' : '';
+    const batchIndeterminateAttr = batchSomeSelected ? 'data-indeterminate="1"' : '';
+    let batchCheckboxCell = '';
+    if (canDelete && batchCanDelete) {
+      batchCheckboxCell = `<input type="checkbox" data-action="select-batch" data-batch-id="${batchId}"
+              ${batchCheckedAttr}
+              ${batchIndeterminateAttr}
+              title="Select all ${batchRuns.length} scenarios in this batch">`;
+    } else if (canDelete) {
+      batchCheckboxCell = `<input type="checkbox" disabled title="Only ${esc(batchRuns[0].submitted_by || 'the batch owner')} or a test_manager can delete this batch">`;
+    }
+    html += `
+    <div class="run-row batch-header" data-batch-id="${batchId}" data-action="toggle-batch">
+      <div class="cb-cell" data-action="batch-cb-cell">${batchCheckboxCell}</div>
+      <div style="font-weight:700;color:#0090D4">
+        <span class="batch-arrow">&#9654;</span> Batch ${fmtDate(batchRuns[0].queued_at)} (${batchRuns.length} scenarios)${batchCertifierAction(batchRuns, batchId)}${batchOperatorAction(batchRuns, batchId)}
+        ${batchLabelHtml(batchRuns[0].batch_label)}
+        ${batchRuns[0].submitted_by
+          ? `<div style="color:#78909c;font-size:11px;font-weight:400;margin-top:2px">👤 ${esc(batchRuns[0].submitted_by)}${batchSubmitterSuffix}</div>`
+          : ''}
+      </div>
+      <div class="batch-counts" title="${completed} passed, ${failed} failed${running ? ', ' + running + ' still running' : ''}">
+        ${completed > 0 ? `<span class="count count-pass">&#10003; ${completed}</span>` : ''}
+        ${failed    > 0 ? `<span class="count count-fail">&#10007; ${failed}</span>`    : ''}
+        ${running   > 0 ? `<span class="count count-run">&#8987; ${running}</span>`     : ''}
+        ${(completed + failed + running) === 0 ? `<span class="count count-zero">&mdash;</span>` : ''}
+      </div>
+      <div class="url">${esc(batchRuns[0].api_base_used || '-')}</div>
+      <div style="color:#546e7a;font-size:12px">${fmtDate(batchRuns[0].queued_at)}</div>
+      <div style="color:#546e7a;font-size:12px">${batchDuration}</div>
+      <div><button class="btn" data-action="download-batch" data-batch-id="${batchId}" title="Download all ${batchRuns.length} reports in this batch as a ZIP" style="padding:4px 10px;font-size:11px;background:#eceff1;color:#455a64;font-weight:700">⬇ Reports</button></div>
+      <div></div>
+    </div>`;
+
+    // Child rows (hidden by default)
+    batchRuns.forEach(r => { html += renderRunRow(r, { batchChild: true }); });
+  });
+
+  // Render unbatched runs after batched groups
+  unbatched.forEach(r => { html += renderRunRow(r); });
+
+  el.innerHTML = html;
+
+  // HTML doesn't natively express checkbox `indeterminate` — we tag those
+  // batch checkboxes with data-indeterminate="1" during render, then set
+  // the actual JS property here once they're in the DOM.
+  el.querySelectorAll('input[data-indeterminate="1"]').forEach(cb => {
+    cb.indeterminate = true;
+  });
+}
+
+// ── Render admin-deleted runs (read-only section) ────────────────────────────
+function renderAdminDeletedRuns(runs) {
+  const flagged = runs.filter(r => r.status === 'DELETED_BY_ADMIN');
+  const section = document.getElementById('admin-deleted-section');
+  if (!flagged.length) { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  // Override grid to 5 columns matching the section header (no checkbox / compare cols)
+  const GRID = 'grid-template-columns:3fr 1.2fr 2fr 1.2fr 1fr';
+  document.getElementById('admin-deleted-list').innerHTML = flagged.map(r => `
+    <div class="run-row deleted-by-admin" style="${GRID}" data-run-id="${r.id}">
+      <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+        <span style="font-weight:600;color:#1a3a6b;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${esc(r.env_name_used || r.id.slice(0,8))}
+        </span>
+        <span class="badge-admin-del" style="align-self:flex-start">Flagged by Admin</span>
+      </div>
+      <div><span class="status s-DELETED_BY_ADMIN">FLAGGED</span></div>
+      <div class="url" title="${esc(r.api_base_used || '')}">${esc(r.api_base_used || '-')}</div>
+      <div style="color:#546e7a;font-size:12px">${fmtDate(r.queued_at)}</div>
+      <div style="color:#e65100;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.deleted_by || 'Admin')}</div>
+    </div>`).join('');
+}
+
+// ── Selection logic ───────────────────────────────────────────────────────────
+function toggleSelect(cb) {
+  if (cb.checked) selected.add(cb.value);
+  else            selected.delete(cb.value);
+  syncBatchCheckboxes();
+  updateBars();
+}
+
+// Toggle every run in a batch in one go (issue #34 follow-up). Updates the
+// `selected` Set, mirrors the change onto each child checkbox in the DOM,
+// and refreshes the action bars.
+function toggleBatchSelect(batchCb) {
+  const batchId = batchCb.dataset.batchId;
+  const childIds = allRuns.filter(r => r.batch_id === batchId).map(r => r.id);
+  if (batchCb.checked) {
+    childIds.forEach(id => selected.add(id));
+  } else {
+    childIds.forEach(id => selected.delete(id));
+  }
+  // Reflect on visible child checkboxes (rendered hidden but still in DOM)
+  document.querySelectorAll(
+    `.batch-child[data-batch-id="${batchId}"] input[data-action="select"]`
+  ).forEach(cb => { cb.checked = batchCb.checked; });
+  batchCb.indeterminate = false;
+  updateBars();
+}
+
+// Recompute every batch-header checkbox's checked / indeterminate state to
+// match the current `selected` Set. Called after individual child toggles
+// or after the initial render.
+function syncBatchCheckboxes() {
+  document.querySelectorAll('input[data-action="select-batch"]').forEach(batchCb => {
+    const batchId = batchCb.dataset.batchId;
+    const childIds = allRuns.filter(r => r.batch_id === batchId).map(r => r.id);
+    if (childIds.length === 0) return;
+    const selCount = childIds.filter(id => selected.has(id)).length;
+    if (selCount === 0)                       { batchCb.checked = false; batchCb.indeterminate = false; }
+    else if (selCount === childIds.length)    { batchCb.checked = true;  batchCb.indeterminate = false; }
+    else                                      { batchCb.checked = false; batchCb.indeterminate = true; }
+  });
+}
+
+function toggleCompare(cb) {
+  if (cb.checked) compared.add(cb.value);
+  else            compared.delete(cb.value);
+  updateBars();
+}
+
+function updateBars() {
+  // Compare bar — uses compared set
+  const cCount = compared.size;
+  const cBar = document.getElementById('compare-bar');
+  const cBtn = document.getElementById('compare-btn');
+  const cLbl = document.getElementById('compare-label');
+  cBar.style.display = cCount > 0 ? 'flex' : 'none';
+  cBtn.disabled = cCount !== 2;
+  cLbl.textContent = cCount === 2
+    ? '2 runs selected — ready to compare'
+    : `${cCount} run(s) selected — select exactly 2 to compare`;
+
+  // Delete bar — uses selected set
+  if (canDelete) {
+    const dCount = selected.size;
+    const dBar = document.getElementById('delete-bar');
+    const dBtn = document.getElementById('delete-btn');
+    const dLbl = document.getElementById('delete-label');
+    dBar.style.display = dCount > 0 ? 'flex' : 'none';
+    dBtn.disabled = dCount === 0;
+    dLbl.textContent = dCount === 1 ? '1 run selected' : `${dCount} runs selected`;
+  }
+}
+
+function goCompare() {
+  const [a, b] = [...compared];
+  window.location.href = `/compare.html?a=${a}&b=${b}`;
+}
+
+// ── Delete confirmation modal — role-aware ───────────────────────────────────
+// Three different consequences depending on actor:
+//   tester       → soft delete (DELETION_REQUESTED), test_manager can restore
+//   test_manager → permanent delete (DELETED), CANNOT be undone — since v1.11.3
+//                  (issue #60 follow-up: admin no longer reads test data,
+//                  so the soft-delete-awaits-admin-review flow doesn't apply)
+//   administrator→ flag (DELETED_BY_ADMIN), still visible to tester
+// The modal text + button label adapt accordingly so users understand what
+// they're committing to.
+const DELETE_MODAL_TEXT = {
+  test_manager: {
+    title:   '🗑 Permanently Delete Runs',
+    note:    '⚠️ <strong>This is a permanent delete.</strong> The selected runs and all their reports, logs, and artifacts will be removed from OSCAR. <strong>This cannot be undone.</strong>',
+    tail:    'Confirm only if you are certain. Consider exporting a comparison report first if you may need this data again.',
+    button:  'Confirm — Permanently Delete',
+  },
+  administrator: {
+    title:   '🗑 Flag Runs for Deletion',
+    note:    'ℹ️ As administrator, this <strong>flags</strong> the runs (DELETED_BY_ADMIN). Testers still see them marked. Final purge is a separate action.',
+    tail:    'The flagged runs are visible to their owner with a warning badge.',
+    button:  'Confirm — Flag for Deletion',
+  },
+  tester: {
+    title:   '🗑 Request Run Deletion',
+    note:    'ℹ️ <strong>This is a soft delete.</strong> The selected runs are removed from your dashboard and queued for your Test Manager to review. They can restore them if you change your mind.',
+    tail:    'The runs will no longer appear in your dashboard once submitted.',
+    button:  'Confirm — Request Deletion',
+  },
+};
+
+// Which wording the delete dialog uses. Every role other than Test Manager
+// and administrator gets the tester wording.
+function deleteModalVariant(role) {
+  if (role === 'test_manager' || role === 'administrator') return role;
+  return 'tester';
+}
+
+function openDeleteModal() {
+  if (selected.size === 0) return;
+  // company_user is the legacy role name for "tester" in the JWT payload.
+  const variant = deleteModalVariant(user.role);
+  const t = DELETE_MODAL_TEXT[variant];
+  document.getElementById('modal-title').textContent     = t.title;
+  document.getElementById('modal-note').innerHTML        = t.note;
+  document.getElementById('modal-tail').textContent      = t.tail;
+  document.getElementById('modal-confirm-btn').textContent = t.button;
+  document.getElementById('modal-count').textContent = selected.size;
+  document.getElementById('delete-modal').style.display = 'flex';
+}
+function closeDeleteModal() {
+  document.getElementById('delete-modal').style.display = 'none';
+}
+function closeModalOnOverlay(e) {
+  if (e.target === document.getElementById('delete-modal')) closeDeleteModal();
+}
+
+async function confirmDelete() {
+  closeDeleteModal();
+  const ids = [...selected];
+  const res = await fetch('/v1/runs/bulk-delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ run_ids: ids })
+  });
+  if (res.status === 401) { logout(); return; }
+  const data = await res.json();
+
+  if (data.deleted && data.deleted.length) {
+    data.deleted.forEach(id => selected.delete(id));
+    olderRuns = olderRuns.filter(r => !data.deleted.includes(r.id));
+    loadRuns().catch(oscarReportError);
+  }
+  if (data.skipped && data.skipped.length) {
+    oscarToast(`${data.skipped.length} run(s) could not be flagged:\n` +
+      data.skipped.map(s => `- ${s.id.slice(0,8)}: ${s.reason}`).join('\n'), 'warning');
+  }
+}
+
+// ── Load runs ─────────────────────────────────────────────────────────────────
+// The first page, then the older pages already read: each run once (the
+// first page's copy, which is the fresher), newest first.
+function mergeRunPages(first, older) {
+  const seen = new Set();
+  const out = [];
+  for (const r of [...first, ...older]) {
+    if (!r || seen.has(r.id)) continue;
+    seen.add(r.id);
+    out.push(r);
+  }
+  return out.sort((a, b) => String(b.queued_at).localeCompare(String(a.queued_at)) || String(b.id).localeCompare(String(a.id)));
+}
+
+// The address of the page after `cursor` (the answer's next_before).
+function olderRunsUrl(cursor) {
+  return '/v1/runs?limit=100&whole_batches=1'
+    + '&before_at=' + encodeURIComponent(cursor.at)
+    + '&before_id=' + encodeURIComponent(cursor.id);
+}
+
+function showOlderButton() {
+  document.getElementById('older-runs').style.display = olderCursor ? '' : 'none';
+}
+
+// A large batch can fill several pages: read on until one brings a run not
+// shown yet, or there is none left (10 pages at most per click).
+async function loadOlderRuns() {
+  const btn = document.getElementById('older-runs-btn');
+  btn.disabled = true;
+  try {
+    for (let i = 0; i < 10 && olderCursor; i++) {
+      const res = await fetch(olderRunsUrl(olderCursor), {});
+      if (res.status === 401) { logout(); return; }
+      if (!res.ok) { oscarToast('Older batches could not be read (' + res.status + ').', 'error'); return; }
+      const data = await res.json();
+      const known = new Set(allRuns.map(r => r.id));
+      const fresh = (data.runs || []).filter(r => !known.has(r.id));
+      olderRuns = olderRuns.concat(fresh);
+      olderCursor = data.next_before || null;
+      if (fresh.length) break;
+    }
+    allRuns = mergeRunPages(allRuns, olderRuns);
+    renderRuns(allRuns);
+    renderAdminDeletedRuns(allRuns);
+    updateBars();
+  } finally {
+    btn.disabled = false;
+    showOlderButton();
+  }
+}
+
+async function loadRuns() {
+  const res = await fetch('/v1/runs?limit=100&whole_batches=1', {});
+  if (res.status === 401) { logout(); return; }
+  const data = await res.json();
+  // Before any older page is read, the next one starts after this page.
+  if (!olderRuns.length) olderCursor = data.next_before || null;
+  allRuns = mergeRunPages(data.runs || [], olderRuns);
+  showOlderButton();
+  renderRuns(allRuns);
+  renderAdminDeletedRuns(allRuns);
+  updateBars();
+
+  const hasActive = allRuns.some(r => r.status === 'QUEUED' || r.status === 'RUNNING');
+  if (hasActive) setTimeout(loadRuns, 3000);
+}
+
+// ── Event delegation (replaces inline onclick/onchange handlers) ─────────────
+document.getElementById('compare-btn').addEventListener('click', goCompare);
+document.getElementById('older-runs-btn').addEventListener('click', () => { loadOlderRuns().catch(e => oscarToast(e.message, 'error')); });
+document.getElementById('delete-btn').addEventListener('click', openDeleteModal);
+document.getElementById('modal-cancel-btn').addEventListener('click', closeDeleteModal);
+document.getElementById('modal-confirm-btn').addEventListener('click', confirmDelete);
+document.getElementById('delete-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeDeleteModal();
+});
+
+// #1041: a whole batch with certifiers (asked first); #901: share with the
+// company that operates the provider, run or batch. True when it was one.
+function handleBatchShareClick(e) {
+  const certEl = e.target.closest('[data-action$="-batch-certifier"]');
+  const opEl = certEl ? null : e.target.closest('[data-action$="-operator"]');
+  const el = certEl || opEl;
+  if (!el) return false;
+  e.preventDefault();
+  e.stopPropagation();
+  const share = el.dataset.action.startsWith('share');
+  if (certEl) {
+    if (confirm(batchCertifierQuestion(share))) {
+      toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(certEl.dataset.batchId)}/share`, share).catch(oscarReportError);
+    }
+  } else if (opEl.dataset.batchId) {
+    toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(opEl.dataset.batchId)}/share-with-operator`, share).catch(oscarReportError);
+  } else {
+    toggleOperatorShare(`/v1/runs/${encodeURIComponent(opEl.dataset.runId)}/share-with-operator`, share).catch(oscarReportError);
+  }
+  return true;
+}
+
+// Delegated handlers for dynamically rendered run rows
+document.getElementById('runs-list').addEventListener('click', function(e) {
+  if (e.target.type === 'checkbox') return; // let change handler deal with it
+
+  // Certifier share / unshare (v1.11.15) — test_manager only. Must run BEFORE
+  // the row-navigation fallthrough so it doesn't open run-detail.
+  const shareEl = e.target.closest('[data-action="share-run"],[data-action="unshare-run"]');
+  if (shareEl) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleShare(shareEl.dataset.runId, shareEl.dataset.action === 'share-run').catch(oscarReportError);
+    return;
+  }
+
+  // #1041 / #901: batch with certifiers, run or batch with the operator.
+  if (handleBatchShareClick(e)) return;
+
+  // Bulk download — all reports in a batch as a ZIP (#405). Must run BEFORE the
+  // batch-header toggle below, since the button lives inside the toggle row.
+  const dlEl = e.target.closest('[data-action="download-batch"]');
+  if (dlEl) {
+    e.preventDefault();
+    e.stopPropagation();
+    downloadBatch(dlEl.dataset.batchId, dlEl).catch(oscarReportError);
+    return;
+  }
+
+  // Batch header toggle
+  const el = e.target.closest('[data-action="toggle-batch"]');
+  if (el) {
+    const batchId = el.dataset.batchId;
+    const children = document.querySelectorAll(`.batch-child[data-batch-id="${batchId}"]`);
+    const arrow = el.querySelector('.batch-arrow');
+    const isOpen = children[0] && children[0].style.display !== 'none';
+    children.forEach(c => c.style.display = isOpen ? 'none' : '');
+    if (arrow) arrow.classList.toggle('open', !isOpen);
+    return; // don't navigate
+  }
+
+  const row = e.target.closest('.run-row');
+  if (row && row.dataset.runId) window.location.href = `/run-detail.html?id=${row.dataset.runId}`;
+});
+
+// Bulk download (#405): fetch the batch's reports.zip (authenticated) and save
+// it under the server-provided {sandbox}_{date}_batch.zip filename.
+async function downloadBatch(batchId, btn) {
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.textContent = '⏳ Zipping…'; btn.style.pointerEvents = 'none'; }
+  try {
+    const res = await fetch(`/v1/runs/batch/${encodeURIComponent(batchId)}/reports.zip`, {});
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      oscarToast(`Download failed (${res.status}): ${err.detail || err.title || 'Unknown error'}`, 'error');
+      return;
+    }
+    const cd = res.headers.get('content-disposition') || '';
+    const m  = /filename="?([^"]+)"?/.exec(cd);
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = m ? m[1] : `batch-${String(batchId).slice(0, 8)}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  } catch (e) {
+    oscarToast('Network error during download: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.textContent = orig; btn.style.pointerEvents = ''; }
+  }
+}
+
+// Share / unshare a single run with certifiers (test_manager only).
+// Wired to POST/DELETE /v1/runs/:id/share. Reloads the list on success so
+// the badge + toggle reflect the new state.
+async function toggleShare(runId, share) {
+  try {
+    const res = await fetch(`/v1/runs/${encodeURIComponent(runId)}/share`, {
+      method: share ? 'POST' : 'DELETE'
+    });
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      oscarToast(`${share ? 'Share' : 'Unshare'} failed (${res.status}): ${err.detail || err.title || 'Unknown error'}`, 'error');
+      return;
+    }
+    const data    = await res.json().catch(() => ({}));
+    const updated = data.run || {};
+    // Update the in-memory model and swap ONLY this row's share line. We
+    // deliberately avoid loadRuns() here: a full re-render collapses any
+    // expanded batches and jumps the scroll position — the "dashboard
+    // collapses on share" UX bug. Event delegation on #runs-list keeps the
+    // new <a> working after the swap.
+    const r = allRuns.find(x => x.id === runId);
+    if (r) {
+      r.shared_with_certifier_at = updated.shared_with_certifier_at || null;
+      r.shared_with_certifier_by = updated.shared_with_certifier_by || null;
+      const el = document.querySelector(`[data-share-line="${runId}"]`);
+      if (el) el.outerHTML = shareLineFor(r);
+      else await loadRuns();   // fallback: row not currently in the DOM
+    } else {
+      await loadRuns();        // fallback: model out of sync
+    }
+  } catch (e) {
+    oscarToast('Network error while updating sharing: ' + e.message, 'error');
+  }
+}
+// #901: share or unshare with the operating company, then redraw the list
+// (a batch changes several rows and its header). A batch shared with
+// certifiers (#1041) goes the same way: its answer has the same shape.
+async function toggleOperatorShare(url, share) {
+  try {
+    const res = await fetch(url, { method: share ? 'POST' : 'DELETE' });
+    if (res.status === 401) { logout(); return; }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      oscarToast(`${share ? 'Share' : 'Unshare'} failed (${res.status}): ${data.detail || data.title || 'Unknown error'}`, 'error');
+      return;
+    }
+    const skipped = (data.runs || []).filter(r => share && !r.shared);
+    if (skipped.length) oscarToast(`${skipped.length} run(s) not shared: ${skipped[0].reason}`, 'warning');
+    await loadRuns();
+  } catch (e) {
+    oscarToast('Network error while updating sharing: ' + e.message, 'error');
+  }
+}
+
+// #901: the runs other companies share with this one (Test Managers).
+function sharedRunRowHtml(r) {
+  const who = r.shared ? `${esc(r.shared.distributor)} · provider ${esc(r.shared.provider)}` : '';
+  return `
+    <div class="run-row" style="grid-template-columns:3fr 1.2fr 2fr 1.2fr 1fr" data-run-id="${esc(r.id)}">
+      <div style="font-weight:600;color:#1a3a6b;font-size:13px">${esc(r.scenario_code || r.env_name_used || String(r.id).slice(0, 8))}</div>
+      <div><span class="status s-${esc(r.status)}">${esc(r.status)}</span></div>
+      <div style="color:#4527a0;font-size:12px">${who}</div>
+      <div style="color:#546e7a;font-size:12px">${fmtDate(r.queued_at)}</div>
+      <div style="color:#546e7a;font-size:12px">${duration(r.started_at, r.completed_at)}</div>
+    </div>`;
+}
+
+async function loadSharedRuns() {
+  if (user.role !== 'test_manager') return;
+  const res = await fetch('/v1/company/shared-runs?limit=200', { headers: { 'X-Provider-Id': '' } });
+  if (!res.ok) return;
+  const runs = (await res.json()).runs || [];
+  document.getElementById('shared-runs-section').style.display = runs.length ? 'block' : 'none';
+  document.getElementById('shared-runs-list').innerHTML = runs.map(sharedRunRowHtml).join('');
+}
+
+document.getElementById('shared-runs-list').addEventListener('click', function(e) {
+  const row = e.target.closest('.run-row');
+  if (row && row.dataset.runId) window.location.href = `/run-detail.html?id=${encodeURIComponent(row.dataset.runId)}`;
+});
+
+document.getElementById('runs-list').addEventListener('change', function(e) {
+  if (e.target.dataset.action === 'select')        toggleSelect(e.target);
+  if (e.target.dataset.action === 'select-batch')  toggleBatchSelect(e.target);
+  if (e.target.dataset.action === 'compare')       toggleCompare(e.target);
+});
+document.getElementById('admin-deleted-list').addEventListener('click', function(e) {
+  const row = e.target.closest('.run-row');
+  if (row && row.dataset.runId) window.location.href = `/run-detail.html?id=${row.dataset.runId}`;
+});
+
+// The operators first: the share actions are drawn with the runs.
+loadOperators().catch(() => {}).then(loadRuns).catch(oscarReportError);
+loadSharedRuns().catch(() => {});
+
+// ── Live queue status ────────────────────────────────────────────────────────
+// A tester is told the place of a colleague's run in the queue, not what it
+// runs nor who runs it (1.11.477): no e-mail comes with such a run.
+function queueScenarioText(r) {
+  if (r.scenario_code) return r.scenario_code;
+  return (r.user_email || r.is_current_user) ? 'All scenarios' : 'Another tester\'s run';
+}
+
+async function pollQueueInfo() {
+  try {
+    const res = await fetch('/v1/runs/queue-status', {});
+    if (!res.ok) return;
+    const data = await res.json();
+    const panel = document.getElementById('queue-info');
+    const stopBtn = document.getElementById('emergency-stop-btn');
+    if (data.runs.length === 0) {
+      panel.style.display = 'none';
+      if (stopBtn) stopBtn.style.display = 'none';
+      return;
+    }
+    panel.style.display = 'block';
+    // Certifiers can't run or stop runs; everyone else gets the kill switch.
+    if (stopBtn) stopBtn.style.display = (user.role !== 'certification_user') ? 'inline-block' : 'none';
+    document.getElementById('qi-slots').textContent =
+      `${data.slots_used}/${data.concurrent_limit} slots used — ${data.slots_available} available`;
+    const rows = data.runs.map(r => {
+      const you = r.is_current_user ? ' <strong style="color:#0090D4">(you)</strong>' : '';
+      const status = r.status === 'RUNNING'
+        ? '<span style="color:#e65100;font-weight:700">RUNNING</span>'
+        : `<span style="color:#1565c0">QUEUED #${r.position}</span>`;
+      return `<div style="display:flex;gap:12px;padding:3px 0;border-bottom:1px solid #f5f5f5">
+        <span style="min-width:60px">${status}</span>
+        <span style="min-width:200px;font-weight:600;color:#1a2e40">${esc(queueScenarioText(r))}</span>
+        <span style="color:#78909c">${esc(r.user_email || '—')}${you}</span>
+      </div>`;
+    }).join('');
+    document.getElementById('qi-runs').innerHTML = rows;
+  } catch { /* optional panel: a failure here is not shown to the user */ }
+}
+setInterval(pollQueueInfo, 3000);
+pollQueueInfo().catch(oscarReportError);
+
+// ── Emergency stop ────────────────────────────────────────────────────────────
+// Force-cancel active runs. Tester → own runs; test_manager/admin → whole
+// company. Running Bruno processes are killed server-side (SIGTERM→SIGKILL),
+// queued runs are purged before they start. Irreversible.
+async function emergencyStopAll() {
+  // Dashboard scope is always own-runs-only (testers + test_managers). Only the
+  // platform administrator can stop other users' runs, and that lives in the
+  // admin console, not here.
+  if (!confirm('🛑 Emergency stop\n\nThis will forcibly cancel YOUR running and queued scenarios.\nRunning scenarios are killed immediately. This cannot be undone.\n\nContinue?')) return;
+
+  const btn = document.getElementById('emergency-stop-btn');
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Stopping…';
+  try {
+    const res = await fetch('/v1/runs/stop-all', { method: 'POST' });
+    if (res.status === 401) { logout(); return; }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      oscarToast(`Emergency stop failed (${res.status}): ${data.detail || data.title || 'Unknown error'}`, 'error');
+      return;
+    }
+    oscarToast(`Emergency stop complete — ${data.running_cancelled || 0} running killed, ${data.queued_cancelled || 0} queued cancelled.`, 'success');
+    pollQueueInfo().catch(oscarReportError);
+    loadRuns().catch(oscarReportError);
+  } catch (e) {
+    oscarToast('Network error during emergency stop: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+}
+document.getElementById('emergency-stop-btn').addEventListener('click', emergencyStopAll);

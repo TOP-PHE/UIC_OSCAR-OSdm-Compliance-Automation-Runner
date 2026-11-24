@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 /**
  * profile-endpoint.test.js — the API Config page (#544, #580).
@@ -27,11 +28,10 @@
  * scenarios-load-guard.test.js does for scenarios.js.
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const SOURCE = fs.readFileSync(path.resolve(__dirname, '..', '..', 'public', 'profile.html'), 'utf8')
+const SOURCE = pageSource(path.resolve(__dirname, '..', '..', 'public', 'profile.html'), 'utf8')
   .replaceAll('\r\n', '\n').split('\n');
 
 function sourceOf(name) {

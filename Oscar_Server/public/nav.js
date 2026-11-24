@@ -471,6 +471,15 @@
   };
 })(window);
 
+// ── A promise nothing awaits (#1423) ──────────────────────────────────────────
+// A page's background load or click handler ends its promise with
+// .catch(oscarReportError): the error is logged, as an unhandled one was, and
+// the page goes on. No toast: most of these are loads that run again by
+// themselves.
+function oscarReportError(err) {
+  console.error('[OSCAR]', err);
+}
+
 // ── #363: in-page toasts ──────────────────────────────────────────────────────
 // Native alert() renders in the browser chrome at the very top of the window
 // and testers miss it. oscarToast() renders INSIDE the OSCAR UI — top-centre,
@@ -530,4 +539,19 @@ function oscarToastAfterNav(message, kind) {
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showPending);
   else showPending();
+})();
+
+// ── The page's own menu entry (#1423) ─────────────────────────────────────────
+// A page names its entry on the menu's element (data-page) instead of calling
+// renderOscarNav() from a script of its own: the content security policy
+// refuses inline scripts. Drawn here, at the end of nav.js, which is where the
+// page's call stood. The administration page's entry is its tab:
+// data-page-tab gives the tab when the address names none.
+(function () {
+  var host = document.getElementById('oscar-nav');
+  if (!host || !host.dataset.page) return;
+  var tab = host.dataset.pageTab
+    ? (new URLSearchParams(location.search).get('tab') || host.dataset.pageTab)
+    : '';
+  window.renderOscarNav('oscar-nav', host.dataset.page + tab);
 })();

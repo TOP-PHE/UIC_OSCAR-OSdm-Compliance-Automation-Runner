@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 // #1147: OSCAR's monitoring on Kubernetes (OSCAR_Deploy/kubernetes/monitoring)
 // held to what OSCAR, the VPS's monitoring and the run dispatcher give it. The
@@ -21,7 +22,7 @@ const REPO = path.resolve(__dirname, '../../..');
 const DEPLOY = path.join(REPO, 'OSCAR_Deploy');
 const MON = path.join(DEPLOY, 'kubernetes/monitoring');
 
-const read = (rel) => fs.readFileSync(path.join(REPO, rel), 'utf8');
+const read = (rel) => pageSource(path.join(REPO, rel), 'utf8');
 const docs = (rel) => yaml.loadAll(read(rel)).filter(Boolean);
 const one = (rel, kind, name) => docs(rel).find(d => d.kind === kind && (!name || d.metadata.name === name));
 

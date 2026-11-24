@@ -49,7 +49,7 @@ function openNav({ role = 'company_user', provider = { id: 'p1', name: 'Carrier 
   };
   const win = { fetch, localStorage: local, sessionStorage: session, location, esc: s => String(s) };
   win.window = win;
-  const context = vm.createContext({ ...win, URL, Headers, Response, console, setTimeout, document: {} });
+  const context = vm.createContext({ ...win, URL, Headers, Response, console, setTimeout, document: { getElementById: () => null } });
   context.window = context;
   vm.runInContext(NAV, context, { filename: 'nav.js' });
   return { context, calls, session, reloads: () => reloaded };

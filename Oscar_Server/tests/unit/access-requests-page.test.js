@@ -6,17 +6,17 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 /**
  * Manage Users shows the administrator a request whose e-mail is not
  * confirmed yet, greyed, with when its link runs out, and offers only Refuse.
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-const PAGE = fs.readFileSync(path.join(__dirname, '../../public/admin.html'), 'utf8');
+const PAGE = pageSource(path.join(__dirname, '../../public/admin.html'), 'utf8');
 
 function loadFunction(name, context) {
   const lines = PAGE.split('\n');

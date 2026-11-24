@@ -35,6 +35,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { pageSource } = require('../helpers/page-source');
 
 const PUBLIC_DIR = path.resolve(__dirname, '..', '..', 'public');
 
@@ -134,7 +135,9 @@ describe('dashboard pages — inline <script> integrity (#291)', () => {
   test('run-detail.html outer inline script reaches its tail marker (regression guard for #287)', () => {
     const f = HTML_FILES.find(p => p.toLowerCase().endsWith('run-detail.html'));
     expect(f).toBeDefined();
-    const html = fs.readFileSync(f, 'utf8');
+    // Since #1423 the script is public/js/run-detail.js: read with it put back
+    // where its tag stands, as it was inline when this guard was written.
+    const html = pageSource(f);
     const inlineOnly = inlineScriptBlocks(html).filter(b => !b.isExternal);
     expect(inlineOnly.length).toBeGreaterThan(0);
     // The outer inline block is the longest one by parser-visible content.
@@ -143,7 +146,7 @@ describe('dashboard pages — inline <script> integrity (#291)', () => {
     // off the run-status polling loop. If a stray `</script>` truncates the
     // outer script (as in #287), this tail is NOT in the parser-visible
     // content.
-    expect(outer.content).toContain('poll();');
+    expect(outer.content).toContain('poll().catch(oscarReportError);');   // #1423: its promise is caught
     // Belt-and-braces: also assert one of the deeply-defined functions is
     // in scope, proving the entire script body was parsed as a single
     // element.

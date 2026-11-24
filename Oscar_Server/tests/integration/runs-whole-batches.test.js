@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 // #986: GET /v1/runs?whole_batches=1 adds the other runs of each batch on the
 // page, under the page's own visibility rule. The dashboard groups by batch,
@@ -14,7 +15,6 @@
 process.env.JWT_SECRET = 'test-jwt-secret-for-whole-batches';
 
 const jwt     = require('jsonwebtoken');
-const fs      = require('fs');
 const path    = require('path');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');
@@ -137,7 +137,7 @@ describe('GET /v1/runs?whole_batches=1 (#986)', () => {
   });
 
   test('the dashboard asks for whole batches', () => {
-    const page = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'dashboard.html'), 'utf8');
+    const page = pageSource(path.join(__dirname, '..', '..', 'public', 'dashboard.html'), 'utf8');
     expect(page).toContain("fetch('/v1/runs?limit=100&whole_batches=1'");
   });
 });

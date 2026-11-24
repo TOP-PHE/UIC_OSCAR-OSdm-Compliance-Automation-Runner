@@ -4650,6 +4650,19 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     argument that reaches a file path as a vulnerability, and one
     vulnerability fails the gate like one bug does: `make-clients.js` now
     writes to one of two fixed places.
+- **A page carries no script of its own** (#1423, PR 1 = 1.11.582). The
+  code of a page is `public/js/<page>.js`, loaded by a `<script src>` where
+  its inline block stood (same moment, same globals); the menu is
+  `<div … id="oscar-nav" data-page="<page>">`, drawn by the last part of
+  `nav.js` (the admin page: `data-page="admin-" data-page-tab="users"`).
+  `page-scripts.test.js` refuses an inline script, an inline event handler
+  or a `javascript:` address in any page: **a new page script is a file**.
+  Tests that lift a page's functions read it through `pageSource()`
+  (`tests/helpers/page-source.js`), which puts the page's own file back in
+  place; a moved file's header says "moved out of the page unchanged
+  (#1423)", which is how the helper knows it. A moved file declares the
+  names it takes from `nav.js` / `esc.js` / `run-exit.js` in a
+  `/* global */` line. PR 2 removes `'unsafe-inline'` from `script-src`.
 - **Every image a page shows is served by OSCAR** (#805, 1.11.319). The
   banner's UIC and OSDM logos were loaded from uic.org and broke on every page
   when uic.org stopped serving them. They are `public/uic-logo.png` and

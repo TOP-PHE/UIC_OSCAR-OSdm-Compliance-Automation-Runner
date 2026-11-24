@@ -1,0 +1,2656 @@
+/* global logout, oscarReportError, parseServerTs */  // nav.js, loaded before it by the page
+// Copyright [2026] [International Union of Railways (UIC)]
+//
+//    Licensed under the Apache License, Version 2.0 (the "License");
+//    you may not use this file except in compliance with the License.
+//    You may obtain a copy of the License at
+//        http://www.apache.org/licenses/LICENSE-2.0
+//
+// The script of report-builder.html, moved out of the page (#1423) so that the
+// content security policy can refuse inline scripts. The page loads it
+// where its inline script stood, so it runs at the same moment as before.
+
+/* ── Auth check ────────────────────────────────────────────────────────────── */
+const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
+const user    = JSON.parse(localStorage.getItem('oscar_user') || '{}');
+// auth guard — redirect to login if no session hint
+if (!user || !user.email) window.location.href = '/';
+// logout() provided by nav.js
+
+/* ── Constants ─────────────────────────────────────────────────────────────── */
+const CATEGORIES = [
+  'environment_check','http_status','content_type','response_structure',
+  'field_validation','business_logic','data_consistency','prerequisite',
+  'script_error','parameter_probe','scenario_config'
+];
+const DOMAINS = [
+  'infrastructure','system','offer','booking',
+  'fulfillment','passenger','refund','exchange'
+];
+const SEVERITIES = ['critical','major','minor','info'];
+const STATUS_OPTIONS = [
+  { value: 'all',    label: 'All' },
+  { value: 'failed', label: 'Failed only' },
+  { value: 'passed', label: 'Passed only' }
+];
+
+/* ── State ─────────────────────────────────────────────────────────────────── */
+const FINISHED_STATUSES = new Set(['COMPLETED', 'FAILED', 'CANCELLED', 'DELETED_BY_ADMIN']);
+const userRole = (user && user.role) || 'company_user';
+const isPlatformUser = userRole === 'administrator' || userRole === 'certification_user';
+const isCertifier = userRole === 'certification_user';
+const canPickAnyUser = isPlatformUser || userRole === 'test_manager';
+
+let allRuns = [];
+let selectedRunId = null;
+let reportData = null;
+let runFilters = { companyId: '', userId: '', date: '' };
+
+/* ── Utilities ─────────────────────────────────────────────────────────────── */
+// S11: the one shared escaper (js/esc.js, loaded in <head> before this script).
+const escHtml = window.esc;
+function fmtDate(d) {
+  if (!d) return '-';
+  // v1.11.7 — parseServerTs (nav.js) handles SQLite's TZ-less UTC strings.
+  return parseServerTs(d).toLocaleString(undefined, { dateStyle:'short', timeStyle:'medium' });
+}
+function runScenarioLabel(r) {
+  // What identifies this run for a human? Prefer the actual scenario(s) executed:
+  //   - single-scenario run → r.scenario_code (e.g. OTST_SALE_PATCH_SRCH_CRIT_1ADT_1LEG)
+  //   - multi-scenario run  → distinct scenario_names from run_suites (joined backend-side)
+  //   - legacy run with no structured data → fall back to env_name_used or short id
+  if (r.scenario_code) return r.scenario_code;
+  if (r.scenario_names) return r.scenario_names.replaceAll(',', ', ');
+  return r.env_name_used || r.id.slice(0, 8);
+}
+function pct(n, d) {
+  return d > 0 ? Math.round(n / d * 1000) / 10 : 0;
+}
+function scenarioLabel(r) {
+  // Prefer accurate scenario_count (= row count in run_suites). Fall back to
+  // artifact_count for legacy runs predating structured-results extraction.
+  var n = (typeof r.scenario_count === 'number') ? r.scenario_count : 0;
+  if (n === 0 && r.artifact_count) {
+    return r.artifact_count + ' artifacts';
+  }
+  return n + ' scenario' + (n === 1 ? '' : 's');
+}
+
+/* ── Build filter UI ───────────────────────────────────────────────────────── */
+function buildCheckboxes(containerId, items, namePrefix) {
+  var container = document.getElementById(containerId);
+  container.innerHTML = items.map(function(item) {
+    return '<label><input type="checkbox" name="' + namePrefix + '" value="' + escHtml(item) + '" checked> ' + escHtml(item) + '</label>';
+  }).join('');
+}
+
+function buildRadios(containerId, options, name) {
+  var container = document.getElementById(containerId);
+  container.innerHTML = options.map(function(opt, i) {
+    return '<label><input type="radio" name="' + name + '" value="' + opt.value + '"' + (i === 0 ? ' checked' : '') + '> ' + escHtml(opt.label) + '</label>';
+  }).join('');
+}
+
+buildCheckboxes('cat-checks', CATEGORIES, 'filter_cat');
+buildCheckboxes('dom-checks', DOMAINS, 'filter_dom');
+buildRadios('status-radios', STATUS_OPTIONS, 'filter_status');
+buildCheckboxes('sev-checks', SEVERITIES, 'filter_sev');
+
+/* ── Load runs ─────────────────────────────────────────────────────────────── */
+async function loadRuns() {
+  try {
+    var res = await fetch('/v1/runs?limit=200', {});
+    if (res.status === 401) { logout(); return; }
+    var data = await res.json();
+    allRuns = (data.runs || []).filter(function(r) { return FINISHED_STATUSES.has(r.status); });
+    populateFilterDropdowns();
+    applyDefaultSelection();
+    renderRunsList();
+  } catch (e) {
+    console.error('Loading the run list failed:', e);
+    document.getElementById('runs-list').innerHTML = '<div class="empty">Failed to load runs.</div>';
+  }
+}
+
+function populateFilterDropdowns() {
+  // Company dropdown — only certifier/admin can pick across companies
+  if (isPlatformUser) {
+    document.getElementById('company-field').style.display = '';
+    var companies = {};
+    allRuns.forEach(function(r) {
+      if (r.company_id) companies[r.company_id] = r.company_name || r.company_id;
+    });
+    var companyIds = Object.keys(companies).sort(function(a, b) {
+      return companies[a].localeCompare(companies[b]);
+    });
+    var companySelect = document.getElementById('filter-company');
+    companySelect.innerHTML = '<option value="">All companies</option>'
+      + companyIds.map(function(id) {
+          return '<option value="' + escHtml(id) + '">' + escHtml(companies[id]) + '</option>';
+        }).join('');
+  }
+
+  // User dropdown — visible for certifier/admin/test_manager (not regular tester)
+  if (canPickAnyUser) {
+    document.getElementById('user-field').style.display = '';
+    refreshUserDropdown();
+  } else {
+    document.getElementById('user-field').style.display = 'none';
+  }
+}
+
+function refreshUserDropdown() {
+  // Limit user list to runs matching the selected company filter
+  var pool = allRuns;
+  if (runFilters.companyId) {
+    pool = pool.filter(function(r) { return r.company_id === runFilters.companyId; });
+  }
+  var emails = {};
+  pool.forEach(function(r) {
+    if (r.submitted_by) emails[r.submitted_by] = true;
+  });
+  var list = Object.keys(emails).sort(function(a, b) { return a.localeCompare(b); });
+  var sel = document.getElementById('filter-user');
+  var prev = sel.value;
+  sel.innerHTML = '<option value="">All users</option>'
+    + list.map(function(e) { return '<option value="' + escHtml(e) + '">' + escHtml(e) + '</option>'; }).join('');
+  // Keep previous selection if still valid
+  if (prev && emails[prev]) sel.value = prev;
+  else { sel.value = ''; runFilters.userId = ''; }
+}
+
+function getFilteredRuns() {
+  return allRuns.filter(function(r) {
+    if (runFilters.companyId && r.company_id !== runFilters.companyId) return false;
+    if (runFilters.userId && r.submitted_by !== runFilters.userId) return false;
+    if (runFilters.date) {
+      var d = (r.queued_at || '').slice(0, 10);
+      if (d !== runFilters.date) return false;
+    }
+    return true;
+  });
+}
+
+function applyDefaultSelection() {
+  // No date filter → pick latest matching run as default
+  var pool = getFilteredRuns();
+  if (!runFilters.date && pool.length > 0) {
+    selectedRunId = pool[0].id;
+  } else if (pool.length === 0) {
+    selectedRunId = null;
+  } else if (selectedRunId && !pool.some(function(r) { return r.id === selectedRunId; })) {
+    // Selected run no longer in the filtered set
+    selectedRunId = pool[0].id;
+  }
+  updateGenerateButton();
+}
+
+function renderRunsList() {
+  var el = document.getElementById('runs-list');
+  var pool = getFilteredRuns();
+  if (!pool.length) {
+    el.innerHTML = '<div class="empty">No runs match the selected filters.</div>';
+    return;
+  }
+  el.innerHTML = pool.map(function(r) {
+    var checked = selectedRunId === r.id ? ' checked' : '';
+    var statusCls = 's-' + (r.status || 'COMPLETED');
+    var primary = escHtml(runScenarioLabel(r));
+    var envSub  = r.env_name_used ? ' <span style="color:#90a4ae;font-weight:400;font-size:11px">[' + escHtml(r.env_name_used) + ']</span>' : '';
+    return '<div class="run-check-row" data-run-id="' + r.id + '">'
+      + '<input type="radio" name="run-pick" value="' + r.id + '" data-action="select-run"' + checked + '>'
+      + '<span class="run-env" title="' + escHtml(r.id) + '">' + primary + envSub + '</span>'
+      + (isPlatformUser && r.company_name ? '<span class="run-company">' + escHtml(r.company_name) + '</span>' : '')
+      + (r.submitted_by ? '<span class="run-user">' + escHtml(r.submitted_by) + '</span>' : '')
+      + '<span class="run-date">' + fmtDate(r.queued_at) + '</span>'
+      + '<span class="status ' + statusCls + '">' + escHtml(r.status || '') + '</span>'
+      + '<span class="run-scenarios">' + scenarioLabel(r) + '</span>'
+      + '</div>';
+  }).join('');
+}
+
+function updateGenerateButton() {
+  document.getElementById('generate-btn').disabled = !selectedRunId;
+}
+
+function onFilterChange() {
+  runFilters.companyId = isPlatformUser ? document.getElementById('filter-company').value : '';
+  runFilters.date      = document.getElementById('filter-date').value;
+  if (canPickAnyUser) {
+    refreshUserDropdown();
+    runFilters.userId = document.getElementById('filter-user').value;
+  } else {
+    runFilters.userId = '';
+  }
+  applyDefaultSelection();
+  renderRunsList();
+}
+
+function resetFilters() {
+  runFilters = { companyId: '', userId: '', date: '' };
+  if (isPlatformUser) document.getElementById('filter-company').value = '';
+  document.getElementById('filter-date').value = '';
+  if (canPickAnyUser) refreshUserDropdown();
+  applyDefaultSelection();
+  renderRunsList();
+}
+
+/* ── Collect current filter state ──────────────────────────────────────────── */
+function getFilters() {
+  var cats = [];
+  document.querySelectorAll('input[name="filter_cat"]:checked').forEach(function(cb) { cats.push(cb.value); });
+  var doms = [];
+  document.querySelectorAll('input[name="filter_dom"]:checked').forEach(function(cb) { doms.push(cb.value); });
+  var sevs = [];
+  document.querySelectorAll('input[name="filter_sev"]:checked').forEach(function(cb) { sevs.push(cb.value); });
+  var status = document.querySelector('input[name="filter_status"]:checked').value;
+  return { categories: cats, domains: doms, severities: sevs, status: status };
+}
+
+/* ── Generate report ───────────────────────────────────────────────────────── */
+async function generateReport() {
+  if (!selectedRunId) return;
+  var btn = document.getElementById('generate-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating...';
+
+  var filters = getFilters();
+  var payload = {
+    run_ids: [selectedRunId],
+    filters: filters
+  };
+
+  try {
+    var res = await fetch('/v1/reports/configured', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) {
+      var errBody = await res.json().catch(function() { return {}; });
+      alert('Report generation failed: ' + (errBody.detail || res.statusText));
+      btn.disabled = false;
+      btn.textContent = 'Generate Report';
+      return;
+    }
+    reportData = await res.json();
+    renderReport();
+  } catch (e) {
+    console.error('Generating the report failed:', e);
+    alert('Network error generating report.');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Generate Report';
+}
+
+/* ── Render report ─────────────────────────────────────────────────────────── */
+function renderReport() {
+  if (!reportData) return;
+  document.getElementById('report-output').style.display = 'block';
+
+  // Echo back the run + scenario(s) the report covers, so the user can verify
+  // the selection at a glance without scrolling into Assertion Details.
+  var run = allRuns.find(function(r) { return r.id === selectedRunId; });
+  var meta = '';
+  if (run) {
+    var scenarioList = run.scenario_code
+      || (run.scenario_names ? run.scenario_names.replaceAll(',', ', ') : '');
+    var scenariosFromReport = (reportData.suites || [])
+      .map(function(su) { return su.scenario_name; })
+      .filter(function(v, i, a) { return v && a.indexOf(v) === i; });
+    if (!scenarioList && scenariosFromReport.length) scenarioList = scenariosFromReport.join(', ');
+
+    meta = '<div><strong>Run:</strong> ' + escHtml(run.id) + '</div>'
+      + (scenarioList ? '<div><strong>Scenario(s):</strong> ' + escHtml(scenarioList) + '</div>' : '')
+      + (run.env_name_used ? '<div><strong>Environment:</strong> ' + escHtml(run.env_name_used) + '</div>' : '')
+      + (run.company_name ? '<div><strong>Company:</strong> ' + escHtml(run.company_name) + '</div>' : '')
+      + (run.submitted_by ? '<div><strong>Submitted by:</strong> ' + escHtml(run.submitted_by) + '</div>' : '')
+      + '<div><strong>Queued at:</strong> ' + escHtml(fmtDate(run.queued_at))
+      +   ' &nbsp;&middot;&nbsp; <strong>Status:</strong> ' + escHtml(run.status || '') + '</div>';
+  }
+  document.getElementById('report-meta').innerHTML = meta;
+
+  var s = reportData.summary || {};
+  var total = s.total || 0;
+  var passed = s.passed || 0;
+  var failed = s.failed || 0;
+  var rate = pct(passed, total);
+
+  document.getElementById('report-summary').innerHTML =
+    '<div class="summary-stat"><div class="val">' + total + '</div><div class="lbl">Total Assertions</div></div>'
+    + '<div class="summary-stat pass"><div class="val">' + passed + '</div><div class="lbl">Passed</div></div>'
+    + '<div class="summary-stat fail"><div class="val">' + failed + '</div><div class="lbl">Failed</div></div>'
+    + '<div class="summary-stat rate"><div class="val">' + rate + '%</div><div class="lbl">Pass Rate</div></div>';
+
+  renderCapabilityMatrix(reportData.capability_matrix || []);
+  renderOfferOptions(reportData.offer_options || []);
+  renderBreakdown('domain-breakdown', reportData.by_domain || [], 'domain');
+  renderBreakdown('category-breakdown', reportData.by_category || [], 'category');
+  renderAssertions(reportData.suites || []);
+  renderLogs();
+  renderHttpTraffic().catch(oscarReportError);   // Phase C: req/res list + chain navigation
+
+  document.getElementById('report-output').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function getFilteredLogs() {
+  if (!reportData || !Array.isArray(reportData.events)) return [];
+  var includePassed = document.getElementById('logs-include-passed').checked;
+  return reportData.events.filter(function(e) {
+    // Milestones always render — they're scenario dividers the certifier relies
+    // on to know which scenario/attempt a log window belongs to.
+    if (e.event_kind && e.event_kind !== 'log') return true;
+    return includePassed || e.request_result === 'FAIL';
+  });
+}
+
+/* ── Multi-line JSON coalescing ────────────────────────────────────────────
+ * Bruno library scripts call console.log(obj) which util.inspect-formats the
+ * object across many lines. Each line becomes its own run_events row. The
+ * result: a single "Selected Offer" dump explodes to 20-30 rows in the UI.
+ *
+ * This collapses a run of continuation-looking lines into one JSON block
+ * pill. Heuristic:
+ *   - An opener looks like "Selected Offer: {" or ends with " {" / " ["
+ *     or matches the forward-compatible marker "[JSON:label]".
+ *   - A continuation is a line that starts with whitespace, or is a pure
+ *     closer ("}" / "]" / "},"), AND belongs to the same request as the opener.
+ *   - The block closes on the first non-continuation line (or request change).
+ */
+function looksLikeJsonOpener(msg) {
+  var s = (msg || '').trimEnd();
+  if (/^\s*\[JSON:[^\]]+\]/.test(s)) return true;          // explicit marker
+  if (/[:=]\s*[{[]\s*$/.test(s)) return true;             // "Selected Offer: {"
+  if (/^[A-Za-z_][\w\s]*:\s*[{[]\s*$/.test(s.trim())) return true;
+  return false;
+}
+function looksLikeJsonContinuation(msg) {
+  if (msg == null) return false;
+  if (/^\s+\S/.test(msg)) return true;                      // indented line
+  if (/^[}\]][,\s]*$/.test(msg.trim())) return true;       // closer
+  return false;
+}
+function coalesceJsonBlocks(events) {
+  var out = [];
+  var i = 0;
+  while (i < events.length) {
+    var e = events[i];
+    var msg = e.message || '';
+    if (e.event_kind && e.event_kind !== 'log') { out.push(e); i++; continue; }
+    if (looksLikeJsonOpener(msg)) {
+      var block = { opener: e, lines: [msg], reqName: e.request_name, suite: e.suite_name };
+      var j = i + 1;
+      while (j < events.length) {
+        var n = events[j];
+        if (n.event_kind && n.event_kind !== 'log') break;
+        if (n.request_name !== block.reqName || n.suite_name !== block.suite) break;
+        if (!looksLikeJsonContinuation(n.message || '')) break;
+        block.lines.push(n.message || '');
+        j++;
+      }
+      // Need at least one continuation line for it to be worth collapsing.
+      if (block.lines.length >= 2) {
+        out.push({ __jsonBlock: true, event: e, body: block.lines.join('\n') });
+        i = j;
+        continue;
+      }
+    }
+    out.push(e);
+    i++;
+  }
+  return out;
+}
+function jsonBlockLabel(opener) {
+  var s = (opener.message || '').trim();
+  // Explicit marker wins.
+  var m = /^\[JSON:([^\]]+)\]\s*(?:\S.*)?$/.exec(s);
+  if (m) return m[1];
+  // Otherwise take the text before the colon/brace as the label.
+  m = /^([^:{[]+)(?::\s*)?[{[]/.exec(s);
+  if (m) return m[1].trim();
+  return 'object';
+}
+
+function renderMilestone(e) {
+  var kind = (e.event_kind || '').replace('scenario_', '');
+  var labelMap = {
+    start:   { cls: 'mile-start',   text: 'Scenario start' },
+    retry:   { cls: 'mile-retry',   text: 'Retry' },
+    skipped: { cls: 'mile-skipped', text: 'Scenario skipped' },
+    end:     { cls: 'mile-end',     text: 'Scenario end' }
+  };
+  var def = labelMap[kind] || { cls: 'mile-start', text: e.event_kind || 'milestone' };
+  var attempt = (e.attempt_index && e.attempt_total)
+    ? 'attempt ' + e.attempt_index + '/' + e.attempt_total
+    : '';
+  var ts = e.ts ? parseServerTs(e.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
+  return '<div class="log-milestone ' + def.cls + '">'
+    + '<span class="mile-label">' + escHtml(def.text) + '</span>'
+    + '<span class="mile-scenario">' + escHtml(e.scenario_name || '(unknown scenario)') + '</span>'
+    + (attempt ? '<span class="mile-attempt">' + escHtml(attempt) + '</span>' : '')
+    + '<span class="mile-ts">' + escHtml(ts) + '</span>'
+    + '</div>';
+}
+
+function renderLogs() {
+  var content = document.getElementById('logs-content');
+  var counter = document.getElementById('logs-count');
+  var events = getFilteredLogs();
+  counter.textContent = events.length + ' event' + (events.length === 1 ? '' : 's');
+  if (events.length === 0) {
+    content.innerHTML = '<div class="log-empty">No log events for the selected filter (try enabling "Include logs from requests whose assertions all passed").</div>';
+    return;
+  }
+
+  // Group by scenario → suite → request. Milestone events are emitted above
+  // the group they logically precede, so they become visual dividers rather
+  // than appearing mid-request.
+  var scenarioBySuite = {};
+  (reportData.suites || []).forEach(function(s) {
+    if (s.suite_name) scenarioBySuite[s.suite_name] = s.scenario_name || '';
+  });
+
+  // Partition events into top-level milestones + suite-scoped events. A
+  // milestone is anchored to its scenario_name; we'll render it before the
+  // first group of that scenario.
+  var milestones = [];
+  var regular = [];
+  events.forEach(function(e) {
+    if (e.event_kind && e.event_kind !== 'log') milestones.push(e);
+    else regular.push(e);
+  });
+
+  var groups = {};
+  var groupOrder = [];
+  regular.forEach(function(e) {
+    var scen = e.scenario_name || scenarioBySuite[e.suite_name] || '';
+    var key = scen + '||' + (e.suite_name || '');
+    if (!groups[key]) {
+      groups[key] = { scenario: scen, suite: e.suite_name, requests: {}, reqOrder: [] };
+      groupOrder.push(key);
+    }
+    var reqName = e.request_name || '(unknown request)';
+    if (!groups[key].requests[reqName]) {
+      groups[key].requests[reqName] = [];
+      groups[key].reqOrder.push(reqName);
+    }
+    groups[key].requests[reqName].push(e);
+  });
+
+  // Stamp each group with the milestone that most recently precedes its first
+  // event (by id). This way we render the milestone banner inside the scenario
+  // transition — right before the first log of the new scenario.
+  var milestonesByScenarioOrder = milestones.slice().sort(function(a, b) { return (a.id||0) - (b.id||0); });
+
+  var html = '';
+  var rendered = {};
+  groupOrder.forEach(function(k) {
+    var g = groups[k];
+    // Emit any milestones that apply to this scenario and haven't been rendered yet.
+    milestonesByScenarioOrder.forEach(function(m) {
+      if (rendered[m.id]) return;
+      if ((m.scenario_name || '') === g.scenario) {
+        html += renderMilestone(m);
+        rendered[m.id] = true;
+      }
+    });
+    var headerLabel = g.scenario
+      ? '<span style="color:#90a4ae;margin-right:6px">Scenario:</span>' + escHtml(g.scenario) + ' &mdash; ' + escHtml(g.suite || '(root)')
+      : escHtml(g.suite || '(root)');
+    html += '<div class="log-suite-header">' + headerLabel + '</div>';
+    g.reqOrder.forEach(function(reqName) {
+      var evs = g.requests[reqName];
+      var anyFail = evs.some(function(e) { return e.request_result === 'FAIL'; });
+      var badge = anyFail
+        ? '<span class="a-fail">FAIL</span>'
+        : '<span class="a-pass">PASS</span>';
+      // Collapse multi-line JSON dumps so "Selected Offer: {...}" (30 lines)
+      // becomes a single expandable pill instead of swamping the view.
+      var collapsed = coalesceJsonBlocks(evs);
+      html += '<div class="log-req-header">' + badge + ' <span>' + escHtml(reqName) + '</span>'
+        + '<span style="color:#90a4ae;font-size:11px;margin-left:auto">' + evs.length + ' log line' + (evs.length === 1 ? '' : 's') + '</span></div>';
+      collapsed.forEach(function(item) {
+        if (item.__jsonBlock) {
+          var o = item.event;
+          var lvl = (o.level || 'stdout').toLowerCase();
+          var ts  = o.ts ? parseServerTs(o.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
+          var label = jsonBlockLabel(o);
+          var lineCount = item.body.split('\n').length;
+          var bodyId = 'json-body-' + (o.id || crypto.getRandomValues(new Uint32Array(2)).join('-'));
+          html += '<div class="log-json-row">'
+            + '<span class="log-ts">' + escHtml(ts) + '</span>'
+            + '<span class="log-level l-' + escHtml(lvl) + '">' + escHtml(lvl) + '</span>'
+            + '<span class="log-cat">' + escHtml(o.category || '-') + '</span>'
+            + '<span>'
+            +   '<button class="log-json-toggle" data-action="toggle-json" data-target="' + bodyId + '">'
+            +     '<span class="caret">&#9656;</span>'
+            +     '<span>' + escHtml(label) + '</span>'
+            +   '</button>'
+            +   '<span class="log-json-summary">' + lineCount + ' line' + (lineCount === 1 ? '' : 's') + ' &middot; click to expand</span>'
+            + '</span>'
+            + '</div>'
+            + '<pre class="log-json-body" id="' + bodyId + '">' + escHtml(item.body) + '</pre>';
+        } else {
+          var e2 = item;
+          var lvl2 = (e2.level || 'stdout').toLowerCase();
+          var ts2  = e2.ts ? parseServerTs(e2.ts).toLocaleTimeString(undefined, { hour12: false }) : '';
+          html += '<div class="log-row">'
+            + '<span class="log-ts">' + escHtml(ts2) + '</span>'
+            + '<span class="log-level l-' + escHtml(lvl2) + '">' + escHtml(lvl2) + '</span>'
+            + '<span class="log-cat">' + escHtml(e2.category || '-') + '</span>'
+            + '<span class="log-msg">' + escHtml(e2.message || '') + '</span>'
+            + '</div>';
+        }
+      });
+    });
+  });
+
+  // Any milestones that didn't match a rendered group (e.g. scenarios whose
+  // suites were filtered out) are appended at the end so they're not lost.
+  milestonesByScenarioOrder.forEach(function(m) {
+    if (!rendered[m.id]) html += renderMilestone(m);
+  });
+
+  content.innerHTML = html;
+}
+
+/* ── Vendor Capability Matrix ──────────────────────────────────────────────
+ * Shows the certifier which endpoints the vendor actually implements, so they
+ * can conclude "not implemented" without reading log messages line-by-line.
+ */
+function renderCapabilityMatrix(rows) {
+  var card = document.getElementById('capability-card');
+  if (!rows || rows.length === 0) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+
+  var counts = { IMPLEMENTED: 0, PARTIAL: 0, NOT_IMPLEMENTED: 0, ERROR: 0, NOT_APPLICABLE: 0 };
+  rows.forEach(function(r) {
+    var k = r.vendor_capability || 'UNKNOWN';
+    if (counts[k] != null) counts[k]++;
+  });
+  var summary = '';
+  ['NOT_IMPLEMENTED', 'ERROR', 'PARTIAL', 'IMPLEMENTED', 'NOT_APPLICABLE'].forEach(function(k) {
+    if (counts[k] > 0) {
+      summary += '<div class="cap-summary-pill s-' + k + '">'
+        + counts[k] + ' ' + k.replace('_', ' ').toLowerCase()
+        + '</div>';
+    }
+  });
+  document.getElementById('capability-summary').innerHTML = summary;
+
+  // Preserve execution order (rows come back from /reports/configured sorted
+  // by run_requests.id ASC = Bruno execution sequence). Certifiers read this
+  // top-to-bottom matching their mental model of the test flow.
+  var tbody = document.querySelector('#capability-table tbody');
+  tbody.innerHTML = rows.map(function(r) {
+    var cap = r.vendor_capability || 'UNKNOWN';
+    var method = r.http_method ? '<span class="cap-method">' + escHtml(r.http_method) + '</span>' : '';
+    var endpoint = (r.suite_name ? escHtml(r.suite_name) + ' / ' : '') + escHtml(r.request_name || '');
+    var ctxTags  = renderContextTags(r.context);
+    return '<tr>'
+      + '<td>' + escHtml(r.scenario_name || '-') + '</td>'
+      + '<td class="cap-endpoint">' + method + endpoint + ctxTags + '</td>'
+      + '<td>' + (r.http_status != null ? escHtml(r.http_status) : '-') + '</td>'
+      + '<td><span class="cap-status cap-' + cap + '">' + escHtml(cap.replace('_', ' ')) + '</span></td>'
+      + '</tr>';
+  }).join('');
+}
+
+/* ── Offer request options (#227) ──────────────────────────────────────────
+ * One table per run of the offer request options scenario: what the provider
+ * did with each optional parameter of the offer request, sent alone, then the
+ * combinations and every supported option at once.
+ */
+var OFFER_OPTION_RESULTS = {
+  'honoured': 'Supported, kept to', 'accepted': 'Supported (nothing to check)',
+  'ignored-said': 'Ignored, said', 'ignored-silent': 'Ignored, not said',
+  'no-offer-said': 'No offer, said', 'no-offer-silent': 'No offer, not said',
+  'invalid-said': 'Made-up value refused or said', 'invalid-silent': 'Made-up value taken without a word',
+  'refused': 'Refused', 'not-implemented': 'Not implemented', 'error': 'Error',
+  'not-tested': 'Not tested', 'not-reached': 'Not reached (request budget)'
+};
+
+function offerOptionResultLabel(result) {
+  return Object.hasOwn(OFFER_OPTION_RESULTS, result) ? OFFER_OPTION_RESULTS[result] : String(result || '');
+}
+
+function offerOptionDeclaredLabel(declared) {
+  if (declared === true) return 'Declared';
+  if (declared === false) return 'Declared not supported';
+  return '';
+}
+
+function offerOptionRunHtml(entry) {
+  var r = entry.report || {};
+  var mandatory = '';
+  if (r.mandatory) {
+    mandatory = r.mandatory.ok ? 'answered' : 'NOT answered';
+    if (r.mandatory.message) mandatory += ' — ' + r.mandatory.message;
+  }
+  var rows = (r.options || []).map(function(o) {
+    var value = o.value != null ? String(o.value) : '';
+    if (value && o.source) value += ' (' + o.source + ')';
+    return '<tr><td>' + escHtml(o.option) + '</td><td>' + escHtml(value) + '</td>'
+      + '<td>' + (o.status != null ? escHtml(o.status) : '-') + '</td>'
+      + '<td>' + escHtml(offerOptionResultLabel(o.result)) + '</td>'
+      + '<td>' + escHtml(offerOptionDeclaredLabel(o.declared)) + '</td>'
+      + '<td>' + escHtml(o.message || '') + '</td></tr>';
+  }).join('');
+  var requests = (r.combinations || []).map(function(c) {
+    return '<li>' + escHtml((c.options || []).join(' + ')) + ': HTTP ' + escHtml(c.status) + ', ' + escHtml(offerOptionResultLabel(c.result)) + (c.message ? ' — ' + escHtml(c.message) : '') + '</li>';
+  });
+  if (r.all) requests.push('<li>Every supported option (' + escHtml(r.all.count) + '): HTTP ' + escHtml(r.all.status) + ', ' + escHtml(offerOptionResultLabel(r.all.result)) + (r.all.message ? ' — ' + escHtml(r.all.message) : '') + '</li>');
+  return '<div style="margin-bottom:18px">'
+    + '<div style="font-size:13px;color:#37474f;line-height:1.6;margin-bottom:8px"><strong>' + escHtml(entry.scenario_code || entry.run_id) + '</strong>'
+    + ' &middot; OSDM ' + escHtml(r.version || '?') + ' &middot; ' + escHtml(r.used) + ' of ' + escHtml(r.budget) + ' request(s) &middot; seed ' + escHtml(r.seed)
+    + '<br>Mandatory parameters only: ' + escHtml(mandatory) + '</div>'
+    + '<table class="cap-table"><thead><tr><th>Option</th><th>Value sent</th><th>HTTP</th><th>Result</th><th>Test Framework</th><th>Detail</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table>'
+    + (requests.length ? '<ul style="font-size:12px;color:#37474f;margin:8px 0 0 18px">' + requests.join('') + '</ul>' : '')
+    + '</div>';
+}
+
+function renderOfferOptions(list) {
+  var card = document.getElementById('offer-options-card');
+  if (!Array.isArray(list) || list.length === 0) { card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  document.getElementById('offer-options-body').innerHTML = list.map(offerOptionRunHtml).join('');
+}
+
+/* Render a context blob (refund mode, flexibility filter, pax count, …) as
+ * a row of small chips under the endpoint label. A handful of keys get
+ * highlight classes so the eye catches them; everything else falls back to
+ * the neutral gray tag.
+ */
+function renderContextTags(ctx) {
+  if (!ctx || typeof ctx !== 'object') return '';
+  var tags = [];
+  Object.keys(ctx).forEach(function(k) {
+    var v = ctx[k];
+    if (v == null || v === '') return;
+    var hl = '';
+    if (k === 'mode' && (v === 'reason-code' || v === 'voluntary')) hl = ' hl-mode-' + v;
+    tags.push('<span class="cap-ctx-tag' + hl + '"><span class="k">' + escHtml(k) + ':</span> ' + escHtml(String(v)) + '</span>');
+  });
+  if (!tags.length) return '';
+  return '<div class="cap-ctx-row">' + tags.join('') + '</div>';
+}
+
+function renderBreakdown(tableId, data, keyField) {
+  var tbody = document.getElementById(tableId).querySelector('tbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#90a4ae;padding:16px">No data</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(function(row) {
+    var name = row[keyField] || 'other';
+    var t = row.total || 0;
+    var p = row.passed || 0;
+    var f = row.failed || 0;
+    var r = pct(p, t);
+    return '<tr><td>' + escHtml(name) + '</td>'
+      + '<td class="num">' + t + '</td>'
+      + '<td class="num pass-cell">' + p + '</td>'
+      + '<td class="num fail-cell">' + f + '</td>'
+      + '<td class="num">' + r + '%</td></tr>';
+  }).join('');
+}
+
+// The PASS / FAIL / SKIP badge of a request.
+function resultBadgeHtml(result) {
+  if (result === 'PASS') return '<span class="a-pass">PASS</span>';
+  if (result === 'FAIL') return '<span class="a-fail">FAIL</span>';
+  return '<span style="color:#90a4ae">SKIP</span>';
+}
+
+function renderAssertions(suites) {
+  var el = document.getElementById('assertion-content');
+  if (!suites.length) {
+    el.innerHTML = '<div style="padding:16px;color:#90a4ae">No assertion data available.</div>';
+    return;
+  }
+  var html = '';
+  suites.forEach(function(suite) {
+    var sfailed = suite.failed || 0;
+    var sTotal = suite.total || 0;
+    var headerLabel = suite.scenario_name
+      ? escHtml(suite.scenario_name) + ' &mdash; ' + escHtml(suite.suite_name)
+      : escHtml(suite.suite_name);
+    html += '<div class="suite-header">'
+      + '<span style="color:#90a4ae;font-weight:600;margin-right:6px">Scenario:</span>'
+      + headerLabel
+      + ' -- ' + sTotal + ' assertions'
+      + (sfailed > 0 ? ' -- <span style="color:#c62828">' + sfailed + ' failed</span>' : '')
+      + ' -- ' + (suite.pass_rate || 0) + '%</div>';
+
+    // Pre-count request_name occurrences in this suite to label parameterized
+    // iterations (e.g. "01. POST Get Offer (iteration 3/8)").
+    var reqList = suite.requests || [];
+    var nameCounts = {};
+    reqList.forEach(function(r) {
+      var n = r.request_name || '(unnamed)';
+      nameCounts[n] = (nameCounts[n] || 0) + 1;
+    });
+    var iterIndex = {};
+
+    reqList.forEach(function(req) {
+      var statusBadge = resultBadgeHtml(req.result);
+      var rname = req.request_name || '(unnamed)';
+      var iterSuffix = '';
+      if (nameCounts[rname] > 1) {
+        iterIndex[rname] = (iterIndex[rname] || 0) + 1;
+        iterSuffix = ' <span style="color:#90a4ae;font-weight:500;font-size:11px">(iteration '
+          + iterIndex[rname] + '/' + nameCounts[rname] + ')</span>';
+      }
+      html += '<div class="req-header">' + statusBadge + ' <span>' + escHtml(rname) + '</span>' + iterSuffix
+        + '<span style="color:#90a4ae;font-size:11px;margin-left:auto">'
+        + (req.http_method || '') + ' ' + (req.http_status || '') + ' -- ' + (req.duration_ms || 0) + 'ms</span></div>';
+
+      (req.assertions || []).forEach(function(a) {
+        var icon = a.passed ? '<span class="a-pass">&#10003;</span>' : '<span class="a-fail">&#10007;</span>';
+        var sev = (!a.passed && a.severity) ? '<span class="a-badge a-sev-' + escHtml(a.severity) + '">' + escHtml(a.severity) + '</span>' : '';
+        html += '<div class="assertion-row">' + icon
+          + '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(a.assertion_name) + '">' + escHtml(a.assertion_name) + '</span>'
+          + (a.category ? '<span class="a-badge a-cat">' + escHtml(a.category) + '</span>' : '')
+          + (a.domain ? '<span class="a-badge a-dom">' + escHtml(a.domain) + '</span>' : '')
+          + sev
+          + '</div>';
+        // Failed assertions show their error message on a dedicated full-width
+        // line so expected-vs-actual details are readable without tooltips.
+        if (a.error_msg && !a.passed) {
+          html += '<div class="assertion-error">&#9888; ' + escHtml(a.error_msg) + '</div>';
+        }
+      });
+    });
+  });
+  el.innerHTML = html;
+}
+
+/* ── Export CSV ─────────────────────────────────────────────────────────────── */
+// One CSV cell, quoted. A cell whose text a spreadsheet would read as a
+// formula (= + - @, a tab or a carriage return first) starts with ' instead.
+function csvCell(c) {
+  let t = String(c);
+  if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+  return '"' + t.replaceAll('"', '""') + '"';
+}
+
+function exportCSV() {
+  if (!reportData || !reportData.suites) return;
+  var rows = [];
+
+  // Capability matrix first — it's the certifier's top-level conclusion.
+  if (Array.isArray(reportData.capability_matrix) && reportData.capability_matrix.length) {
+    rows.push(
+      ['--- VENDOR CAPABILITY MATRIX ---'],
+      ['Scenario','Suite','Request','HTTP Method','HTTP Status','Capability']
+    );
+    reportData.capability_matrix.forEach(function(r) {
+      rows.push([
+        r.scenario_name || '',
+        r.suite_name || '',
+        r.request_name || '',
+        r.http_method || '',
+        r.http_status != null ? String(r.http_status) : '',
+        r.vendor_capability || 'UNKNOWN'
+      ]);
+    });
+    rows.push([]);
+  }
+
+  // #227: the offer request options, one row per option and run.
+  if (Array.isArray(reportData.offer_options) && reportData.offer_options.length) {
+    rows.push(
+      ['--- OFFER REQUEST OPTIONS ---'],
+      ['Scenario','Option','Value sent','Source','HTTP Status','Result','Test Framework','Detail']
+    );
+    reportData.offer_options.forEach(function(entry) {
+      ((entry.report || {}).options || []).forEach(function(o) {
+        rows.push([
+          entry.scenario_code || entry.run_id || '', o.option || '', o.value != null ? String(o.value) : '', o.source || '',
+          o.status != null ? String(o.status) : '', o.result || '', offerOptionDeclaredLabel(o.declared), o.message || ''
+        ]);
+      });
+    });
+    rows.push([]);
+  }
+
+  rows.push(
+    ['--- ASSERTIONS ---'],
+    ['Scenario','Group','Request','Iteration','Assertion','Passed','Category','Domain','Severity','Error']
+  );
+
+  reportData.suites.forEach(function(suite) {
+    var reqList = suite.requests || [];
+    var nameCounts = {};
+    reqList.forEach(function(r) {
+      var n = r.request_name || '(unnamed)';
+      nameCounts[n] = (nameCounts[n] || 0) + 1;
+    });
+    var iterIndex = {};
+
+    reqList.forEach(function(req) {
+      var rname = req.request_name || '';
+      var iterCell = '';
+      if (nameCounts[rname] > 1) {
+        iterIndex[rname] = (iterIndex[rname] || 0) + 1;
+        iterCell = iterIndex[rname] + '/' + nameCounts[rname];
+      }
+      (req.assertions || []).forEach(function(a) {
+        rows.push([
+          suite.scenario_name || '',
+          suite.suite_name || '',
+          rname,
+          iterCell,
+          a.assertion_name || '',
+          a.passed ? 'PASS' : 'FAIL',
+          a.category || '',
+          a.domain || '',
+          a.severity || '',
+          a.error_msg || ''
+        ]);
+      });
+    });
+  });
+
+  // Append a logs section using the same toggle the user has on screen.
+  var logEvents = getFilteredLogs();
+  if (logEvents.length > 0) {
+    rows.push(
+      [], // blank row separator
+      ['--- LOGS ---'],
+      ['Scenario','Group','Request','Timestamp','Level','Category','Message']
+    );
+    var scenarioBySuite = {};
+    (reportData.suites || []).forEach(function(s) {
+      if (s.suite_name) scenarioBySuite[s.suite_name] = s.scenario_name || '';
+    });
+    logEvents.forEach(function(e) {
+      rows.push([
+        scenarioBySuite[e.suite_name] || '',
+        e.suite_name || '',
+        e.request_name || '',
+        e.ts || '',
+        (e.level || ''),
+        e.category || '',
+        e.message || ''
+      ]);
+    });
+  }
+
+  var csv = rows.map(function(r) {
+    return r.map(csvCell).join(',');
+  }).join('\n');
+
+  var blob = new Blob([csv], { type: 'text/csv' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'oscar-report-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ── Templates (localStorage) ──────────────────────────────────────────────── */
+var TEMPLATE_KEY = 'oscar_report_templates';
+
+function loadTemplateList() {
+  var templates = JSON.parse(localStorage.getItem(TEMPLATE_KEY) || '{}');
+  var sel = document.getElementById('template-select');
+  sel.innerHTML = '<option value="">-- Load Template --</option>';
+  Object.keys(templates).sort(function(a, b) { return a.localeCompare(b); }).forEach(function(name) {
+    var opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    sel.appendChild(opt);
+  });
+}
+
+function saveTemplate() {
+  var name = prompt('Template name:');
+  if (!name || !name.trim()) return;
+  name = name.trim();
+  var templates = JSON.parse(localStorage.getItem(TEMPLATE_KEY) || '{}');
+  templates[name] = getFilters();
+  localStorage.setItem(TEMPLATE_KEY, JSON.stringify(templates));
+  loadTemplateList();
+  document.getElementById('template-select').value = name;
+}
+
+function loadTemplate() {
+  var sel = document.getElementById('template-select');
+  var name = sel.value;
+  if (!name) return;
+  var templates = JSON.parse(localStorage.getItem(TEMPLATE_KEY) || '{}');
+  var tpl = templates[name];
+  if (!tpl) return;
+
+  // Apply categories
+  document.querySelectorAll('input[name="filter_cat"]').forEach(function(cb) {
+    cb.checked = tpl.categories.includes(cb.value);
+  });
+  // Apply domains
+  document.querySelectorAll('input[name="filter_dom"]').forEach(function(cb) {
+    cb.checked = tpl.domains.includes(cb.value);
+  });
+  // Apply severities
+  document.querySelectorAll('input[name="filter_sev"]').forEach(function(cb) {
+    cb.checked = tpl.severities.includes(cb.value);
+  });
+  // Apply status
+  document.querySelectorAll('input[name="filter_status"]').forEach(function(r) {
+    r.checked = r.value === tpl.status;
+  });
+}
+
+function deleteTemplate() {
+  var sel = document.getElementById('template-select');
+  var name = sel.value;
+  if (!name) return;
+  if (!confirm('Delete template "' + name + '"?')) return;
+  var templates = JSON.parse(localStorage.getItem(TEMPLATE_KEY) || '{}');
+  delete templates[name];
+  localStorage.setItem(TEMPLATE_KEY, JSON.stringify(templates));
+  loadTemplateList();
+}
+
+loadTemplateList();
+
+/* ── Toggle all helper ─────────────────────────────────────────────────────── */
+function toggleAll(group) {
+  var nameMap = { cat: 'filter_cat', dom: 'filter_dom', sev: 'filter_sev' };
+  var name = nameMap[group];
+  if (!name) return;
+  var checkboxes = document.querySelectorAll('input[name="' + name + '"]');
+  var allChecked = true;
+  checkboxes.forEach(function(cb) { if (!cb.checked) allChecked = false; });
+  checkboxes.forEach(function(cb) { cb.checked = !allChecked; });
+  // Update toggle label
+  var toggle = document.querySelector('[data-action="toggle-all"][data-group="' + group + '"]');
+  if (toggle) toggle.textContent = allChecked ? 'Select all' : 'Deselect all';
+}
+
+/* ── Event delegation ──────────────────────────────────────────────────────── */
+
+// Run selection (single-select via radio)
+document.getElementById('runs-list').addEventListener('change', function(e) {
+  if (e.target.dataset.action === 'select-run' && e.target.checked) {
+    selectedRunId = e.target.value;
+    updateGenerateButton();
+  }
+});
+document.getElementById('runs-list').addEventListener('click', function(e) {
+  if (e.target.type === 'radio') return;
+  var row = e.target.closest('.run-check-row');
+  if (!row) return;
+  var rb = row.querySelector('input[type="radio"]');
+  if (rb && !rb.checked) {
+    rb.checked = true;
+    selectedRunId = rb.value;
+    updateGenerateButton();
+  }
+});
+
+// Filter bar
+['filter-company', 'filter-user', 'filter-date'].forEach(function(id) {
+  var el = document.getElementById(id);
+  if (el) el.addEventListener('change', onFilterChange);
+});
+document.getElementById('filter-reset').addEventListener('click', resetFilters);
+
+// Generate
+document.getElementById('generate-btn').addEventListener('click', generateReport);
+
+// Logs include-passed toggle: re-render logs in place (no new fetch needed)
+document.getElementById('logs-include-passed').addEventListener('change', function() {
+  if (reportData) renderLogs();
+});
+
+/* ── Phase C: HTTP Traffic viewer ─────────────────────────────────────────────
+ * Independent of the generated report — fetches from
+ *   GET /v1/runs/:id/requests              (list, no bodies)
+ *   GET /v1/runs/:id/requests/:reqId       (full bodies + parent + children)
+ * Lazy load: bodies only fetched when a row is expanded.
+ */
+var _httpRequests = [];   // current list cached in memory
+var _httpDetailCache = {};// reqId → full detail (parent + children + bodies)
+
+document.getElementById('http-include').addEventListener('change', function() {
+  document.getElementById('http-filter-options').style.display = this.checked ? 'block' : 'none';
+  if (reportData) renderHttpTraffic().catch(oscarReportError);
+});
+document.querySelectorAll('input[name="http_filter"]').forEach(function(r) {
+  r.addEventListener('change', function() { if (reportData) renderHttpTraffic().catch(oscarReportError); });
+});
+
+async function renderHttpTraffic() {
+  var card = document.getElementById('http-card');
+  var include = document.getElementById('http-include').checked;
+  if (!include || !selectedRunId) { card.style.display = 'none'; return; }
+
+  var filter = (document.querySelector('input[name="http_filter"]:checked') || {}).value || 'all';
+  card.style.display = 'block';
+  document.getElementById('http-content').innerHTML =
+    '<div style="padding:20px;text-align:center;color:#90a4ae"><span class="spin">⟳</span> Loading…</div>';
+
+  try {
+    var url = '/v1/runs/' + encodeURIComponent(selectedRunId) + '/requests?status_filter=' + filter;
+    var res = await fetch(url, {});
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var data = await res.json();
+    _httpRequests = data.requests || [];
+    _httpDetailCache = {};   // invalidate detail cache when filter changes
+    document.getElementById('http-count').textContent =
+      _httpRequests.length + (filter === 'all' ? ' request(s)' : ' ' + filter + ' request(s)');
+    renderHttpList();
+  } catch (e) {
+    document.getElementById('http-content').innerHTML =
+      '<div style="padding:20px;color:#c62828">Failed to load HTTP traffic: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function renderHttpList() {
+  if (!_httpRequests.length) {
+    document.getElementById('http-content').innerHTML =
+      '<div style="padding:20px;text-align:center;color:#90a4ae">No requests match the current filter.</div>';
+    return;
+  }
+  // Group by scenario for readability
+  var byScenario = {};
+  _httpRequests.forEach(function(r) {
+    var k = r.scenario_name || '(no scenario)';
+    if (!byScenario[k]) byScenario[k] = [];
+    byScenario[k].push(r);
+  });
+
+  var html = '';
+  Object.keys(byScenario).forEach(function(scen) {
+    html += '<div style="background:#f5f7f9;padding:8px 12px;font-size:12px;font-weight:700;color:#0090D4;border-bottom:1px solid #cfd8dc">'
+         + escHtml(scen) + '</div>';
+    byScenario[scen].forEach(function(r) {
+      html += renderHttpRow(r);
+    });
+  });
+  document.getElementById('http-content').innerHTML = html;
+}
+
+// The colour class of an HTTP status: s2 to s5 by hundreds, s0 when there is
+// no status or it is below 200.
+function httpStatusClass(status) {
+  if (status == null) return 's0';
+  if (status >= 500) return 's5';
+  if (status >= 400) return 's4';
+  if (status >= 300) return 's3';
+  if (status >= 200) return 's2';
+  return 's0';
+}
+
+function renderHttpRow(r) {
+  var sClass = httpStatusClass(r.http_status);
+  var statusLbl = r.http_status == null ? '—' : r.http_status;
+  var linkBadge = r.parent_request_id
+    ? '<span class="has-link" title="Linked to parent request">↑ chain</span>' : '';
+  return '<div class="http-row" data-action="toggle-http" data-req-id="' + r.id + '">'
+    + '<span class="arrow">▶</span>'
+    + '<span class="method ' + escAttr(r.http_method || '') + '">' + escHtml(r.http_method || '?') + '</span>'
+    + '<span class="name" title="' + escAttr(r.request_name) + '">' + escHtml(r.request_name) + '</span>'
+    + '<span class="url" title="' + escAttr(r.http_url || '') + '">' + escHtml(r.http_url || '') + '</span>'
+    + '<span class="status ' + sClass + '">' + escHtml(String(statusLbl)) + '</span>'
+    + '<span class="duration">' + (r.duration_ms != null ? r.duration_ms + 'ms' : '—') + '</span>'
+    + linkBadge
+    + '</div>'
+    + '<div class="http-detail" id="http-detail-' + r.id + '" style="display:none"></div>';
+}
+
+document.getElementById('http-content').addEventListener('click', function(e) {
+  var row = e.target.closest('[data-action="toggle-http"]');
+  if (!row) {
+    // could be a nav-arrow click
+    var nav = e.target.closest('[data-nav-req-id]');
+    if (nav) {
+      var navId = nav.dataset.navReqId;
+      navigateToHttpRequest(navId);
+    }
+    // or a json toggle — walk up to the .node ancestor (the .line wrapping
+    // the toggle is a sibling of .children, not its parent)
+    var tog = e.target.closest('[data-json-toggle]');
+    if (tog) {
+      var node = tog.closest('.node');
+      if (node) {
+        node.classList.toggle('collapsed');
+        // Flip the arrow glyph on the toggle in the OPENING line of this node
+        // (the first .toggle inside the immediate .line child)
+        var topLine = node.querySelector(':scope > .line');
+        var arrow = topLine && topLine.querySelector('.toggle');
+        if (arrow && !arrow.classList.contains('empty')) {
+          arrow.textContent = node.classList.contains('collapsed') ? '▶' : '▼';
+        }
+      }
+    }
+    // or a tab switch
+    var tab = e.target.closest('[data-http-tab]');
+    if (tab) switchHttpTab(tab);
+    // or copy
+    var cpy = e.target.closest('[data-copy-target]');
+    if (cpy) { copyJsonContent(cpy); return; }
+    // #325: or download
+    var dnl = e.target.closest('[data-download-target]');
+    if (dnl) { downloadJsonContent(dnl); return; }
+    return;
+  }
+  toggleHttpRow(row).catch(oscarReportError);
+});
+
+async function toggleHttpRow(row) {
+  var reqId = row.dataset.reqId;
+  var detail = document.getElementById('http-detail-' + reqId);
+  if (row.classList.contains('expanded')) {
+    row.classList.remove('expanded');
+    detail.style.display = 'none';
+    return;
+  }
+  row.classList.add('expanded');
+  detail.style.display = 'block';
+  detail.innerHTML = '<div style="color:#90a4ae;font-style:italic;padding:8px">Loading…</div>';
+
+  try {
+    var data = _httpDetailCache[reqId] || await fetchHttpDetail(reqId);
+    _httpDetailCache[reqId] = data;
+    detail.innerHTML = renderHttpDetail(data);
+  } catch (e) {
+    detail.innerHTML = '<div style="color:#c62828;padding:8px">Failed to load detail: ' + escHtml(e.message) + '</div>';
+  }
+}
+
+async function fetchHttpDetail(reqId) {
+  var url = '/v1/runs/' + encodeURIComponent(selectedRunId) + '/requests/' + encodeURIComponent(reqId);
+  var res = await fetch(url, {});
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return await res.json();
+}
+
+// Which tab of an HTTP exchange is shown first: the first of response body,
+// request body and response headers that has content, else request headers.
+function initialHttpTab(hasResBody, hasReqBody, hasResHdr) {
+  if (hasResBody) return 'response';
+  if (hasReqBody) return 'request';
+  return hasResHdr ? 'resHeaders' : 'reqHeaders';
+}
+
+function renderHttpDetail(data) {
+  var r = data.request || {};
+  var nav = '';
+  if (data.parent) {
+    nav += '<button class="nav-arrow parent" data-nav-req-id="' + data.parent.id + '">'
+         + 'parent: ' + escHtml(data.parent.request_name)
+         + '<span class="meta">' + escHtml(data.parent.http_method || '') + ' ' + escHtml((data.parent.http_url||'').split('?')[0].split('/').pop()) + '</span>'
+         + '</button>';
+  }
+  if (data.children && data.children.length) {
+    data.children.forEach(function(c) {
+      nav += '<button class="nav-arrow child" data-nav-req-id="' + c.id + '">'
+           + 'child: ' + escHtml(c.request_name)
+           + '<span class="meta">' + escHtml(c.http_method || '') + '</span>'
+           + '</button>';
+    });
+  }
+  var navHtml = nav ? '<div class="nav-arrows">' + nav + '</div>' : '';
+
+  var hasReqBody = !!r.request_body;
+  var hasResBody = !!r.response_body;
+  var hasReqHdr  = !!r.request_headers;
+  var hasResHdr  = !!r.response_headers;
+
+  // The response tab is the open one unless only the request has a body.
+  var responseTabActive = hasResBody || !hasReqBody;
+  var requestTabActive  = !hasResBody && hasReqBody;
+
+  var tabs =
+      '<button class="tab' + (responseTabActive ? ' active' : '') + (hasResBody ? '' : ' empty') + '" data-http-tab="response" data-detail-id="' + r.id + '">Response Body</button>'
+    + '<button class="tab' + (requestTabActive ? ' active' : '') + (hasReqBody ? '' : ' empty') + '" data-http-tab="request" data-detail-id="' + r.id + '">Request Body</button>'
+    + '<button class="tab' + (hasResHdr ? '' : ' empty') + '" data-http-tab="resHeaders" data-detail-id="' + r.id + '">Response Headers</button>'
+    + '<button class="tab' + (hasReqHdr ? '' : ' empty') + '" data-http-tab="reqHeaders" data-detail-id="' + r.id + '">Request Headers</button>';
+
+  var initial = initialHttpTab(hasResBody, hasReqBody, hasResHdr);
+  var body = renderHttpTabBody(r, initial);
+
+  return navHtml
+    + '<div class="tab-bar" data-detail-id="' + r.id + '">' + tabs + '</div>'
+    + '<div class="tab-body" id="http-tab-body-' + r.id + '">' + body + '</div>';
+}
+
+function renderHttpTabBody(r, kind) {
+  var raw, isJson = true;
+  if (kind === 'response') raw = r.response_body;
+  else if (kind === 'request') raw = r.request_body;
+  else if (kind === 'resHeaders') return renderHeaders(r.response_headers);
+  else if (kind === 'reqHeaders') return renderHeaders(r.request_headers);
+
+  if (raw == null || raw === '') return '<div class="json-tree-empty">(empty)</div>';
+
+  // Try parse JSON; fall back to raw text
+  var parsed = null;
+  try { parsed = JSON.parse(raw); } catch (_e) { isJson = false; }
+
+  var copyId = 'http-raw-' + r.id + '-' + kind;
+  // #325: tester-ergonomics — Download button next to Copy. Filename built
+  // from the same context used in the run-detail dashboard so files moved
+  // between the two views match.
+  var scenarioForName = r.scenario_code || r.scenario_name || r.suite_name || '';
+  var stepForName     = r.request_name || '';
+  var copyBtn = '<button class="copy-btn" data-copy-target="' + copyId + '">Copy</button>';
+  var downloadBtn = '<button class="copy-btn" data-download-target="' + copyId + '"'
+    + ' data-download-scenario="' + escAttr(scenarioForName) + '"'
+    + ' data-download-step="' + escAttr(stepForName) + '"'
+    + ' data-download-kind="' + escAttr(kind) + '">Download</button>';
+  var actionsBtn = copyBtn + downloadBtn;
+
+  if (isJson) {
+    return actionsBtn
+      + '<div class="json-tree" id="' + copyId + '" data-raw="' + escAttr(raw) + '">' + renderJsonNode(parsed, '', true) + '</div>';
+  }
+  return actionsBtn + '<div class="raw-text" id="' + copyId + '">' + escHtml(raw) + '</div>';
+}
+
+function renderHeaders(jsonStr) {
+  if (!jsonStr) return '<div class="json-tree-empty">(no headers captured)</div>';
+  var obj;
+  try { obj = JSON.parse(jsonStr); } catch (_e) { return '<div class="raw-text">' + escHtml(jsonStr) + '</div>'; }
+  if (!obj || typeof obj !== 'object') return '<div class="json-tree-empty">(empty)</div>';
+  var rows = Object.keys(obj).map(function(k) {
+    return '<tr><td>' + escHtml(k) + '</td><td>' + escHtml(String(obj[k])) + '</td></tr>';
+  }).join('');
+  return '<table class="headers-table"><tbody>' + rows + '</tbody></table>';
+}
+
+/* JSON tree renderer — recursive, expandable */
+function renderJsonNode(value, key, root) {
+  var keyHtml = key !== '' ? '<span class="key">' + escHtml(key) + '</span><span class="punct">: </span>' : '';
+  if (value === null) return '<div class="line">' + keyHtml + '<span class="null">null</span></div>';
+  if (typeof value === 'boolean') return '<div class="line">' + keyHtml + '<span class="bool">' + value + '</span></div>';
+  if (typeof value === 'number') return '<div class="line">' + keyHtml + '<span class="num">' + value + '</span></div>';
+  if (typeof value === 'string') return '<div class="line">' + keyHtml + '<span class="str">' + escHtml(JSON.stringify(value)) + '</span></div>';
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '<div class="line">' + keyHtml + '<span class="punct">[]</span></div>';
+    var inner = value.map(function(v, i) { return renderJsonNode(v, String(i), false); }).join('');
+    var summary = ' <span class="summary" data-json-toggle>(' + value.length + ' item' + (value.length===1?'':'s') + ')</span>';
+    var startCollapsed = !root && value.length > 5;
+    var arrowChar = startCollapsed ? '▶' : '▼';
+    // No dedicated closing-bracket line — the dashed border + indentation
+    // already convey scope. Drops 33% of vertical space vs full pretty-print.
+    return '<div class="node' + (startCollapsed ? ' collapsed' : '') + '">'
+      + '<div class="line"><span class="toggle" data-json-toggle>' + arrowChar + '</span>' + keyHtml + '<span class="punct">[</span>' + summary + '</div>'
+      + '<div class="children">' + inner + '</div>'
+      + '</div>';
+  }
+  // object
+  var keys = Object.keys(value);
+  if (keys.length === 0) return '<div class="line">' + keyHtml + '<span class="punct">{}</span></div>';
+  var innerObj = keys.map(function(k) { return renderJsonNode(value[k], k, false); }).join('');
+  var summaryObj = ' <span class="summary" data-json-toggle>(' + keys.length + ' field' + (keys.length===1?'':'s') + ')</span>';
+  var startCollapsedObj = !root && keys.length > 8;
+  var arrowCharObj = startCollapsedObj ? '▶' : '▼';
+  return '<div class="node' + (startCollapsedObj ? ' collapsed' : '') + '">'
+    + '<div class="line"><span class="toggle" data-json-toggle>' + arrowCharObj + '</span>' + keyHtml + '<span class="punct">{</span>' + summaryObj + '</div>'
+    + '<div class="children">' + innerObj + '</div>'
+    + '</div>';
+}
+
+// The four tabs renderHttpDetail() draws: switchHttpTab() takes no other.
+var HTTP_TAB_KINDS = ['response', 'request', 'resHeaders', 'reqHeaders'];
+
+function switchHttpTab(tabEl) {
+  // The tab's name comes from the page and reaches the innerHTML below
+  // through renderHttpTabBody(): it is one of the four tabs, or nothing is
+  // drawn (#1423: the code-scanning alert dismissed while this code was in
+  // report-builder.html came back at the new path; fixed, not dismissed).
+  var kind = tabEl.getAttribute('data-http-tab');
+  if (HTTP_TAB_KINDS.indexOf(kind) < 0) return;
+  var detailId = tabEl.dataset.detailId;
+  if (tabEl.classList.contains('empty')) return;
+  // toggle active on siblings
+  tabEl.parentElement.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  tabEl.classList.add('active');
+  // re-render body
+  var data = _httpDetailCache[detailId];
+  if (!data) return;
+  document.getElementById('http-tab-body-' + detailId).innerHTML = renderHttpTabBody(data.request, kind);
+}
+
+function navigateToHttpRequest(reqId) {
+  // Make sure the row is in the list; if not, the user changed filter — refetch
+  var existing = document.querySelector('[data-req-id="' + reqId + '"]');
+  if (!existing) {
+    // Switch filter to "all" so the target is visible
+    var allRadio = document.querySelector('input[name="http_filter"][value="all"]');
+    if (allRadio) { allRadio.checked = true; renderHttpTraffic().then(function() { navigateToHttpRequest(reqId); }).catch(oscarReportError); }
+    return;
+  }
+  // Collapse other open rows for clarity (optional — keeps UI focused)
+  document.querySelectorAll('.http-row.expanded').forEach(function(r) {
+    if (r !== existing) {
+      r.classList.remove('expanded');
+      var d = document.getElementById('http-detail-' + r.dataset.reqId);
+      if (d) d.style.display = 'none';
+    }
+  });
+  if (!existing.classList.contains('expanded')) toggleHttpRow(existing).catch(oscarReportError);
+  existing.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function copyJsonContent(btn) {
+  var targetId = btn.dataset.copyTarget;
+  var el = document.getElementById(targetId);
+  if (!el) return;
+  // Prefer the original raw payload (kept as data-raw) over the formatted tree
+  var text = el.dataset.raw || el.textContent || '';
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(function() {
+    btn.textContent = 'Copied!';
+    setTimeout(function() { btn.textContent = 'Copy'; }, 1200);
+  }).catch(oscarReportError);
+}
+
+// #325: tester-ergonomics — Download a request/response body as a JSON file.
+// Filename pattern: ${scenario}_${step}_${kind}.json with non-FS-safe chars
+// collapsed to underscores so the file moves cleanly between Windows, macOS,
+// and Linux. Matches the pattern used by the run-detail dashboard so a
+// downloaded file from either view has the same name.
+function _rbSanitiseFilename(s) {
+  return String(s == null ? '' : s)
+    .replace(/[\\/:*?"<>|\s]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');   // one at most after the collapse above
+}
+function downloadJsonContent(btn) {
+  var targetId = btn.dataset.downloadTarget;
+  var el = document.getElementById(targetId);
+  if (!el) return;
+  var text = el.dataset.raw || el.textContent || '';
+  if (!text) return;
+  var scenario = btn.dataset.downloadScenario || '';
+  var step     = btn.dataset.downloadStep     || '';
+  var kind     = btn.dataset.downloadKind     || 'response';
+  var filename = [
+    _rbSanitiseFilename(scenario) || 'oscar',
+    _rbSanitiseFilename(step)     || 'request',
+    kind
+  ].join('_') + '.json';
+  var blob = new Blob([text], { type: 'application/json' });
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
+  btn.textContent = '✓ Downloaded';
+  setTimeout(function() { btn.textContent = 'Download'; }, 1400);
+}
+
+// S11: attribute escaping is the same shared escaper (it already escapes " and ').
+const escAttr = window.esc;
+
+
+// Templates
+document.getElementById('save-template-btn').addEventListener('click', saveTemplate);
+document.getElementById('load-template-btn').addEventListener('click', loadTemplate);
+document.getElementById('delete-template-btn').addEventListener('click', deleteTemplate);
+
+// Export/Print
+document.getElementById('export-csv-btn').addEventListener('click', exportCSV);
+document.getElementById('print-btn').addEventListener('click', function() { window.print(); });
+
+// Toggle all (delegated on document for the small toggle spans)
+document.addEventListener('click', function(e) {
+  if (e.target.dataset.action === 'toggle-all') {
+    toggleAll(e.target.dataset.group);
+  }
+});
+
+// Expand/collapse JSON log blocks (delegated — rows are re-rendered on filter change)
+document.getElementById('logs-content').addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-action="toggle-json"]');
+  if (!btn) return;
+  var body = document.getElementById(btn.dataset.target);
+  if (!body) return;
+  var expanded = body.classList.toggle('expanded');
+  btn.classList.toggle('expanded', expanded);
+});
+
+/* ── Test Framework coverage (#956) ─────────────────────────────────────────
+ * GET /v1/company/coverage: how far what the Test Framework declares is
+ * tested, for the company or provider selected. Not tied to a run. The
+ * company's members only: the card is not drawn for administrators and
+ * certifiers, whom the route refuses.
+ */
+const COVERAGE_STATES = {
+  passed: 'Passed', defects: 'Passed with defects', failed: 'Failed', 'never-run': 'Never run', 'not-covered': 'No scenario',
+  'not-declared': 'Not supported (not declared)', 'declared-not-supported': 'Not supported (declared)'
+};
+const COVERAGE_DECLARATIONS = {
+  declared: 'Declared', 'not-declared': 'Not declared', 'every-value': 'Every value declared',
+  'declared-not-supported': 'Declared not supported'
+};
+// #972: the results of the coverage by capability, and the kinds of points.
+const CAPABILITY_RESULTS = {
+  passed: 'Passed', deviation: 'Passed with deviation', points: 'Passed with points', blocked: 'Blocked',
+  'not-supported': 'Not supported by the provider', 'not-tested': 'Not tested', 'out-of-scope': 'Out of scope',
+  refused: 'Refused as expected', 'not-refused': 'Not refused', 'not-run': 'Not run'
+};
+// #972 part 4: what changed since the previous shared report, as the workbook names it.
+const CHANGE_LABELS = {
+  fixed: 'Fixed', still: 'Still open', new: 'New', notRetested: 'Not run again'
+};
+const POINT_KINDS = {
+  provider: 'For the provider', accepted: 'Accepted deviations', unsupported: 'Not supported by the provider (not counted against it)',
+  question: 'Questions on the specification', oscar: 'OSCAR\'s own points (not counted against the provider)'
+};
+let coverageData = null;
+
+function coverageStateLabel(state) {
+  return Object.hasOwn(COVERAGE_STATES, state) ? COVERAGE_STATES[state] : String(state || '');
+}
+
+function coverageDeclarationLabel(declaration) {
+  return Object.hasOwn(COVERAGE_DECLARATIONS, declaration) ? COVERAGE_DECLARATIONS[declaration] : String(declaration || '');
+}
+
+function coverageRunAgainLabel(value) {
+  if (value === true) return 'to run again';
+  if (value === false) return 'up to date';
+  return '';
+}
+
+function coverageSummaryText(summary, days) {
+  var s = summary || {};
+  var parts = [
+    s.declared + ' function(s) declared', s.covered + ' with a scenario', s.passed + ' passed',
+    (s.withDefects || 0) + ' passed with defects', s.failed + ' failed', s.neverRun + ' never run', s.notCovered + ' without a scenario',
+    s.toRunAgain + ' to run again'
+  ];
+  var latest = s.latestRunAt ? 'latest run ' + s.latestRunAt : 'no run';
+  return parts.join(' · ') + ' — runs of the last ' + days + ' day(s), ' + latest + '.';
+}
+
+function coverageScenarioText(s) {
+  var text = s.code + ': ' + coverageStateLabel(s.result);
+  if (s.run) text += ' (' + s.run.passed + ' passed, ' + s.run.failed + ' failed, ' + (s.run.at || '?') + ')';
+  var again = coverageRunAgainLabel(s.toRunAgain);
+  if (again) text += ', ' + again;
+  return text;
+}
+
+function coverageFindingText(f) {
+  return f.title + ' (' + f.category + ', ' + f.status + (f.scenarioCode ? ', ' + f.scenarioCode : '') + ')';
+}
+
+function coverageRowsHtml(functions) {
+  var group = null;
+  return (functions || []).map(function(f) {
+    var head = '';
+    if (f.group !== group) {
+      group = f.group;
+      head = '<tr><th colspan="4">' + escHtml(group) + '</th></tr>';
+    }
+    var findings = (f.findings || []).map(function(x) { return '<li>' + escHtml(coverageFindingText(x)) + '</li>'; }).join('');
+    return head + '<tr><td>' + escHtml(f.label) + '</td>'
+      + '<td><span class="cov-state cov-' + escHtml(f.state) + '">' + escHtml(coverageStateLabel(f.state)) + '</span>'
+      + (f.toRunAgain ? '<br><small>to run again</small>' : '') + '</td>'
+      + '<td>' + coverageFunctionScenariosHtml(f.scenarios) + '</td>'
+      + '<td>' + (findings ? '<ul class="cov-list">' + findings + '</ul>' : '-') + '</td></tr>';
+  }).join('');
+}
+
+// #972 G3: a function's scenarios as the flow view shows them: the counts,
+// those not passed (ten at most), and the whole list folded.
+function coverageFunctionScenariosHtml(list) {
+  var all = Array.isArray(list) ? list : [];
+  if (all.length === 0) return '-';
+  var count = function(r) { return all.filter(function(s) { return s.result === r; }).length; };
+  var counts = { scenarios: all.length, passed: count('passed'), withDefects: count('defects'), failed: count('failed'), neverRun: count('never-run') };
+  var notPassed = all.filter(function(s) { return s.result !== 'passed'; });
+  var shown = notPassed.slice(0, 10).map(function(s) { return '<li>' + escHtml(coverageScenarioText(s)) + '</li>'; }).join('');
+  if (notPassed.length > 10) shown += '<li>' + escHtml('… and ' + (notPassed.length - 10) + ' more') + '</li>';
+  return escHtml(coverageCountsText(counts))
+    + (shown ? '<ul class="cov-list cov-failed-list">' + shown + '</ul>' : '')
+    + '<details><summary>Scenarios</summary><ul class="cov-list">'
+    + all.map(function(s) { return '<li>' + escHtml(coverageScenarioText(s)) + '</li>'; }).join('') + '</ul></details>';
+}
+
+function coverageNotDeclaredHtml(list) {
+  if (!Array.isArray(list) || list.length === 0) return '';
+  return '<div class="cov-note"><strong>Scenarios testing what the Test Framework does not declare</strong><ul class="cov-list">'
+    + list.map(function(n) { return '<li>' + escHtml(n.code) + ': ' + escHtml((n.warnings || []).join(', ')) + '</li>'; }).join('')
+    + '</ul></div>';
+}
+
+function coverageCountsText(c) {
+  var n = c || {};
+  return (n.passed || 0) + ' of ' + (n.scenarios || 0) + ' scenario(s) passed (' + (n.withDefects || 0) + ' with defects, '
+    + (n.failed || 0) + ' failed, ' + (n.neverRun || 0) + ' never run)';
+}
+
+// A run id read from the answer, put in a link only when it is a UUID.
+function coverageRunIdOf(id) {
+  return typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ? id : '';
+}
+
+// The scenarios of a row that did not pass, blocked first, each linked to its run.
+function coverageFailedHtml(list) {
+  if (!Array.isArray(list) || list.length === 0) return '';
+  return '<ul class="cov-list cov-failed-list">' + list.map(function(f) {
+    var id = coverageRunIdOf(f.runId);
+    var name = id ? '<a href="/run-detail.html?id=' + encodeURIComponent(id) + '">' + escHtml(f.code) + '</a>' : escHtml(f.code);
+    var where = f.step ? ' at ' + f.step : '';
+    var check = f.check ? ' — ' + f.check : '';
+    return '<li>' + name + ': <strong>' + escHtml(coverageStateLabel(f.result)) + '</strong>' + escHtml(where + check) + '</li>';
+  }).join('') + '</ul>';
+}
+
+function coverageProviderText(n) {
+  return 'the provider says "not supported" in ' + n + ' scenario(s)';
+}
+
+function coverageMatrixRowHtml(r, flowCell) {
+  var codes = (r.scenarios || []).map(function(code) { return '<li>' + escHtml(code) + '</li>'; }).join('');
+  var findings = (r.findings || []).map(function(x) { return '<li>' + escHtml(coverageFindingText(x)) + '</li>'; }).join('');
+  return '<tr><td><strong>' + escHtml(flowCell) + '</strong></td>'
+    + '<td><small class="cov-group">' + escHtml(r.group) + '</small><br>' + escHtml(r.label) + '</td>'
+    + '<td><span class="cov-state cov-' + escHtml(r.result) + '">' + escHtml(coverageStateLabel(r.result)) + '</span>'
+    + (r.toRunAgain ? '<br><small>to run again</small>' : '')
+    + (r.providerNotSupported ? '<br><small class="cov-provider">' + escHtml(coverageProviderText(r.providerNotSupported)) + '</small>' : '') + '</td>'
+    + '<td>' + escHtml(coverageDeclarationLabel(r.declaration)) + '</td>'
+    + '<td>' + escHtml(coverageCountsText(r.counts)) + coverageFailedHtml(r.failedScenarios)
+    + (codes ? '<details><summary>Scenarios</summary><ul class="cov-list">' + codes + '</ul></details>' : '') + '</td>'
+    + '<td>' + (findings ? '<ul class="cov-list">' + findings + '</ul>' : '-') + '</td></tr>';
+}
+
+function coverageMatrixHtml(rows) {
+  var flow = null;
+  return '<table class="cap-table"><thead><tr><th>Flow</th><th>Element tested</th><th>Result</th><th>Test Framework</th><th>Scenarios (latest finished run)</th><th>Open findings</th></tr></thead><tbody>'
+    + (rows || []).map(function(r) {
+      var flowCell = r.flow === flow ? '' : r.flowLabel;
+      flow = r.flow;
+      return coverageMatrixRowHtml(r, flowCell);
+    }).join('')
+    + '</tbody></table>';
+}
+
+/* ── Coverage by capability (#972) ─────────────────────────────────────────
+ * The answer's byCapability: one row per capability, the expected refusals,
+ * the numbered points to look at. Every text goes through escHtml(); a run id
+ * is linked only when it is a UUID, a point number only when it is a whole
+ * number.
+ */
+function capabilityResultLabel(result) {
+  return Object.hasOwn(CAPABILITY_RESULTS, result) ? CAPABILITY_RESULTS[result] : String(result || '');
+}
+
+function capabilitySummaryText(summary, days) {
+  var s = summary || {};
+  var r = s.expectedRefusals || {};
+  var p = s.pointsToLookAt || {};
+  var parts = [
+    (s.tested || 0) + ' capability(ies) tested: ' + (s.passed || 0) + ' passed, ' + (s.deviation || 0) + ' passed with deviation, '
+      + (s.points || 0) + ' passed with points, ' + (s.blocked || 0) + ' blocked, ' + (s.notSupported || 0) + ' not supported by the provider',
+    (s.notTested || 0) + ' declared and not tested', (s.outOfScope || 0) + ' out of scope',
+    'expected refusals: ' + (r.refused || 0) + ' of ' + (r.total || 0) + ' refused (' + (r.deviation || 0) + ' accepted deviation, '
+      + (r.notRefused || 0) + ' not refused, ' + (r.blocked || 0) + ' blocked, ' + (r.notRun || 0) + ' not run)',
+    (p.total || 0) + ' point(s) to look at: ' + (p.provider || 0) + ' for the provider, ' + (p.accepted || 0) + ' accepted deviation(s), '
+      + (p.unsupported || 0) + ' not supported, ' + (p.questions || 0) + ' question(s), ' + (p.oscar || 0) + ' of OSCAR' + (p.truncated ? ' (the first 500 only)' : ''),
+    (s.declaredWithoutScenario || 0) + ' declared function(s) without a scenario run', (s.apart || 0) + ' scenario(s) set apart'
+  ];
+  return parts.join(' · ') + ' — runs of the last ' + days + ' day(s).';
+}
+
+function capabilityPointLinks(numbers) {
+  var list = (Array.isArray(numbers) ? numbers : []).filter(function(n) { return Number.isInteger(n) && n > 0; });
+  if (list.length === 0) return '-';
+  return list.map(function(n) { return '<a href="#cov-point-' + n + '" data-cov-point="' + n + '" aria-expanded="false">#' + n + '</a>'; }).join(', ');
+}
+
+// The points a row names, each in a row of its own under it, hidden until
+// its number is clicked (#984).
+function capabilityPointRows(numbers, points, columns, positions) {
+  var byNumber = {};
+  (Array.isArray(points) ? points : []).forEach(function(p) { if (Number.isInteger(p.number)) byNumber[p.number] = p; });
+  return (Array.isArray(numbers) ? numbers : []).filter(function(n) { return Number.isInteger(n) && byNumber[n]; }).map(function(n) {
+    return '<tr class="cov-point-detail" data-cov-detail="' + n + '" hidden><td colspan="' + columns + '"><ul class="cov-points-list">'
+      + capabilityPointHtml(byNumber[n], false, positions) + '</ul></td></tr>';
+  }).join('');
+}
+
+// A click on a point number opens that point under its row, a second click
+// closes it. Anything else, or a row drawn without it, is left to the link.
+function toggleCoveragePoint(e) {
+  var link = e.target && typeof e.target.closest === 'function' ? e.target.closest('a[data-cov-point]') : null;
+  if (!link) return;
+  var row = link.closest('tr');
+  var detail = row ? row.nextElementSibling : null;
+  while (detail && detail.classList.contains('cov-point-detail') && detail.dataset.covDetail !== link.dataset.covPoint) {
+    detail = detail.nextElementSibling;
+  }
+  if (!detail || !detail.classList.contains('cov-point-detail')) return;
+  e.preventDefault();
+  detail.hidden = !detail.hidden;
+  link.setAttribute('aria-expanded', String(!detail.hidden));
+}
+
+function capabilityPointNumbers(numbers) {
+  var list = (Array.isArray(numbers) ? numbers : []).filter(function(n) { return Number.isInteger(n) && n > 0; });
+  return list.length ? list.map(function(n) { return '#' + n; }).join(', ') : '-';
+}
+
+function capabilityRunLink(code, runId) {
+  var id = coverageRunIdOf(runId);
+  return id ? '<a href="/run-detail.html?id=' + encodeURIComponent(id) + '">' + escHtml(code) + '</a>' : escHtml(code);
+}
+
+function capabilityFormText(f) {
+  var text = (f.form ? ' (' + f.form + ')' : '') + ': ' + capabilityResultLabel(f.result);
+  if (f.step) text += ' at ' + f.step + (f.check ? ' — ' + f.check : '');
+  else if (f.check) text += ' — ' + f.check;
+  // #1008: the point of the check that blocked it, listed with the row's.
+  if (Number.isInteger(f.point) && f.point > 0) text += ' (point #' + f.point + ')';
+  var again = coverageRunAgainLabel(f.toRunAgain);
+  if (again) text += ', ' + again;
+  return text;
+}
+
+function capabilityFormHtml(f) {
+  return '<li>' + capabilityRunLink(f.code, f.runId) + escHtml(capabilityFormText(f)) + '</li>';
+}
+
+function capabilityTestHtml(t) {
+  return '<li><strong>' + escHtml(t.entry || t.key) + '</strong>: ' + escHtml(capabilityResultLabel(t.result))
+    + (t.purpose ? '<br><small>' + escHtml(t.purpose) + '</small>' : '')
+    + '<ul class="cov-list">' + (t.forms || []).map(capabilityFormHtml).join('') + '</ul></li>';
+}
+
+function capabilityTestedText(row) {
+  var tests = row.tests || [];
+  var forms = tests.reduce(function(n, t) { return n + (t.forms || []).filter(function(f) { return f.result !== 'not-run'; }).length; }, 0);
+  var proven = (row.provenBy && row.provenBy.count) || 0;
+  var parts = [];
+  if (tests.length) parts.push(tests.length + ' test(s), ' + forms + ' form(s) run');
+  if (proven) parts.push('proven on the way by ' + proven + ' run(s)');
+  return parts.length ? parts.join(' · ') : 'No test';
+}
+
+function capabilityTestedHtml(row) {
+  var tests = (row.tests || []).map(capabilityTestHtml).join('');
+  var side = (row.sideProblems || []).map(function(s) { return '<li>' + escHtml(s.code + ': ' + capabilityResultLabel(s.result)) + '</li>'; }).join('');
+  var out = escHtml(capabilityTestedText(row));
+  // #995: the latest run's offer request options, in one line.
+  if (row.parameters) out += '<br><small>' + escHtml(row.parameters) + '</small>';
+  if (tests) out += '<details><summary>Tests</summary><ul class="cov-list">' + tests + '</ul></details>';
+  if (side) out += '<details><summary>Problems on the way</summary><ul class="cov-list">' + side + '</ul></details>';
+  return out;
+}
+
+function capabilityLabelText(row) {
+  return row.label + (row.optional ? ' (optional)' : '') + (row.declaration ? ' — ' + coverageDeclarationLabel(row.declaration) : '');
+}
+
+function capabilityRowsHtml(rows, points, positions) {
+  var group = null;
+  return (rows || []).map(function(c) {
+    var head = '';
+    if (c.group !== group) {
+      group = c.group;
+      head = '<tr><th colspan="4">' + escHtml(group) + '</th></tr>';
+    }
+    return head + '<tr><td>' + escHtml(capabilityLabelText(c)) + '</td>'
+      + '<td>' + capabilityTestedHtml(c) + '</td>'
+      + '<td><span class="cov-state cov-' + escHtml(c.result) + '">' + escHtml(capabilityResultLabel(c.result)) + '</span></td>'
+      + '<td>' + capabilityPointLinks(c.points) + '</td></tr>' + capabilityPointRows(c.points, points, 4, positions);
+  }).join('');
+}
+
+// #996: an expected refusal's forms as the rest of the report shows them: the
+// counts, the forms not refused grouped by the step they went through (three
+// lines at most: the copies of a test fail the same way, and listing each
+// made a row dozens of lines tall), and every form folded. What failed is in
+// the folded forms and in the row's point.
+function capabilityRefusalFormsHtml(forms) {
+  var REFUSAL_GROUPS_OPEN = 3;
+  var all = Array.isArray(forms) ? forms : [];
+  if (all.length === 0) return '-';
+  var counts = {};
+  all.forEach(function(f) { counts[f.result] = (counts[f.result] || 0) + 1; });
+  // Always in one order, whatever order the forms come in.
+  var order = ['refused', 'deviation', 'not-refused', 'blocked', 'not-run'];
+  var rank = function(k) { var i = order.indexOf(k); return i < 0 ? order.length : i; };
+  var text = all.length + ' form(s): ' + Object.keys(counts).sort(function(a, b) { return rank(a) - rank(b); }).map(function(k) {
+    return counts[k] + ' ' + capabilityResultLabel(k).toLowerCase();
+  }).join(', ');
+  var groups = [];
+  all.filter(function(f) { return f.result === 'not-refused'; }).forEach(function(f) {
+    var step = f.step || '';
+    var group = groups.find(function(g) { return g.step === step; });
+    if (group) group.count += 1;
+    else groups.push({ step: step, count: 1 });
+  });
+  var shown = groups.slice(0, REFUSAL_GROUPS_OPEN).map(function(g) {
+    return '<li>' + escHtml('Not refused' + (g.step ? ' at ' + g.step : '') + ' (' + g.count + ' form(s))') + '</li>';
+  }).join('');
+  if (groups.length > REFUSAL_GROUPS_OPEN) shown += '<li>' + escHtml('… and ' + (groups.length - REFUSAL_GROUPS_OPEN) + ' more step(s)') + '</li>';
+  return escHtml(text)
+    + (shown ? '<ul class="cov-list cov-failed-list">' + shown + '</ul>' : '')
+    + '<details><summary>Forms</summary><ul class="cov-list">' + all.map(capabilityFormHtml).join('') + '</ul></details>';
+}
+
+function capabilityRefusalsHtml(list, points, positions) {
+  if (!Array.isArray(list) || list.length === 0) return '';
+  return '<h4 class="cov-heading">Expected refusals (' + list.length + ')</h4><table class="cap-table"><thead><tr><th>Expected refusal</th>'
+    + '<th>Capability probed</th><th>Result</th><th>Forms</th><th>Points</th></tr></thead><tbody>'
+    + list.map(function(r) {
+      return '<tr><td><strong>' + escHtml(r.entry || r.key) + '</strong>' + (r.purpose ? '<br><small>' + escHtml(r.purpose) + '</small>' : '') + '</td>'
+        + '<td>' + escHtml(r.capabilityLabel) + '</td>'
+        + '<td><span class="cov-state cov-' + escHtml(r.result) + '">' + escHtml(capabilityResultLabel(r.result)) + '</span></td>'
+        + '<td>' + capabilityRefusalFormsHtml(r.forms) + '</td>'
+        + '<td>' + capabilityPointLinks(r.points) + '</td></tr>' + capabilityPointRows(r.points, points, 5, positions);
+    }).join('') + '</tbody></table>';
+}
+
+// #995: the offer request options' results, each stated in words. A point is
+// raised only for the mandatory request not answered, a declared parameter not
+// taken or a refused combination; everything else is stated here.
+function capabilityDeclaredText(declared) {
+  if (declared === true) return 'Declared';
+  if (declared === false) return 'Declared not supported';
+  return 'Not declared';
+}
+
+function capabilityCombinationText(c) {
+  var words = { answered: 'Answered', 'no-offer': 'No offer', refused: 'Refused (a point)', 'not-sent': 'Not sent' };
+  var head = Object.hasOwn(words, c.state) ? words[c.state] : String(c.state || '');
+  return head + (c.status ? ' (HTTP ' + c.status + ')' : '') + (c.message ? ' — ' + c.message : '');
+}
+
+// The combinations and every parameter at once, one text each.
+function capabilityCombinationLines(e) {
+  var lines = (e.combinations || []).map(function(c) { return (c.options || []).join(' + ') + ': ' + capabilityCombinationText(c); });
+  if (e.all) lines.push('Every supported parameter at once' + (Number.isInteger(e.all.count) ? ' (' + e.all.count + ')' : '') + ': ' + capabilityCombinationText(e.all));
+  return lines;
+}
+
+function capabilityMandatoryText(e) {
+  if (!e.mandatory) return 'Mandatory parameters only: not in the report';
+  return 'Mandatory parameters only: ' + (e.mandatory.ok ? 'answered' : 'NOT answered') + (e.mandatory.message ? ' — ' + e.mandatory.message : '');
+}
+
+function capabilityParameterCells(p) {
+  var value = '';
+  if (p.value !== undefined && p.value !== null) value = String(p.value) + (p.source ? ' (' + p.source + ')' : '');
+  return [p.option, value, Number.isInteger(p.status) ? String(p.status) : '-', p.resultText || p.result || '', capabilityDeclaredText(p.declared), p.message || ''];
+}
+
+function capabilityOptionsRunHtml(e) {
+  var rows = (e.parameters || []).map(function(p) {
+    return '<tr>' + capabilityParameterCells(p).map(function(c) { return '<td>' + escHtml(c) + '</td>'; }).join('') + '</tr>';
+  }).join('');
+  var lines = capabilityCombinationLines(e);
+  return '<details class="cov-options"><summary>' + capabilityRunLink(e.code, e.runId) + escHtml(e.at ? ', ' + e.at : '')
+    + (e.text ? '<br><small>' + escHtml(e.text) + '</small>' : '') + '</summary>'
+    + '<div class="cov-note">' + escHtml(capabilityMandatoryText(e)) + '</div>'
+    + (rows ? '<table class="cap-table"><thead><tr><th>Parameter</th><th>Value sent</th><th>HTTP</th><th>Result</th><th>Test Framework</th><th>Detail</th></tr></thead><tbody>' + rows + '</tbody></table>' : '')
+    + (lines.length ? '<div class="cov-note">Combinations of the parameters found supported:</div><ul class="cov-list">'
+      + lines.map(function(l) { return '<li>' + escHtml(l) + '</li>'; }).join('') + '</ul>' : '')
+    + '</details>';
+}
+
+function capabilityOptionsHtml(list) {
+  if (!Array.isArray(list) || list.length === 0) return '';
+  return '<h4 class="cov-heading">Optional parameters of the offer request (' + list.length + ' run(s))</h4>'
+    + '<div class="cov-note">' + escHtml('The latest run of each test form: the request with the mandatory parameters only, each optional parameter alone, '
+      + 'combinations of those found supported, and all of them at once. A point is raised only when the mandatory request is not answered, '
+      + 'a declared parameter is not taken, or a combination is refused; everything else is stated here.') + '</div>'
+    + list.map(capabilityOptionsRunHtml).join('');
+}
+
+function capabilityOptionsMarkdown(list) {
+  if (!Array.isArray(list) || list.length === 0) return [];
+  var lines = ['', '## Optional parameters of the offer request'];
+  for (const e of list) {
+    lines.push('', '### ' + mdCell(e.code + (e.at ? ', ' + e.at : '')), '', mdCell(e.text || ''), '', mdCell(capabilityMandatoryText(e)));
+    if ((e.parameters || []).length) {
+      lines.push('', '| Parameter | Value sent | HTTP | Result | Test Framework | Detail |', '|---|---|---|---|---|---|');
+      for (const p of e.parameters) lines.push('| ' + capabilityParameterCells(p).map(mdCell).join(' | ') + ' |');
+    }
+    var combos = capabilityCombinationLines(e);
+    if (combos.length) lines.push('');
+    for (const l of combos) lines.push('- ' + mdCell(l));
+  }
+  return lines;
+}
+
+function capabilityFindingText(f, possible) {
+  if (!f) return '';
+  return (possible ? 'Possibly finding: ' : 'Finding: ') + f.title + ' (' + f.category + ', ' + f.status + ')';
+}
+
+function capabilitySeenText(p) {
+  if (!p.firstSeen) return 'no date';
+  return p.firstSeen === p.lastSeen ? 'on ' + p.firstSeen : 'from ' + p.firstSeen + ' to ' + p.lastSeen;
+}
+
+// Where a point was met, and the answer when it was not a success.
+function capabilityStepText(p) {
+  var steps = (Array.isArray(p.steps) && p.steps.length ? p.steps : [p.step]).join(', ');
+  // A status says something only when the answer was not a success.
+  var answer = [p.status >= 300 ? 'HTTP ' + p.status : '', p.problemCode || ''].filter(Boolean).join(', ');
+  return steps + (answer ? ' (' + answer + ')' : '');
+}
+
+// What a point is (#990): a failed check says what it expected and what the
+// latest run saw; a known deviation is one line. A report published before
+// #990 has no "Seen".
+function capabilityProblemLines(p) {
+  if (p.source === 'known-deviation') return [capabilityStepText(p) + ': ' + p.check];
+  var lines = [capabilityStepText(p), 'Expected: ' + p.check];
+  if (p.observed && p.observed.text) lines.push('Seen: ' + p.observed.text);
+  return lines;
+}
+
+// A line of a point, its "Expected:" or "Seen:" label in bold.
+function capabilityLineHtml(line) {
+  var label = /^(Expected|Seen): /.exec(line);
+  return label ? '<strong>' + label[1] + ':</strong> ' + escHtml(line.slice(label[0].length)) : escHtml(line);
+}
+
+// A text ending as a sentence, for the Markdown's one line per point.
+function capabilitySentence(text) {
+  var t = String(text);
+  return /[.!?…]$/.test(t) ? t : t + '.';
+}
+
+// A test and the codes that showed it, a code that is the test's own name left out.
+function capabilityTestCodes(t) {
+  var name = t.entry || t.key;
+  var others = (t.codes || []).filter(function(c) { return c !== name; });
+  return others.length ? name + ' (' + others.join(', ') + ')' : name;
+}
+
+function capabilityWhereText(p) {
+  var tests = (p.tests || []).map(capabilityTestCodes).join('; ');
+  var modes = (p.modes || []).map(capabilityModeText).join(' and ');
+  return 'Found in ' + (tests || 'no test') + ', ' + capabilitySeenText(p) + (p.occurrences > 1 ? ', ' + p.occurrences + ' times' : '')
+    + (modes ? ' (' + modes.toLowerCase() + ')' : '');
+}
+
+// #1053: the name of a distribution mode.
+function capabilityModeText(mode) {
+  var MODE_TEXT = { PRODUCT: 'Product-based distribution', FARE: 'Fare-based distribution' };
+  return Object.hasOwn(MODE_TEXT, mode) ? MODE_TEXT[mode] : String(mode || '');
+}
+
+// #1053: one mode's summary: its capabilities, refusals and points.
+function capabilityModeSummaryText(m) {
+  var s = (m && m.summary) || {};
+  var r = s.expectedRefusals || {};
+  var p = s.pointsToLookAt || {};
+  return (m && m.scenarios || 0) + ' scenario(s) · ' + (s.tested || 0) + ' capability(ies) tested: ' + (s.passed || 0) + ' passed, '
+    + (s.deviation || 0) + ' passed with deviation, ' + (s.points || 0) + ' passed with points, ' + (s.blocked || 0) + ' blocked, '
+    + (s.notSupported || 0) + ' not supported by the provider · ' + (s.notTested || 0) + ' declared and not tested · expected refusals: '
+    + (r.refused || 0) + ' of ' + (r.total || 0) + ' refused · ' + (p.total || 0) + ' point(s) to look at';
+}
+
+// The capability tables: one, or one per distribution mode (#1053), each
+// with its expected refusals. The points stay one list for the report.
+function capabilityTablesHtml(data) {
+  var table = function(rows, refusals) {
+    if (!Array.isArray(rows) || rows.length === 0) return '<div class="cov-note">No capability: no scenario of this distribution mode is read.</div>';
+    return '<table class="cap-table"><thead><tr><th>Capability</th><th>Tested</th><th>Result</th><th>Points</th></tr></thead><tbody>'
+      + capabilityRowsHtml(rows, data.points, data.positions) + '</tbody></table>';
+  };
+  if (!Array.isArray(data.byMode)) return table(data.capabilities) + capabilityRefusalsHtml(data.expectedRefusals, data.points, data.positions);
+  return data.byMode.map(function(m) {
+    return '<h3 class="cov-heading">' + escHtml(capabilityModeText(m.mode)) + '</h3>'
+      + '<div class="cov-summary">' + escHtml(capabilityModeSummaryText(m)) + '</div>'
+      + table(m.capabilities) + capabilityRefusalsHtml(m.expectedRefusals, data.points, data.positions);
+  }).join('');
+}
+
+// The provider's position on a point (#994), on one line: what, who and
+// when, then why. A published report names the role only, without comment.
+function capabilityPositionText(position) {
+  if (!position || !position.label) return '';
+  var who = [position.by, position.role ? '(' + position.role + ')' : ''].filter(Boolean).join(' ');
+  var signed = [who, position.at].filter(Boolean).join(', ');
+  var text = 'Position: ' + position.label + (signed ? ' — ' + signed : '');
+  return position.comment ? text + ': ' + position.comment : text;
+}
+
+// The positions the reader may take on a point (#994): none on a published
+// report (it has no `positions`), on a known deviation or on a point OSCAR
+// owns; "not supported" never under a capability every provider must have,
+// nor for an expected refusal. The server holds the same rule.
+function capabilityPositionChoices(p, positions) {
+  if (!positions || !Array.isArray(positions.choices)) return [];
+  if (p.source !== 'check' || !/^[0-9a-f]{32}$/.test(String(p.id || ''))) return [];
+  if (p.kind === 'oscar' && !(p.finding && p.finding.category === 'oscar_issue')) return [];
+  var required = Array.isArray(positions.alwaysRequired) ? positions.alwaysRequired : [];
+  return positions.choices.filter(function(c) {
+    return c.key !== 'notSupported' || (!p.expectedRefusal && !required.includes(p.capability));
+  });
+}
+
+function capabilityPositionButtonHtml(p, positions) {
+  if (capabilityPositionChoices(p, positions).length === 0) return '';
+  return '<br><button type="button" class="btn btn-secondary btn-sm" data-cov-position="' + p.id + '">'
+    + (p.finding && p.finding.position ? 'Change the position' : 'Take a position') + '</button>';
+}
+
+// The form a point's button opens: the choices, a comment, Save.
+function capabilityPositionFormHtml(p, positions) {
+  var options = capabilityPositionChoices(p, positions).map(function(c) {
+    return '<option value="' + escHtml(c.key) + '">' + escHtml(c.label) + '</option>';
+  }).join('');
+  return '<form class="cov-position-form" data-cov-position-form="' + p.id + '">'
+    + '<label>Position<select name="position">' + options + '</select></label>'
+    + '<label>Comment (kept in the finding\'s thread)<textarea name="comment" rows="3" maxlength="4000" required></textarea></label>'
+    + '<span><button type="submit" class="btn btn-primary btn-sm">Save the position</button> '
+    + '<button type="button" class="btn btn-secondary btn-sm" data-cov-position-cancel="1">Cancel</button></span>'
+    + '<span class="cov-position-msg" role="status"></span></form>';
+}
+
+// A point; `withId` for the list at the end only, which the numbers link to;
+// `positions` on the live coverage only, where a position can be taken (#994).
+function capabilityPointHtml(p, withId, positions) {
+  var n = Number.isInteger(p.number) ? p.number : 0;
+  var finding = capabilityFindingText(p.finding, false) || capabilityFindingText(p.possibleFinding, true);
+  var position = capabilityPositionText(p.finding && p.finding.position);
+  var runs = (p.runs || []).map(function(r) { return capabilityRunLink(r.code, r.runId); }).join(', ');
+  return '<li' + (withId ? ' id="cov-point-' + n + '"' : '') + '><strong>#' + n + '</strong> ' + escHtml(p.capabilityLabel)
+    + (p.expectedRefusal ? ' <small class="cov-group">(expected refusal)</small>' : '')
+    + (p.blocking ? ' <span class="cov-state cov-blocked">Blocking</span>' : '')
+    + '<br>' + capabilityProblemLines(p).map(capabilityLineHtml).join('<br>')
+    + (p.note ? '<br><small>' + escHtml(p.note) + '</small>' : '')
+    + '<br><small>' + escHtml(capabilityWhereText(p)) + '</small>'
+    + (finding ? '<br><small>' + escHtml(finding) + '</small>' : '')
+    + (position ? '<br><small>' + escHtml(position) + '</small>' : '')
+    + (runs ? '<br><small>Runs: ' + runs + '</small>' : '') + capabilityPositionButtonHtml(p, positions) + '</li>';
+}
+
+function capabilityPointsHtml(points, positions) {
+  var list = Array.isArray(points) ? points : [];
+  if (list.length === 0) return '<h4 class="cov-heading">Points to look at</h4><div class="cov-note">None.</div>';
+  return '<h4 class="cov-heading">Points to look at (' + list.length + ')</h4>' + Object.keys(POINT_KINDS).map(function(kind) {
+    var of = list.filter(function(p) { return p.kind === kind; });
+    if (of.length === 0) return '';
+    return '<h5 class="cov-subheading">' + escHtml(POINT_KINDS[kind]) + ' (' + of.length + ')</h5>'
+      + '<ul class="cov-points-list">' + of.map(function(p) { return capabilityPointHtml(p, true, positions); }).join('') + '</ul>';
+  }).join('');
+}
+
+function capabilityAsideHtml(c) {
+  var notTested = c.notTested || [];
+  var apart = c.apart || [];
+  var out = '';
+  if (notTested.length) {
+    out += '<details class="cov-note"><summary>Declared functions without a scenario run (' + notTested.length + ')</summary><ul class="cov-list">'
+      + notTested.map(function(f) { return '<li>' + escHtml(f.group + ': ' + f.label + ' (' + coverageStateLabel(f.state) + ')') + '</li>'; }).join('')
+      + '</ul></details>';
+  }
+  if (apart.length) {
+    out += '<details class="cov-note"><summary>Scenarios set apart: neither in the run list nor run (' + apart.length + ')</summary><ul class="cov-list">'
+      + apart.map(function(a) { return '<li>' + escHtml(a.code + (a.entry && a.entry !== a.code ? ' (' + a.entry + ')' : '')) + '</li>'; }).join('')
+      + '</ul></details>';
+  }
+  return out;
+}
+
+// #1029: the simulator's deliberate errors, kept out of the provider's
+// coverage: did OSCAR see each one? The words are the server's RESULT_TEXT and
+// KIND_TEXT (utils/simulatedErrors.js), pinned by ui-scripts.test.js.
+function simulatedErrorsLabels() {
+  return {
+    results: { detected: 'Detected', missed: 'Missed', 'not-run': 'Not run' },
+    kinds: { wrong: 'Wrong answer', fault: 'Fault' }
+  };
+}
+
+function simulatedErrorsSummaryText(s) {
+  var sum = s || {};
+  return (sum.detected || 0) + ' of ' + (sum.total || 0) + ' detected (' + (sum.missed || 0) + ' missed, ' + (sum.notRun || 0) + ' not run)';
+}
+
+function simulatedErrorWhatText(e) {
+  if (e.result === 'not-run') return '';
+  if (e.kind === 'fault') {
+    var faults = (e.faults || []).map(function(x) { return x.code + (x.detected ? '' : ' (not reported)'); }).join(', ');
+    return faults + (e.check ? ' — ' + e.check : '');
+  }
+  return (e.step ? e.step + ' — ' : '') + (e.check || '');
+}
+
+// The colour of a simulated error's result: detected reads as passed, missed as blocked.
+function simulatedErrorClass(result) {
+  if (result === 'detected') return 'passed';
+  if (result === 'missed') return 'blocked';
+  return 'never-run';
+}
+
+function simulatedErrorsHtml(se) {
+  var list = (se && se.entries) || [];
+  if (list.length === 0) return '';
+  var labels = simulatedErrorsLabels();
+  return '<h4 class="cov-heading">Simulated errors (' + list.length + ')</h4>'
+    + '<div class="cov-note">' + escHtml('The simulator\'s deliberate errors (SIM_WRONG_, SIM_FAULT_): not counted in the provider\'s coverage, nor in a published report. '
+      + simulatedErrorsSummaryText(se.summary) + '.') + '</div>'
+    + '<table class="cap-table"><thead><tr><th>Scenario</th><th>Kind</th><th>Result</th><th>What OSCAR reported</th></tr></thead><tbody>'
+    + list.map(function(e) {
+      return '<tr><td>' + capabilityRunLink(e.code, e.runId) + '</td><td>' + escHtml(labels.kinds[e.kind] || e.kind) + '</td>'
+        + '<td class="cov-' + simulatedErrorClass(e.result) + '">' + escHtml(labels.results[e.result] || e.result) + '</td>'
+        + '<td>' + escHtml(simulatedErrorWhatText(e)) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function simulatedErrorsMarkdown(se) {
+  var list = (se && se.entries) || [];
+  if (list.length === 0) return [];
+  var labels = simulatedErrorsLabels();
+  var lines = ['', '## Simulated errors', '', mdCell('Not counted in the provider\'s coverage. ' + simulatedErrorsSummaryText(se.summary) + '.'), '',
+    '| Scenario | Kind | Result | What OSCAR reported |', '|---|---|---|---|'];
+  for (const e of list) {
+    lines.push('| ' + [e.code, labels.kinds[e.kind] || e.kind, labels.results[e.result] || e.result, simulatedErrorWhatText(e)].map(mdCell).join(' | ') + ' |');
+  }
+  return lines;
+}
+
+function capabilityHtml(c) {
+  var data = c || {};
+  return capabilityTablesHtml(data) + capabilityOptionsHtml(data.offerOptions)
+    + capabilityPointsHtml(data.points, data.positions) + simulatedErrorsHtml(data.simulatedErrors) + capabilityAsideHtml(data);
+}
+
+function coverageViewHtml(data, view) {
+  if (view === 'capabilities') return capabilityHtml(data.byCapability);
+  if (view === 'functions') {
+    return '<table class="cap-table"><thead><tr><th>Function declared</th><th>State</th><th>Scenarios (latest finished run)</th><th>Open findings</th></tr></thead>'
+      + '<tbody>' + coverageRowsHtml(data.functions) + '</tbody></table>';
+  }
+  return coverageMatrixHtml(data.matrix);
+}
+
+function coverageHtml(data, view) {
+  var notes = [];
+  if (!data.framework) notes.push('No Test Framework is stored: nothing is declared beyond product-based distribution.');
+  if (!data.datafile) notes.push('No data file is stored: no scenario exercises anything.');
+  var summary = view === 'capabilities'
+    ? capabilitySummaryText((data.byCapability || {}).summary, data.days)
+    : coverageSummaryText(data.summary, data.days);
+  return '<div class="cov-summary">' + escHtml(summary) + '</div>'
+    + notes.map(function(n) { return '<div class="cov-note">' + escHtml(n) + '</div>'; }).join('')
+    + coverageViewHtml(data, view)
+    + coverageNotDeclaredHtml(data.notDeclared);
+}
+
+// One Markdown text: one line, no "|" breaking a table, no "<" read as HTML.
+function mdCell(value) {
+  return String(value ?? '').replaceAll('\r\n', ' ').replaceAll('\n', ' ').replaceAll('\r', ' ')
+    .replaceAll('\\', String.raw`\\`).replaceAll('|', String.raw`\|`).replaceAll('<', String.raw`\<`);
+}
+
+function capabilityPointLine(p) {
+  var finding = capabilityFindingText(p.finding, false) || capabilityFindingText(p.possibleFinding, true);
+  var position = capabilityPositionText(p.finding && p.finding.position);
+  return '#' + p.number + ' ' + p.capabilityLabel + (p.expectedRefusal ? ' (expected refusal)' : '') + (p.blocking ? ', blocking' : '')
+    + ' — ' + capabilityProblemLines(p).map(capabilitySentence).join(' ') + ' ' + capabilityWhereText(p) + '.' + (finding ? ' ' + finding + '.' : '') + (position ? ' ' + capabilitySentence(position) : '') + (p.note ? ' ' + p.note : '');
+}
+
+function capabilityRowsMarkdown(rows) {
+  var lines = [];
+  var group = null;
+  for (const c of rows || []) {
+    if (c.group !== group) {
+      group = c.group;
+      lines.push('', '### ' + mdCell(group), '', '| Capability | Tested | Result | Points |', '|---|---|---|---|');
+    }
+    var tested = capabilityTestedText(c) + (c.parameters ? ' · ' + c.parameters : '');
+    lines.push('| ' + [capabilityLabelText(c), tested, capabilityResultLabel(c.result), capabilityPointNumbers(c.points)].map(mdCell).join(' | ') + ' |');
+  }
+  return lines;
+}
+
+function capabilityRefusalsMarkdown(list) {
+  if (!Array.isArray(list) || list.length === 0) return [];
+  var lines = ['', '## Expected refusals', '', '| Expected refusal | Capability probed | Result | Forms | Points |', '|---|---|---|---|---|'];
+  for (const r of list) {
+    var forms = (r.forms || []).map(function(f) { return f.code + capabilityFormText(f); }).join('; ');
+    lines.push('| ' + [r.entry || r.key, r.capabilityLabel, capabilityResultLabel(r.result), forms, capabilityPointNumbers(r.points)].map(mdCell).join(' | ') + ' |');
+  }
+  return lines;
+}
+
+function capabilityPointsMarkdown(points) {
+  var list = Array.isArray(points) ? points : [];
+  var lines = ['', '## Points to look at'];
+  if (list.length === 0) lines.push('', 'None.');
+  for (const kind of Object.keys(POINT_KINDS)) {
+    var of = list.filter(function(p) { return p.kind === kind; });
+    if (of.length === 0) continue;
+    lines.push('', '### ' + mdCell(POINT_KINDS[kind]), '');
+    for (const p of of) lines.push('- ' + mdCell(capabilityPointLine(p)));
+  }
+  return lines;
+}
+
+function capabilityAsideMarkdown(c) {
+  var lines = [];
+  if ((c.notTested || []).length) {
+    lines.push('', '## Declared functions without a scenario run', '');
+    for (const f of c.notTested) lines.push('- ' + mdCell(f.group + ': ' + f.label + ' (' + coverageStateLabel(f.state) + ')'));
+  }
+  if ((c.apart || []).length) {
+    lines.push('', '## Scenarios set apart (neither in the run list nor run)', '', mdCell(c.apart.map(function(a) { return a.code; }).join(', ')));
+  }
+  return lines;
+}
+
+// The capability tables in Markdown: one, or one per distribution mode (#1053).
+function capabilityTablesMarkdown(data) {
+  if (!Array.isArray(data.byMode)) return capabilityRowsMarkdown(data.capabilities).concat(capabilityRefusalsMarkdown(data.expectedRefusals));
+  var lines = [];
+  for (const m of data.byMode) {
+    lines.push('', '### ' + mdCell(capabilityModeText(m.mode)), '', mdCell(capabilityModeSummaryText(m)));
+    lines = lines.concat(capabilityRowsMarkdown(m.capabilities).map(function(l) { return l.startsWith('### ') ? '#' + l : l; }),
+      capabilityRefusalsMarkdown(m.expectedRefusals).map(function(l) { return l.startsWith('## ') ? '#' + l : l; }));
+  }
+  return lines;
+}
+
+function capabilityMarkdown(c, days) {
+  var data = c || {};
+  return ['## By capability', '', mdCell(capabilitySummaryText(data.summary, days))]
+    .concat(capabilityTablesMarkdown(data),
+      capabilityOptionsMarkdown(data.offerOptions), capabilityPointsMarkdown(data.points), simulatedErrorsMarkdown(data.simulatedErrors),
+      capabilityAsideMarkdown(data));
+}
+
+function coverageMatrixMarkdown(data) {
+  var lines = ['', '## By flow and element', '', mdCell(coverageSummaryText(data.summary, data.days)), '',
+    '| Flow | Element tested | Result | Test Framework | Scenarios | Not passed |', '|---|---|---|---|---|---|'];
+  for (const r of data.matrix || []) {
+    var result = coverageStateLabel(r.result) + (r.toRunAgain ? ', to run again' : '')
+      + (r.providerNotSupported ? ', ' + coverageProviderText(r.providerNotSupported) : '');
+    var notPassed = (r.failedScenarios || []).map(function(f) { return f.code + ' (' + coverageStateLabel(f.result) + (f.step ? ' at ' + f.step : '') + ')'; }).join('; ');
+    lines.push('| ' + [r.flowLabel, r.group + ': ' + r.label, result, coverageDeclarationLabel(r.declaration), coverageCountsText(r.counts), notPassed].map(mdCell).join(' | ') + ' |');
+  }
+  return lines;
+}
+
+function coverageFunctionsMarkdown(data) {
+  var lines = ['', '## By function declared'];
+  var group = null;
+  for (const f of data.functions || []) {
+    if (f.group !== group) {
+      group = f.group;
+      lines.push('', '### ' + mdCell(group), '', '| Function | State | Scenarios | Open findings |', '|---|---|---|---|');
+    }
+    var state = coverageStateLabel(f.state) + (f.toRunAgain ? ', to run again' : '');
+    lines.push('| ' + [f.label, state, (f.scenarios || []).map(coverageScenarioText).join('; '),
+      (f.findings || []).map(coverageFindingText).join('; ')].map(mdCell).join(' | ') + ' |');
+  }
+  if (Array.isArray(data.notDeclared) && data.notDeclared.length) {
+    lines.push('', '## Scenarios testing what the Test Framework does not declare', '');
+    for (const n of data.notDeclared) lines.push('- ' + mdCell(n.code) + ': ' + mdCell((n.warnings || []).join(', ')));
+  }
+  return lines;
+}
+
+function coverageMarkdown(data, title) {
+  var lines = ['# Test Framework coverage — ' + mdCell(title), '']
+    .concat(capabilityMarkdown(data.byCapability, data.days), coverageMatrixMarkdown(data), coverageFunctionsMarkdown(data));
+  return lines.join('\n') + '\n';
+}
+
+/* ── Published coverage reports (#972 part 4) ──────────────────────────────
+ * A Test Manager publishes the coverage of the day: numbered and frozen.
+ * Sharing it with the certifier shares its runs; a shared report can be
+ * withdrawn. Each report says what changed since the previous shared one.
+ * The certifier reads the reports shared with it. Ids reach a request
+ * address only as UUIDs (coverageRunIdOf()).
+ */
+function publishedStateText(r) {
+  if (r.withdrawnAt) return 'Withdrawn ' + r.withdrawnAt + (r.withdrawnBy ? ' by ' + r.withdrawnBy : '');
+  if (r.sharedAt) return 'Shared with the certifier ' + r.sharedAt + (r.sharedBy ? ' by ' + r.sharedBy : '');
+  return 'Not shared';
+}
+
+function publishedCountsText(s) {
+  var c = s || {};
+  var p = c.pointsToLookAt || {};
+  return (c.tested || 0) + ' capability(ies) tested: ' + (c.passed || 0) + ' passed, ' + (c.deviation || 0) + ' with deviation, '
+    + (c.points || 0) + ' with points, ' + (c.blocked || 0) + ' blocked · ' + (p.total || 0) + ' point(s) to look at';
+}
+
+function publishedOwnerText(r) {
+  if (!r.company) return '';
+  return r.distributor ? r.distributor + ' — ' + r.company : r.company;
+}
+
+function publishedButtonHtml(action, id, number, label) {
+  return '<button class="btn btn-secondary btn-sm" type="button" data-report-action="' + escHtml(action) + '" data-report-id="' + escHtml(id)
+    + '" data-report-number="' + escHtml(number) + '">' + escHtml(label) + '</button>';
+}
+
+function publishedRowHtml(r, canChange) {
+  var id = coverageRunIdOf(r.id);
+  var number = Number.isInteger(r.number) ? r.number : 0;
+  if (!id) return '';
+  var actions = [publishedButtonHtml('view', id, number, 'View'), publishedButtonHtml('excel', id, number, 'Excel')];
+  if (canChange && !r.sharedAt) actions.push(publishedButtonHtml('share', id, number, 'Share with the certifier'));
+  if (canChange && r.sharedAt && !r.withdrawnAt) actions.push(publishedButtonHtml('withdraw', id, number, 'Withdraw'));
+  var owner = publishedOwnerText(r);
+  return '<tr><td><strong>#' + escHtml(number) + '</strong>' + (owner ? '<br><small>' + escHtml(owner) + '</small>' : '') + '</td>'
+    + '<td>' + escHtml(r.createdAt || '') + (r.createdBy ? '<br><small>' + escHtml(r.createdBy) + '</small>' : '') + '</td>'
+    + '<td>' + escHtml(publishedStateText(r)) + '</td>'
+    + '<td>' + escHtml(publishedCountsText(r.summary)) + '</td>'
+    + '<td>' + actions.join(' ') + '</td></tr>';
+}
+
+function publishedListHtml(reports, canChange) {
+  var list = Array.isArray(reports) ? reports : [];
+  if (list.length === 0) {
+    return '<div class="cov-note">' + (canChange ? 'No report published yet: show the coverage, then publish it.' : 'No report has been shared with you yet.') + '</div>';
+  }
+  return '<table class="cap-table"><thead><tr><th>Report</th><th>Published</th><th>Certifier</th><th>Summary</th><th>Actions</th></tr></thead><tbody>'
+    + list.map(function(r) { return publishedRowHtml(r, canChange); }).join('') + '</tbody></table>';
+}
+
+function comparisonResultText(result) {
+  return result ? capabilityResultLabel(result) : 'not in the report';
+}
+
+function comparisonPointText(p) {
+  var which = '#' + p.previousNumber + ' of the previous report';
+  if (p.number) which = '#' + p.number + (p.previousNumber ? ' (was #' + p.previousNumber + ')' : '');
+  return which + ' ' + (p.capabilityLabel || p.capability || '') + ' — ' + (p.steps || []).join(', ') + ': ' + (p.check || '');
+}
+
+function comparisonHtml(c) {
+  if (!c) return '<div class="cov-note">No report had been shared with the certifier before this one: nothing to compare with.</div>';
+  var counts = c.counts || {};
+  var previous = c.previous || {};
+  var head = 'Since published report #' + (previous.number || '?') + ' (shared ' + (previous.sharedAt || '?') + '): ' + (counts.fixed || 0) + ' fixed, '
+    + (counts.still || 0) + ' still open, ' + (counts.new || 0) + ' new, ' + (counts.notRetested || 0) + ' not run again.';
+  var changed = (c.capabilities || []).map(function(x) {
+    var mode = x.mode ? ' (' + capabilityModeText(x.mode).toLowerCase() + ')' : '';
+    return '<li>' + escHtml((x.label || x.id) + mode + ': ' + comparisonResultText(x.before) + ' → ' + comparisonResultText(x.now)) + '</li>';
+  }).join('');
+  var lists = Object.keys(CHANGE_LABELS).map(function(k) {
+    var of = (c.points && c.points[k]) || [];
+    if (of.length === 0) return '';
+    return '<details><summary>' + escHtml(CHANGE_LABELS[k] + ' (' + of.length + ')') + '</summary><ul class="cov-list">'
+      + of.map(function(p) { return '<li>' + escHtml(comparisonPointText(p)) + '</li>'; }).join('') + '</ul></details>';
+  }).join('');
+  return '<div class="cov-summary">' + escHtml(head) + '</div>'
+    + (changed ? '<details><summary>' + escHtml('Capabilities whose result changed (' + c.capabilities.length + ')') + '</summary><ul class="cov-list">' + changed + '</ul></details>' : '')
+    + lists;
+}
+
+function publishedHtml(d, view) {
+  var owner = publishedOwnerText(d);
+  var head = 'Published report #' + d.number + (owner ? ' of ' + owner : '') + ', frozen on ' + d.createdAt
+    + ' (runs of the last ' + d.days + ' day(s)). ' + publishedStateText(d) + '.';
+  return '<h4 class="cov-heading">' + escHtml(head) + '</h4>'
+    + '<h5 class="cov-subheading">What changed</h5>' + comparisonHtml(d.comparison)
+    + '<h5 class="cov-subheading">The report</h5>' + coverageHtml(d.report || {}, view);
+}
+
+// The start of a coverage file's name (#1002): the company or provider's
+// name, letters and digits only, accents dropped, any other run one dash,
+// 60 characters at most. The server's fileNamePrefix() is the same rule.
+function coverageFilePrefix(name) {
+  var plain = String(name ?? '').normalize('NFKD').replace(/\p{M}/gu, '');
+  return plain.replace(/[^A-Za-z0-9]+/g, '-').slice(0, 60).replace(/^-|-$/g, '');
+}
+
+function coverageFileName(name, rest) {
+  var prefix = coverageFilePrefix(name);
+  return prefix ? prefix + '-' + rest : rest;
+}
+
+// The name the server gave a download (it starts with the provider's), else
+// `fallback`. Only a plain file name is taken.
+function downloadFileName(res, fallback) {
+  var header = res && res.headers && typeof res.headers.get === 'function' ? res.headers.get('Content-Disposition') : '';
+  var found = /filename="([A-Za-z0-9._-]{1,120})"/.exec(header || '');
+  return found ? found[1] : fallback;
+}
+
+function coverageTitle() {
+  if (isCertifier) {
+    var select = document.getElementById('coverage-company');
+    var chosen = select.options[select.selectedIndex];
+    return (chosen && chosen.textContent) || 'company';
+  }
+  var provider = typeof window.oscarSelectedProvider === 'function' ? window.oscarSelectedProvider() : null;
+  return (provider && provider.name) || company.name || 'company';
+}
+
+// #1043: a certifier reads the coverage of the company or provider chosen,
+// from the runs shared with certifiers; everyone else their own.
+function coverageUrl(suffix) {
+  var days = '?days=' + encodeURIComponent(document.getElementById('coverage-days').value);
+  if (!isCertifier) return '/v1/company/coverage' + suffix + days;
+  var id = coverageRunIdOf(document.getElementById('coverage-company').value);
+  return id ? '/v1/certifier/coverage/' + encodeURIComponent(id) + suffix + days : null;
+}
+
+async function loadCoverage() {
+  var body = document.getElementById('coverage-body');
+  var mdBtn = document.getElementById('coverage-md-btn');
+  coverageData = null;
+  mdBtn.disabled = true;
+  var url = coverageUrl('');
+  if (!url) {
+    body.textContent = 'Choose a company or provider first.';
+    return;
+  }
+  body.textContent = 'Loading coverage...';
+  try {
+    var res = await fetch(url, {});
+    var data = await res.json().catch(function() { return null; });
+    if (!res.ok || !data) {
+      body.textContent = 'The coverage could not be read: ' + ((data && data.detail) || ('HTTP ' + res.status)) + '.';
+      return;
+    }
+    coverageData = data;
+    body.innerHTML = coverageHtml(data, document.getElementById('coverage-view').value);
+    mdBtn.disabled = false;
+    document.getElementById('coverage-publish-btn').disabled = false;
+    document.getElementById('published-body').textContent = '';
+  } catch (e) {
+    body.textContent = 'The coverage could not be read: ' + e.message + '.';
+  }
+}
+
+// The live coverage's point of that id (#994), or null.
+function coveragePointById(id) {
+  var points = coverageData && coverageData.byCapability ? coverageData.byCapability.points : null;
+  return (Array.isArray(points) ? points : []).find(function(p) { return p.id === id; }) || null;
+}
+
+// "Take a position" opens its form under it, a second click or Cancel closes it (#994).
+function toggleCoveragePosition(e) {
+  var target = e.target && typeof e.target.closest === 'function' ? e.target : null;
+  if (!target) return;
+  var cancel = target.closest('button[data-cov-position-cancel]');
+  if (cancel) {
+    cancel.closest('form').remove();
+    return;
+  }
+  var button = target.closest('button[data-cov-position]');
+  if (!button) return;
+  var open = button.nextElementSibling;
+  if (open && open.classList.contains('cov-position-form')) {
+    open.remove();
+    return;
+  }
+  var point = coveragePointById(button.dataset.covPosition);
+  if (point) button.insertAdjacentHTML('afterend', capabilityPositionFormHtml(point, coverageData.byCapability.positions));
+}
+
+// The coverage drawn again after a position, at that point (its number may
+// have moved with its kind).
+async function redrawCoverageAt(pointId) {
+  var res = await fetch('/v1/company/coverage?days=' + encodeURIComponent(document.getElementById('coverage-days').value), {});
+  var data = await res.json().catch(function() { return null; });
+  if (!res.ok || !data) return false;
+  coverageData = data;
+  document.getElementById('coverage-body').innerHTML = coverageHtml(data, document.getElementById('coverage-view').value);
+  var point = coveragePointById(pointId);
+  var at = point && Number.isInteger(point.number) ? document.getElementById('cov-point-' + point.number) : null;
+  if (at) at.scrollIntoView({ block: 'center' });
+  return true;
+}
+
+// What a position form asks, or null when it is not one of the coverage's points.
+function coveragePositionAsked(form) {
+  var id = form.dataset.covPositionForm;
+  if (!/^[0-9a-f]{32}$/.test(String(id || '')) || !coverageData) return null;
+  return { point: id, days: coverageData.days, position: form.elements.position.value, comment: form.elements.comment.value };
+}
+
+async function saveCoveragePosition(e) {
+  var form = e.target && typeof e.target.closest === 'function' ? e.target.closest('form.cov-position-form') : null;
+  if (!form) return;
+  e.preventDefault();
+  var asked = coveragePositionAsked(form);
+  var msg = form.querySelector('.cov-position-msg');
+  if (!asked) return;
+  msg.textContent = 'Saving...';
+  try {
+    var res = await fetch('/v1/company/coverage/positions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(asked)
+    });
+    var data = await res.json().catch(function() { return null; });
+    if (!res.ok) {
+      msg.textContent = capabilitySentence('Not saved: ' + ((data && data.detail) || ('HTTP ' + res.status)));
+      return;
+    }
+    msg.textContent = 'Saved.';
+    if (!(await redrawCoverageAt(asked.point))) msg.textContent = 'Saved. Show the coverage again to see it.';
+  } catch (err) {
+    msg.textContent = capabilitySentence('Not saved: ' + err.message);
+  }
+}
+
+async function exportCoverageExcel() {
+  var msg = document.getElementById('coverage-xlsx-msg');
+  var address = coverageUrl('/download');
+  if (!address) {
+    msg.textContent = 'Choose a company or provider first.';
+    return;
+  }
+  msg.textContent = 'Preparing the workbook...';
+  try {
+    var res = await fetch(address, {});
+    if (!res.ok) {
+      var err = await res.json().catch(function() { return null; });
+      msg.textContent = 'The workbook could not be made: ' + ((err && err.detail) || ('HTTP ' + res.status)) + '.';
+      return;
+    }
+    var blob = await res.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = downloadFileName(res, coverageFileName(coverageTitle(), 'oscar-coverage-' + new Date().toISOString().slice(0, 10) + '.xlsx'));
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
+    msg.textContent = '';
+  } catch (e) {
+    msg.textContent = 'The workbook could not be made: ' + e.message + '.';
+  }
+}
+
+function exportCoverageMarkdown() {
+  if (!coverageData) return;
+  var blob = new Blob([coverageMarkdown(coverageData, coverageTitle())], { type: 'text/markdown' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = coverageFileName(coverageTitle(), 'oscar-coverage-' + new Date().toISOString().slice(0, 10) + '.md');
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
+}
+
+// #1043: the companies or providers that shared a report with the certifier.
+function coverageCompaniesHtml(companies) {
+  return (Array.isArray(companies) ? companies : []).filter(function(c) { return coverageRunIdOf(c.id); }).map(function(c) {
+    var name = c.distributor ? c.distributor + ' — ' + c.company : c.company;
+    return '<option value="' + escHtml(c.id) + '">' + escHtml(name || '') + '</option>';
+  }).join('');
+}
+
+async function loadCoverageCompanies() {
+  var intro = document.getElementById('coverage-intro');
+  var select = document.getElementById('coverage-company');
+  var res = await fetch('/v1/certifier/coverage', {});
+  var data = await res.json().catch(function() { return null; });
+  if (!res.ok || !data) {
+    intro.textContent = 'The companies could not be read: ' + ((data && data.detail) || ('HTTP ' + res.status)) + '.';
+    return;
+  }
+  select.innerHTML = coverageCompaniesHtml(data.companies);
+  var none = select.options.length === 0;
+  document.getElementById('coverage-btn').disabled = none;
+  document.getElementById('coverage-xlsx-btn').disabled = none;
+  intro.textContent = none
+    ? 'No company or provider has shared a coverage report with you yet.'
+    : 'The coverage of a company or provider that shared a report with you, built now from the runs it shared with certifiers.';
+}
+
+if (!isPlatformUser || isCertifier) {
+  document.getElementById('coverage-card').style.display = 'block';
+  document.getElementById('coverage-btn').addEventListener('click', function() { loadCoverage().catch(function() {}); });
+  document.getElementById('coverage-md-btn').addEventListener('click', exportCoverageMarkdown);
+  document.getElementById('coverage-xlsx-btn').addEventListener('click', function() { exportCoverageExcel().catch(function() {}); });
+  document.getElementById('coverage-body').addEventListener('click', toggleCoveragePoint);
+  document.getElementById('coverage-body').addEventListener('click', toggleCoveragePosition);
+  document.getElementById('coverage-body').addEventListener('submit', function(e) { saveCoveragePosition(e).catch(function() {}); });
+  document.getElementById('coverage-view').addEventListener('change', function() {
+    if (coverageData) document.getElementById('coverage-body').innerHTML = coverageHtml(coverageData, this.value);
+  });
+}
+if (isCertifier) {
+  // A .btn rule sets display, so `hidden` alone does not hide it.
+  document.getElementById('coverage-publish-btn').style.display = 'none';
+  document.getElementById('coverage-intro').hidden = false;
+  document.getElementById('coverage-company').hidden = false;
+  document.querySelector('label[for="coverage-company"]').hidden = false;
+  document.getElementById('coverage-company').addEventListener('change', function() {
+    coverageData = null;
+    document.getElementById('coverage-body').textContent = '';
+    document.getElementById('coverage-md-btn').disabled = true;
+  });
+  loadCoverageCompanies().catch(function(e) { document.getElementById('coverage-intro').textContent = 'The companies could not be read: ' + e.message + '.'; });
+}
+
+const canPublish = userRole === 'test_manager';
+let publishedShown = null;
+
+function publishedBase() {
+  return isCertifier ? '/v1/certifier/coverage-reports' : '/v1/company/coverage/reports';
+}
+
+async function loadPublished() {
+  var listEl = document.getElementById('published-list');
+  try {
+    var res = await fetch(publishedBase(), {});
+    var data = await res.json().catch(function() { return null; });
+    if (!res.ok || !data) {
+      listEl.textContent = 'The published reports could not be read: ' + ((data && data.detail) || ('HTTP ' + res.status)) + '.';
+      return;
+    }
+    listEl.innerHTML = publishedListHtml(data.reports, canPublish);
+  } catch (e) {
+    listEl.textContent = 'The published reports could not be read: ' + e.message + '.';
+  }
+}
+
+async function showPublished(id) {
+  var body = document.getElementById('published-body');
+  body.textContent = 'Loading the report...';
+  var res = await fetch(publishedBase() + '/' + encodeURIComponent(id), {});
+  var data = await res.json().catch(function() { return null; });
+  if (!res.ok || !data) {
+    body.textContent = 'The report could not be read: ' + ((data && data.detail) || ('HTTP ' + res.status)) + '.';
+    return;
+  }
+  publishedShown = data;
+  // One set of point anchors at a time: the live coverage is cleared.
+  document.getElementById('coverage-body').textContent = '';
+  document.getElementById('published-actions').hidden = false;
+  body.innerHTML = publishedHtml(data, document.getElementById('published-view').value);
+}
+
+async function changePublished(id, action) {
+  var question = action === 'share'
+    ? 'Share this report with the certifier? Its runs are shared with the certifier too.'
+    : 'Withdraw this report? The certifier will no longer see it. Its runs stay shared.';
+  if (!confirm(question)) return;
+  var msg = document.getElementById('published-msg');
+  var res = await fetch(publishedBase() + '/' + encodeURIComponent(id) + '/' + action, { method: 'POST' });
+  var data = await res.json().catch(function() { return null; });
+  if (!res.ok || !data) {
+    msg.textContent = 'Not done: ' + ((data && data.detail) || ('HTTP ' + res.status)) + '.';
+    return;
+  }
+  msg.textContent = action === 'share' ? 'Report #' + data.number + ' is shared with the certifier, with ' + data.runsShared + ' run(s) not shared before.'
+    : 'Report #' + data.number + ' is withdrawn.';
+  await loadPublished();
+}
+
+async function downloadPublished(id, number) {
+  var msg = document.getElementById('published-msg');
+  var res = await fetch(publishedBase() + '/' + encodeURIComponent(id) + '/download', {});
+  if (!res.ok) {
+    var err = await res.json().catch(function() { return null; });
+    msg.textContent = 'The workbook could not be made: ' + ((err && err.detail) || ('HTTP ' + res.status)) + '.';
+    return;
+  }
+  var url = URL.createObjectURL(await res.blob());
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = downloadFileName(res, 'oscar-coverage-report-' + number + '.xlsx');
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1500);
+}
+
+async function publishCoverage() {
+  var msg = document.getElementById('coverage-xlsx-msg');
+  if (!confirm('Publish this coverage as a numbered report? It is frozen as it is now.')) return;
+  var res = await fetch('/v1/company/coverage/reports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ days: Number(document.getElementById('coverage-days').value) })
+  });
+  var data = await res.json().catch(function() { return null; });
+  if (!res.ok || !data) {
+    msg.textContent = 'The report could not be published: ' + ((data && data.detail) || ('HTTP ' + res.status)) + '.';
+    return;
+  }
+  msg.textContent = 'Published as report #' + data.number + '. Share it from Published Coverage Reports.';
+  await loadPublished();
+}
+
+function onPublishedClick(e) {
+  var button = e.target.closest('[data-report-action]');
+  if (!button) return;
+  var id = coverageRunIdOf(button.dataset.reportId);
+  var number = Number.parseInt(button.dataset.reportNumber, 10) || 0;
+  if (!id) return;
+  var action = button.dataset.reportAction;
+  var done;
+  if (action === 'view') done = showPublished(id);
+  else if (action === 'excel') done = downloadPublished(id, number);
+  else if (action === 'share' || action === 'withdraw') done = changePublished(id, action);
+  if (done !== undefined) done.catch(function(err) { document.getElementById('published-msg').textContent = 'Not done: ' + err.message + '.'; });
+}
+
+if (canPublish || isCertifier) {
+  document.getElementById('published-card').style.display = 'block';
+  document.getElementById('published-intro').textContent = canPublish
+    ? 'A published report is frozen as it was. Sharing it with the certifier also shares its runs; a shared report can be withdrawn. Each report says what changed since the last report shared.'
+    : 'The coverage reports companies have shared with you, each frozen as it was published, with what changed since their previous shared report.';
+  document.getElementById('published-list').addEventListener('click', onPublishedClick);
+  document.getElementById('published-body').addEventListener('click', toggleCoveragePoint);
+  document.getElementById('published-view').addEventListener('change', function() {
+    if (publishedShown) document.getElementById('published-body').innerHTML = publishedHtml(publishedShown, this.value);
+  });
+  loadPublished().catch(function() {});
+}
+if (canPublish) {
+  var publishBtn = document.getElementById('coverage-publish-btn');
+  publishBtn.hidden = false;
+  publishBtn.addEventListener('click', function() { publishCoverage().catch(function() {}); });
+}
+
+/* ── Init ──────────────────────────────────────────────────────────────────── */
+loadRuns().catch(oscarReportError);

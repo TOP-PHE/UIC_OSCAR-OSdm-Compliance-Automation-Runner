@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 /**
  * Values a user stores (a scenario code, an endpoint, a list id, an e-mail)
@@ -13,12 +14,11 @@
  * hands a spreadsheet a formula.
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
 const PUBLIC_DIR = path.join(__dirname, '../../public');
-const read = rel => fs.readFileSync(path.join(PUBLIC_DIR, rel), 'utf8');
+const read = rel => pageSource(path.join(PUBLIC_DIR, rel), 'utf8');
 
 function loadFunction(rel, name, context = {}) {
   const lines = read(rel).split('\n');
@@ -98,5 +98,35 @@ describe('CSV export', () => {
   test('other text is quoted once', () => {
     expect(csvCell('a "b" c')).toBe('"a ""b"" c"');
     expect(csvCell('OTST_SALE')).toBe('"OTST_SALE"');
+  });
+});
+
+// #1423: once the pages' code became files, SonarCloud traced values of an
+// answer, the address or browser storage to innerHTML without esc(). The
+// queue panel was the one that mattered: a Test Manager sees the scenario
+// codes of the company's testers there, and a code is text a tester writes.
+describe('values traced to innerHTML (#1423)', () => {
+  test('run: the queue panel escapes the scenario code, the e-mail and the counts', () => {
+    const src = read('run.html');
+    expect(src).toContain("<td style=\"padding:6px 8px\">' + esc(scenario) + '</td>'");
+    expect(src).toContain("<td style=\"padding:6px 8px\">' + esc(email) + youBadge + '</td>'");
+    expect(src).toContain("' + esc(used) + '/' + esc(total) + ' slots used</div>'");
+  });
+
+  test("reset-password: the server's message is set as text, the link is the page's own", () => {
+    const src = read('reset-password.html');
+    expect(src).toContain('box.textContent = msg;');
+    expect(src).not.toMatch(/innerHTML\s*=\s*\n?\s*msg/);
+  });
+
+  test('admin: user and company ids reach the page through esc()', () => {
+    const src = read('admin.html');
+    expect(src).not.toMatch(/\$\{(u|c)\.id\}/);
+    // '$' + '{…}': the page's own template text, not one of this file's.
+    expect(src).toContain('data-user-id="$' + '{esc(u.id)}"');
+  });
+
+  test('welcome: the name taken from the stored e-mail goes through esc()', () => {
+    expect(read('welcome.html')).toContain('heading.innerHTML = `Welcome, $' + '{esc(displayName)}! $' + '{pill}`;');
   });
 });
