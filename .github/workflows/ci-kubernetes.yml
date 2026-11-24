@@ -744,3 +744,19 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: oscar.example.com' http://127.0.0.1/METRICS/)
           echo "/METRICS/: $code"
           test "$code" = 404
+
+      - name: No nginx version, no security header of the proxy's own (#1426)
+        run: |
+          set -euo pipefail
+          headers() { curl -s -o /dev/null -D - -H 'Host: oscar.example.com' "$@" | tr -d '\r'; }
+          # The Server header and nginx's own error page name no version.
+          server=$(headers http://127.0.0.1/compatibility.json | awk -F': ' 'tolower($1) == "server" { print $2 }')
+          echo "Server: $server"
+          test "$server" = nginx
+          page=$(curl -s -H 'Host: oscar.example.com' http://127.0.0.1/metrics)
+          if printf '%s' "$page" | grep -Eq 'nginx/[0-9]'; then echo "an error page names the version"; exit 1; fi
+          # The stand-in sends no Content-Security-Policy: the proxy must add none.
+          if headers http://127.0.0.1/compatibility.json | grep -iq '^content-security-policy:'; then
+            echo "the proxy adds a Content-Security-Policy of its own"; exit 1
+          fi
+          echo "no Content-Security-Policy added by the proxy"
