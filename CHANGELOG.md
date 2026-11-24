@@ -60,6 +60,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Switching a Docker installation's secrets to files keeps its compose files** (*OSCAR - Server Admin Guide*, 13.7, after #1430). Documentation and a comment of `docker-compose.secrets.yml`, no version.
+  - **Seen:** on the VPS, on 2026-11-24, the steps as written would have set `COMPOSE_FILE=docker-compose.yml:docker-compose.secrets.yml`: the server, made from `docker-compose.yml` and `docker-compose.metrics.yml`, would have been created again without the monitoring stack's additions. A `COMPOSE_FILE` already in `.env` was kept as it was, without the secrets file, while the key's line was emptied; and an empty `SMTP_PASS` gave an empty file, which the server refuses at start.
+  - **Now:** seven steps, each saying what it prints: read the installation (both secrets set, the compose files the server runs from), a copy of `.env`, the files, a check that each file holds the `.env` value and that compose reads the files before anything changes, `COMPOSE_FILE` written from the running server's files plus the secrets file, `.env` made readable by its owner only, then the server created again and checked, with the way back. Without a mail password, an override for the key alone.
+  - The VPS was switched that way the same day.
+
 - **SonarCloud no longer warns of a file encoding problem** (#1412). Tests and the scanner's settings, no version.
   - **Seen:** an analysis warning on `main`, "There are problems with file encoding in the source code". The scan job's log names the file: `Invalid character encountered in file …/Oscar_Server/tests/unit/output-sender.test.js at line 78 for encoding UTF-8`.
   - **Why:** the line held the replacement character (U+FFFD) written as it is. The file was valid UTF-8 (the test checks that a character cut at the very end of a run's output is replaced by that one), but the scanner takes the character in a source file for a decoding problem, and warned at every analysis since the test was added (#1319).

@@ -828,24 +828,101 @@ Besides the limit per IP address (`AUTH_RATE_LIMIT_MAX`, 50 attempts in 15 minut
 
 Every secret of the `.env` (`ENCRYPTION_KEY`, `SMTP_PASS`, `PLATFORM_BOOTSTRAP_TOKEN`, `METRICS_TOKEN`, `RUN_AGENT_TOKEN`) may be given as a file instead: `NAME_FILE` names a file holding the value, read once when the server starts. The value is then not in the container's configuration, where `docker inspect` shows every environment variable. `NAME` keeps working, and setting both stops the start with a clear message. A file that others than its owner can read is reported in the log.
 
-**Switching a Docker installation** (the VPS), as root on the machine, once its release is 1.11.584 or later. The `ENCRYPTION_KEY` line of `.env` is moved into a file, the same value, never a new one:
+**Switching a Docker installation** (the VPS), once its release is 1.11.584 or later, with no run going: the last step creates the server again. The values move from `.env` into files as they are, never new ones. Run the blocks one by one as root (`sudo -i`); each says what it should print, and nothing changes before step 5.
 
-```bash
-cd /opt/OSCAR/OSCAR_Deploy
-install -d -m 700 -o 1000 -g 1000 secrets
-for NAME in ENCRYPTION_KEY SMTP_PASS; do
-  FILE="secrets/$(echo "$NAME" | tr 'A-Z' 'a-z')"
-  install -m 400 -o 1000 -g 1000 /dev/null "$FILE"
-  # The value as dotenv reads it: one pair of surrounding quotes is not part of it.
-  grep -E "^$NAME=" .env | head -1 | cut -d= -f2- | sed -E "s/^([\"'])(.*)\1\$/\2/" | tr -d '\n' > "$FILE"
-  test -s "$FILE" && sed -i -E "s/^$NAME=.*/$NAME=/" .env
-done
-grep -q '^COMPOSE_FILE=' .env || echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.secrets.yml' >> .env
-docker compose up -d oscar
-docker compose logs --tail 20 oscar | grep -E 'read from files|FATAL'
-```
+1. **Read the installation** (nothing changes, no value printed):
 
-The log says `[server] read from files: ENCRYPTION_KEY, SMTP_PASS`. `docker inspect oscar --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E '^(ENCRYPTION_KEY|SMTP_PASS)='` then shows both lines empty. The backup carries `secrets/` with `.env`, and the restore puts it back (`oscar-restore.sh`). Keep the vault copy of the key (*Security Operations Policy*, 3.2).
+   ```bash
+   cd /opt/OSCAR/OSCAR_Deploy
+   for NAME in ENCRYPTION_KEY SMTP_PASS; do echo "$NAME set: $(grep -c "^$NAME=..*" .env)"; done
+   grep '^COMPOSE_FILE=' .env || echo "COMPOSE_FILE: none"
+   docker inspect oscar --format 'running from: {{ index .Config.Labels "com.docker.compose.project.config_files" }}'
+   ```
+
+   - Both secrets must print `set: 1`: `docker-compose.secrets.yml` reads both files, and the server refuses to start on an empty one. Without a mail password, move the key alone: put the override below in a file of your own beside the others (an untracked file does not stop the release refresh), name it instead of `docker-compose.secrets.yml` in steps 4 and 5, and leave `SMTP_PASS` out of the loops.
+
+     ```yaml
+     services:
+       oscar:
+         environment:
+           ENCRYPTION_KEY_FILE: /run/secrets/encryption_key
+         secrets: [encryption_key]
+     secrets:
+       encryption_key:
+         file: ./secrets/encryption_key
+     ```
+
+   - `running from` names the compose files the server was made from: with the monitoring stack, `docker-compose.yml` and `docker-compose.metrics.yml`. Step 5 keeps them all. A server created again from fewer files loses what the others add (the monitoring stack's volume shared with Alertmanager, for one).
+
+2. **A copy of `.env` to go back to** (it holds the key; removed in step 7):
+
+   ```bash
+   cd /opt/OSCAR/OSCAR_Deploy
+   install -m 600 .env /root/env.before-secrets && echo "copy OK"
+   ```
+
+3. **The files**, for the container's user (uid 1000) alone:
+
+   ```bash
+   cd /opt/OSCAR/OSCAR_Deploy
+   install -d -m 700 -o 1000 -g 1000 secrets
+   for NAME in ENCRYPTION_KEY SMTP_PASS; do
+     FILE="secrets/$(echo "$NAME" | tr 'A-Z' 'a-z')"
+     install -m 400 -o 1000 -g 1000 /dev/null "$FILE"
+     # The value as dotenv reads it: one pair of surrounding quotes is not part of it.
+     grep -E "^$NAME=" .env | head -1 | cut -d= -f2- | sed -E "s/^([\"'])(.*)\1\$/\2/" | tr -d '\n' > "$FILE"
+   done
+   ls -l secrets
+   ```
+
+4. **Check before changing anything:**
+
+   ```bash
+   cd /opt/OSCAR/OSCAR_Deploy
+   for NAME in ENCRYPTION_KEY SMTP_PASS; do
+     FILE="secrets/$(echo "$NAME" | tr 'A-Z' 'a-z')"
+     V=$(grep -E "^$NAME=" .env | head -1 | cut -d= -f2- | sed -E "s/^([\"'])(.*)\1\$/\2/")
+     if [ -s "$FILE" ] && [ "$(cat "$FILE")" = "$V" ]; then echo "$NAME: OK ($(stat -c '%a %u' "$FILE"), $(wc -c < "$FILE") bytes)"; else echo "$NAME: DIFFERENT, stop here"; fi
+   done
+   FILES=$(docker inspect oscar --format '{{ index .Config.Labels "com.docker.compose.project.config_files" }}')
+   docker compose $(printf -- '-f %s ' ${FILES//,/ }) -f docker-compose.secrets.yml config --quiet && echo "compose OK"
+   ```
+
+   Expected: each secret `OK (400 1000, …)`, the key 64 bytes, then `compose OK`. Anything else: stop, nothing has changed yet.
+
+5. **Switch `.env`**: the two lines emptied, every compose file named in `COMPOSE_FILE` (the running ones, then the secrets), the file readable by its owner only:
+
+   ```bash
+   cd /opt/OSCAR/OSCAR_Deploy
+   FILES=$(docker inspect oscar --format '{{ index .Config.Labels "com.docker.compose.project.config_files" }}')
+   sed -i -E "s/^ENCRYPTION_KEY=.*/ENCRYPTION_KEY=/; s/^SMTP_PASS=.*/SMTP_PASS=/; /^COMPOSE_FILE=/d" .env
+   [ -n "$(tail -c 1 .env)" ] && echo >> .env
+   echo "COMPOSE_FILE=$(printf '%s' "$FILES" | tr ',' ':'):$PWD/docker-compose.secrets.yml" >> .env
+   chmod 600 .env
+   grep -E '^(ENCRYPTION_KEY|SMTP_PASS|COMPOSE_FILE)=' .env
+   ```
+
+6. **Create the server again, and check:**
+
+   ```bash
+   cd /opt/OSCAR/OSCAR_Deploy
+   docker compose up -d oscar
+   sleep 40
+   docker compose logs --tail 40 oscar | grep -E 'read from files|FATAL'
+   docker inspect oscar --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E '^(ENCRYPTION_KEY|SMTP_PASS)(_FILE)?='
+   docker inspect oscar --format 'running from: {{ index .Config.Labels "com.docker.compose.project.config_files" }}'
+   docker ps --filter name=^oscar$ --format '{{.Status}}'
+   ```
+
+   Expected: `[server] read from files: ENCRYPTION_KEY, SMTP_PASS`; `ENCRYPTION_KEY=` and `SMTP_PASS=` empty beside their `…_FILE=/run/secrets/…`; the files of step 1 plus `docker-compose.secrets.yml`; `(healthy)`. If the server does not start, go back with the copy and the files step 1 printed (here with the monitoring stack):
+
+   ```bash
+   cd /opt/OSCAR/OSCAR_Deploy
+   cp /root/env.before-secrets .env
+   docker compose -f docker-compose.yml -f docker-compose.metrics.yml up -d oscar
+   ```
+
+7. **Then:** open a run's report and the Test Config page in OSCAR (both are encrypted with the key), click *Send test email* on *Server Config*, and remove the copy with `shred -u /root/env.before-secrets`. Keep the vault copy of the key (*Security Operations Policy*, 3.2). The backup carries `secrets/` with `.env`, and the restore puts it back (`oscar-restore.sh`). A promotion keeps the switch: it creates the server again from the compose files the running one was made from (*auto-deploy-setup.md*, step 4).
 
 **On Kubernetes** the Secret `oscar-secrets` stays as it is (`envFrom`). A cluster that wants files mounts that Secret as a volume and sets `ENCRYPTION_KEY_FILE` and the others to its paths.
 
