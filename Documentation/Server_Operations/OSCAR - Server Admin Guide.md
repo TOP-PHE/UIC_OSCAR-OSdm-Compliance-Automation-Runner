@@ -792,6 +792,7 @@ Full setup notes: [`metrics-and-monitoring.md`](metrics-and-monitoring.md).
 **Every administrator signs in with a second factor**: the password, then the six-digit code of an authenticator app (Google or Microsoft Authenticator, 1Password and the like, TOTP as RFC 6238 defines it). Every other account may turn it on from *My account* (the e-mail at the right of the menu bar).
 
 - **The first sign-in after the update** (and the first sign-in of a new administrator) asks to set it up: scan the QR code with the app, or type the key shown under it, then type the first code. Have the phone at hand. The update ends the administrators' sessions open before it, so each administrator meets this page at the next sign-in.
+- **The app's entry names the server** (server 1.11.580, #1418): `OSCAR (oscar.uic.org)`, the host of `APP_URL`, so that the entries of a production server and of a test server are told apart. A server without `APP_URL` names it `OSCAR`. An entry added before 1.11.580 keeps the name `OSCAR`: rename it in the app (its codes do not change), or turn the factor off and on again to get the new name.
 - **A lost phone:** another administrator opens *Manage Users* and clicks *Reset 2FA* on the account. The account is signed out everywhere and its owner receives an e-mail; at the next sign-in an administrator sets up a new factor. There are no recovery codes, by decision.
 - **No other administrator can do it** (the last one lost their phone): from a shell on the server, with the account's e-mail.
 

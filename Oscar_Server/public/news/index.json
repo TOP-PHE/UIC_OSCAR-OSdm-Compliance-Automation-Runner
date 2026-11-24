@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-23-authenticator-entry-names-server",
+    "date": "November 23, 2026",
+    "tag": "Improvement",
+    "title": "Your authenticator app names the OSCAR server",
+    "summary": "A factor set up from now on appears in the authenticator app as OSCAR followed by the server, for example OSCAR (oscar.uic.org).",
+    "content": "When you set up two-factor authentication, the entry your authenticator app adds is now named after the server: for example OSCAR (oscar.uic.org). If you also use a test server of OSCAR, its entry carries its own name, so the code of one is not typed into the other.\n\nAn entry added before this change keeps the name OSCAR and its codes keep working. Nothing is required: you may rename the entry in your app if you wish."
+  },
+  {
     "id": "2026-11-23-two-factor-authentication",
     "date": "November 23, 2026",
     "tag": "Security",

@@ -110,4 +110,37 @@ describe('the otpauth:// address', () => {
     expect(parsed.protocol).toBe('otpauth:');
     expect(parsed.searchParams.get('secret')).toBe('JBSWY3DPEHPK3PXP');
   });
+
+  test('writes a space as %20, never +, in the label and in the issuer', () => {
+    const uri = T.otpauthUri('JBSWY3DPEHPK3PXP', 'admin@example.org', 'OSCAR (oscar.uic.org)');
+    expect(uri).toBe('otpauth://totp/OSCAR%20(oscar.uic.org):admin%40example.org?secret=JBSWY3DPEHPK3PXP&issuer=OSCAR%20(oscar.uic.org)&algorithm=SHA1&digits=6&period=30');
+    expect(uri).not.toContain('+');
+    const parsed = new URL(uri);
+    expect(parsed.searchParams.get('issuer')).toBe('OSCAR (oscar.uic.org)');
+    expect(decodeURIComponent(parsed.pathname.slice(1))).toBe('OSCAR (oscar.uic.org):admin@example.org');
+  });
+});
+
+describe('the issuer names the server (#1418)', () => {
+  test.each([
+    ['https://oscar.uic.org', 'OSCAR (oscar.uic.org)'],
+    ['https://oscar.uic.org/', 'OSCAR (oscar.uic.org)'],
+    ['https://OscarTest.TrackOnPath.com:8443/oscar/', 'OSCAR (oscartest.trackonpath.com)'],
+    ['http://localhost:3001', 'OSCAR (localhost)'],
+    ['http://127.0.0.1:3001', 'OSCAR (127.0.0.1)'],
+    ['https://bücher.example', 'OSCAR (xn--bcher-kva.example)'],
+  ])('%s → %s', (appUrl, issuer) => {
+    expect(T.issuerFor(appUrl)).toBe(issuer);
+  });
+
+  test.each([undefined, null, '', 'oscar.uic.org', 'not an address', 'http://[::1]:3001', 'mailto:a@b.org'])(
+    'OSCAR alone for %p', (appUrl) => {
+      expect(T.issuerFor(appUrl)).toBe('OSCAR');
+    });
+
+  test('an issuer never holds the colon that ends it in the label', () => {
+    for (const appUrl of ['http://[::1]', 'https://a:b@oscar.uic.org', 'https://oscar.uic.org:443']) {
+      expect(T.issuerFor(appUrl)).not.toContain(':');
+    }
+  });
 });

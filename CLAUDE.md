@@ -1138,6 +1138,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   CI: `OSCAR_Deploy/kubernetes/ci/totp.sh` (RFC 6238 in bash) lets
   `smoke.sh` set up the first administrator's factor (its secret goes in the
   account file) and `check-monitoring.sh` sign in with it.
+  **The app's entry names the server** (#1418, 1.11.580): issuer
+  `OSCAR (<host>)` from `APP_URL` (`issuerFor()`; `OSCAR` alone without it
+  or for a host that is not a plain name, an IPv6 address holding colons).
+  `otpauthUri()` writes every value with `encodeURIComponent` (a space
+  `%20`, as the Key Uri Format's own example), never `URLSearchParams`'
+  `+`. Nothing is stored: an entry made before keeps the name `OSCAR`.
 - **A run's secret works from the run only; an answer meant to attack OSCAR
   stops the run** (1.11.458 / OTST_V2.0.249, 1.11.460 / OTST_V2.0.250).
   `fromThisMachine()` (`server.js`): the two loopback routes take

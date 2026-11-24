@@ -654,6 +654,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.580] — 2026-11-23
+
+**The authenticator app's entry names the server** (#1418). Not released on its own: listed in `compatibility.json` (2026.621) without moving `current_release`. Collection unchanged at OTST_V2.0.270.
+
+- **Seen:** an administrator using the production server and a test server had two entries named *OSCAR* in the authenticator app, with the same e-mail under each, and nothing to tell them apart.
+- **Now:** a factor set up from this version is named `OSCAR (<host>)`, the host of `APP_URL`: *OSCAR (oscar.uic.org)*, *OSCAR (oscartest.trackonpath.com)*. Without `APP_URL`, or for a host that is not a plain name, it stays `OSCAR` (`issuerFor()` in `utils/totp.js`).
+- **The `otpauth://` address writes a space as `%20`**, as the Key Uri Format's own example does, in the label and in the `issuer` parameter; `URLSearchParams` wrote `+`, a space in HTML forms only. For an issuer without a space nothing changes.
+- **An entry added before keeps the name `OSCAR`** and its codes: nothing about the secret is stored differently. Its owner may rename it in the app, or turn the factor off and on again.
+- *Server Admin Guide* 13.5, *Tester User Guide* 2.5, a news entry.
+- Tests: `totp.test.js` (the issuer from 13 addresses, the encoded address), `two-factor.test.js` (the setup answer names the server of `APP_URL`).
+
+---
+
 ## [server-1.11.579] — 2026-11-23
 
 **Release 2026.620 (`current_release`)**: two-factor authentication (#1414) and the dependency updates of 23 November. Server 1.11.577 (2026.618, the codes of an authenticator app and the QR code encoder) and 1.11.578 (2026.619, an administrator signs in with a second factor) are described in their own sections below; this section is the dependency updates. Collection unchanged at OTST_V2.0.270.

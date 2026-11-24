@@ -4,6 +4,17 @@
   "current_release": "2026.620",
   "releases": [
     {
+      "release": "2026.621",
+      "date": "2026-11-23",
+      "server": "1.11.580",
+      "collection": "OTST_V2.0.270",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.580 (#1418): the authenticator app's entry names the server, OSCAR (<host of APP_URL>), so that the entries of a production server and of a test server are told apart; OSCAR alone without APP_URL. An entry added before keeps the name OSCAR and its codes. The otpauth:// address writes a space as %20. Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.620",
       "date": "2026-11-23",
       "server": "1.11.579",
