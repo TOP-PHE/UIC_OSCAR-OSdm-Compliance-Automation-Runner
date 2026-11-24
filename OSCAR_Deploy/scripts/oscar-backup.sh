@@ -145,6 +145,12 @@ sqlite3 "$DATA_DIR/oscar.db" ".backup '$STAGE/data/oscar.db'" || die "sqlite bac
 
 # --- 3) .env (holds ENCRYPTION_KEY - archive is encrypted, see SECURITY) ------
 cp -a "$ENV_FILE" "$STAGE/.env"
+# The secrets given as files (docker-compose.secrets.yml, #1430) travel with it.
+SECRETS_DIR="$(dirname "$ENV_FILE")/secrets"
+if [ -d "$SECRETS_DIR" ]; then
+  cp -a "$SECRETS_DIR" "$STAGE/secrets"
+  log "secrets  : $SECRETS_DIR"
+fi
 
 # --- 4) manifest -------------------------------------------------------------
 REPO_DIR="$(cd "$(dirname "$ENV_FILE")/.." 2>/dev/null && pwd || echo "")"
@@ -163,6 +169,7 @@ printf '{\n  "created_at": "%s",\n  "release_tag": "%s",\n  "collection_version"
 # .env, manifest.json): the folders read in place are renamed under data/ in
 # the archive. A folder OSCAR has not made yet goes in empty.
 STAGED=(data/oscar.db .env manifest.json)
+[ -d "$STAGE/secrets" ] && STAGED+=(secrets)
 for d in datafiles artifacts; do
   if [ ! -d "$DATA_DIR/$d" ]; then mkdir -p "$STAGE/data/$d"; STAGED+=("data/$d"); fi
 done

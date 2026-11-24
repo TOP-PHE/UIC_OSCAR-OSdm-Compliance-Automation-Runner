@@ -235,6 +235,17 @@ describe('the host scripts write it', () => {
     expect(failed.stdout).toContain('tar failed (exit 2)');
     expect(fs.readdirSync(out)).toEqual([]);
   });
+
+  // #1430: the secrets given as files (docker-compose.secrets.yml) sit in
+  // secrets/ beside .env, and travel with it.
+  bashTest('a secrets folder beside .env goes into the archive', () => {
+    fs.mkdirSync(path.join(root, 'secrets'));
+    fs.writeFileSync(path.join(root, 'secrets', 'encryption_key'), 'secret-key-value\n');
+    const r = runBackup(false);
+    expect([r.status, r.stderr]).toEqual([0, '']);
+    expect(members(archives()[0])).toEqual(['.env', 'data/artifacts/', 'data/datafiles/', 'data/oscar.db', 'manifest.json',
+      'secrets/', 'secrets/encryption_key']);
+  });
 });
 
 describe('the Admin Dashboard panel', () => {

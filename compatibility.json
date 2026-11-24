@@ -4,6 +4,17 @@
   "current_release": "2026.621",
   "releases": [
     {
+      "release": "2026.625",
+      "date": "2026-11-24",
+      "server": "1.11.584",
+      "collection": "OTST_V2.0.270",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.584 (#1430): every secret of the .env (ENCRYPTION_KEY, SMTP_PASS, PLATFORM_BOOTSTRAP_TOKEN, METRICS_TOKEN, RUN_AGENT_TOKEN) may be given as a file instead, NAME_FILE, read once at the start: the value is then not in the container's configuration. NAME keeps working; both is refused. Optional docker-compose.secrets.yml mounts ENCRYPTION_KEY and SMTP_PASS from OSCAR_Deploy/secrets/ (ignored by git); backup and restore carry secrets/. The runner agent and the dispatcher read their RUN_AGENT_TOKEN_FILE and refuse a server secret's file. Nothing changes on an installation until it is switched (Server Admin Guide, 13.7). Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.624",
       "date": "2026-11-24",
       "server": "1.11.583",

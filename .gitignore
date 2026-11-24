@@ -40,6 +40,8 @@ SemanticSymbols.db
 logs/
 
 # ── Env / secrets ───────────────────────────────────────────────────────
+# The server's secrets as files (docker-compose.secrets.yml, #1430).
+OSCAR_Deploy/secrets/
 .env
 .env.local
 .env.*.local
