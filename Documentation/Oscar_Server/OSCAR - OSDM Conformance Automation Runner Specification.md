@@ -316,12 +316,12 @@ All HTTP responses include security headers set by the `helmet` middleware:
 
 | Header | Value | Purpose |
 |--------|-------|---------|
-| Content-Security-Policy | `default-src 'self'; script-src 'self' 'unsafe-inline'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://uic.org https://*.uic.org; connect-src 'self'; frame-ancestors 'none'` | Prevents XSS, clickjacking, and unauthorised resource loading |
+| Content-Security-Policy | `default-src 'self'; script-src 'self'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'` (and helmet's other defaults) | Prevents XSS, clickjacking, and unauthorised resource loading |
 | Strict-Transport-Security | `max-age=31536000; includeSubDomains` | Enforces HTTPS for 1 year |
 | X-Content-Type-Options | `nosniff` | Prevents MIME sniffing |
 | X-Frame-Options | `SAMEORIGIN` | Prevents clickjacking |
 
-**CSP note:** `script-src-attr 'none'` blocks all inline event handler attributes (`onclick`, `onchange`, etc.). All UI event handling uses `addEventListener()` and event delegation with `data-action` attributes.
+**CSP note:** `script-src 'self'` (since server 1.11.583, #1423) runs no inline script: every page's code is a file under `public/js/`, and `page-scripts.test.js` refuses an inline script, an inline event handler or a `javascript:` address in a page. `script-src-attr 'none'` blocks inline event handler attributes (`onclick`, `onchange`, etc.); all UI event handling uses `addEventListener()` and event delegation with `data-action` attributes. `style-src` keeps `'unsafe-inline'` for the pages' `style` attributes.
 
 ### 9.2 CORS Policy
 
