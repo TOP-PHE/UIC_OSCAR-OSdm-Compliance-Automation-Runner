@@ -244,6 +244,7 @@ Replace `oscar.example.org` below with your hostname.
 server {
     listen 80;
     server_name oscar.example.org;
+    server_tokens off;
     location / { return 301 https://$host$request_uri; }
 }
 
@@ -253,6 +254,14 @@ server {
 
     ssl_certificate     /etc/letsencrypt/live/oscar.example.org/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/oscar.example.org/privkey.pem;
+
+    # No version in the Server header nor in nginx's own error pages.
+    server_tokens off;
+
+    # The security headers are OSCAR's (Content-Security-Policy, HSTS,
+    # X-Frame-Options and the rest, src/server.js): add none here and hide
+    # none. A policy written in a proxy stays as it was written when OSCAR's
+    # changes (#1423 made script-src 'self' alone).
 
     client_max_body_size 50M;     # for datafile uploads
 
@@ -285,6 +294,8 @@ sudo ln -s /etc/nginx/sites-available/oscar /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 sudo certbot --nginx -d oscar.example.org
 ```
+
+**Version and security headers.** `server_tokens off` keeps nginx's version out of the `Server` header and its error pages. OSCAR sends its own security headers (`Content-Security-Policy`, HSTS, `X-Frame-Options`…): a site that adds one, or hides OSCAR's with `proxy_hide_header`, keeps an old policy when OSCAR's changes. To check an installed server: `curl -sI https://oscar.example.org/index.html` shows `Server: nginx` with no version, and one `Content-Security-Policy` whose `script-src` is `'self'` from server 1.11.583.
 
 **Compression.** OSCAR compresses nothing itself, so that its one thread is
 kept for the pages and the runs: nginx does it. The `gzip_types` line is what

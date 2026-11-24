@@ -21,6 +21,14 @@ server {
     listen 80;
     server_name oscar.example.com;          # ← your domain
 
+    # No version in the Server header nor in nginx's own error pages.
+    server_tokens off;
+
+    # The security headers are OSCAR's (Content-Security-Policy, HSTS,
+    # X-Frame-Options and the rest, src/server.js): add none here and hide
+    # none. A policy written in a proxy stays as it was written when OSCAR's
+    # changes (#1423 made script-src 'self' alone).
+
     # Data-file uploads (Test Config / company datafile).
     client_max_body_size 50M;
 

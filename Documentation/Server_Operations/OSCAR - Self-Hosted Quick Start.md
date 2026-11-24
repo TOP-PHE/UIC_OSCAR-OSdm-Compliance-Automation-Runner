@@ -206,6 +206,8 @@ sudo tee /etc/nginx/sites-available/oscar.example.org <<'EOF'
 server {
     listen 80;
     server_name oscar.example.org;
+    server_tokens off;   # no nginx version in the Server header
+    # Security headers: OSCAR sends its own; add none here, hide none.
 
     # Reverse proxy to the OSCAR container (bound to 127.0.0.1:3001 in compose)
     location / {
