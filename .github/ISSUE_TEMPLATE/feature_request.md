@@ -19,7 +19,7 @@ Copyright [2026] [International Union of Railways (UIC)]
 
 - [ ] Server (Node.js runner, REST API, admin UI)
 - [ ] Bruno collection (new scenarios, new conformance checks)
-- [ ] Deployment (CI/CD, Watchtower, image, etc.)
+- [ ] Deployment (CI/CD, image, etc.)
 - [ ] Documentation
 
 ## Problem / use case

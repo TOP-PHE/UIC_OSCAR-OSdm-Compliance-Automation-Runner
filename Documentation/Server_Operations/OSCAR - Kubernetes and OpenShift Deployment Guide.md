@@ -47,7 +47,7 @@ That is the same program as on the VPS (where the runner is the optional
 | Collection | a folder mounted beside the container, updated by `git pull` | inside the bundle image: a new collection is a new image |
 | Way in | nginx on the host, TLS | an Ingress (ingress-nginx) or an OpenShift Route |
 | `/metrics` | nginx answers 404 from outside | OSCAR asks for `METRICS_TOKEN` |
-| Updates | Watchtower follows `:stable` | you change the image tag and apply |
+| Updates | each approved promotion starts its image by digest | you change the image tag and apply |
 | Restarts | autoheal sidecar | Kubernetes, from the liveness probe |
 | Backups | `oscar-backup.sh` on the host | volume snapshots, or `oscar-data.sh save` (section 9) |
 

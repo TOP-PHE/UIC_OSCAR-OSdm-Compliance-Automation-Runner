@@ -22,9 +22,9 @@ differs from this guide.
 After ~15 minutes you'll have:
 
 - **OSCAR server** (Node 22, SQLite, Bruno CLI baked in) — the prebuilt
-  `ghcr.io/top-phe/oscar-server:stable` image, auto-restarting via Docker
-- **Watchtower** — polls GHCR every 5 min and pulls new `:stable` releases
-  automatically (no SSH-and-redeploy cycle ever again)
+  `ghcr.io/top-phe/oscar-server` image of the release you choose, named by
+  its digest, auto-restarting via Docker. You move to a new release when you
+  choose (Step 9)
 - **Autoheal sidecar** — restarts OSCAR if its `/health` probe fails
 - **(Optional) Prometheus + Grafana + Loki + Alertmanager** — opt-in metrics
   + log aggregation + email alerts to admins
@@ -44,13 +44,13 @@ Internet
          ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  Docker network "oscar"                                       │
-│  ┌────────┐  ┌────────────┐  ┌──────┐  ┌───────────────┐    │
-│  │ oscar  │  │ watchtower │  │ auto │  │  alertmanager │    │
-│  │  app   │  │  (updater) │  │ heal │  │  prometheus   │    │
-│  └────┬───┘  └────────────┘  └──────┘  │  grafana      │    │
-│       │ writes                          │  loki         │    │
-│       ▼                                 │  promtail     │    │
-│  ./data (host bind mount)               └───────────────┘    │
+│  ┌────────┐  ┌──────┐  ┌───────────────┐                    │
+│  │ oscar  │  │ auto │  │  alertmanager │                    │
+│  │  app   │  │ heal │  │  prometheus   │                    │
+│  └────┬───┘  └──────┘  │  grafana      │                    │
+│       │ writes          │  loki         │                    │
+│       ▼                 │  promtail     │                    │
+│  ./data (bind mount)    └───────────────┘                    │
 │   ├─ oscar.db                                                 │
 │   ├─ artifacts/                                               │
 │   └─ datafiles/                                               │
@@ -172,14 +172,28 @@ cp /opt/OSCAR/OSCAR_Deploy/.env.example /opt/OSCAR/OSCAR_Deploy/.env
 nano /opt/OSCAR/OSCAR_Deploy/.env       # or your editor of choice
 ```
 
-Fill in **at minimum** these four values from Step 2 + your domain:
+Fill in **at minimum** these values from Step 2, your domain, and the
+digest of the release you install:
 
 ```bash
+OSCAR_IMAGE_DIGEST=<the release's digest, read below>
 ENCRYPTION_KEY=<paste from step 2>
 PLATFORM_BOOTSTRAP_TOKEN=<paste from step 2>
 JWT_SECRET=<paste from step 2>
 ALLOWED_REDIRECT_HOSTS=oscar.example.org   # your domain
 ```
+
+The server image is named by its digest, never by a tag (a tag can be moved
+to other content). Read the digest of the release you install:
+
+```bash
+R=release-2026.621   # ← the release you install
+docker pull -q ghcr.io/top-phe/oscar-server:$R >/dev/null
+docker inspect --format '{{index .RepoDigests 0}}' ghcr.io/top-phe/oscar-server:$R | cut -d@ -f2
+```
+
+and check it against the summary of that release's *Promote* run on GitHub
+(Actions). *auto-deploy-setup.md*, "Which image to run", says more.
 
 Everything else (`RUN_TIMEOUT_MS`, `MAX_CONCURRENT_RUNS`, `LOG_LEVEL`,
 `ALERT_RECIPIENTS`, …) is **optional at first boot**. For these the `.env`
@@ -257,18 +271,17 @@ sudo docker compose up -d
 ```
 
 What happens:
-- Docker pulls `ghcr.io/top-phe/oscar-server:stable` from the public GHCR (~150 MB)
-- Docker pulls `nickfedor/watchtower:latest` (~50 MB)
+- Docker pulls `ghcr.io/top-phe/oscar-server@<your digest>` from the public
+  GHCR (~150 MB)
 - Docker pulls `willfarrell/autoheal:1.2.0` (~5 MB)
 - The `oscar` container starts, runs DB migrations, opens port 3001 on
   127.0.0.1 (nginx is the only thing reaching it from outside)
-- Watchtower starts polling GHCR every 5 min — any future `:stable` push
-  rolls out automatically
+- Without `OSCAR_IMAGE_DIGEST` in `.env`, compose stops here and says so
 
 ```bash
 # Verify everything is healthy
 docker ps --format 'table {{.Names}}\t{{.Status}}'
-# oscar should show "(healthy)" after ~30 s; watchtower + oscar-autoheal "Up"
+# oscar should show "(healthy)" after ~30 s; oscar-autoheal "Up"
 
 # Check the app responds
 curl -s https://oscar.example.org/health | python3 -m json.tool
@@ -331,8 +344,7 @@ cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose up -d oscar
 > **Why `up -d` and not `restart`:** a container keeps the environment it
 > was created with. `docker compose restart` keeps the container, so an
 > edited `.env` is not read; `docker compose up -d oscar` sees the change
-> and creates the container again. An image update by Watchtower does not
-> read `.env` either. If you start OSCAR with more than one compose file
+> and creates the container again. If you start OSCAR with more than one compose file
 > (`-f docker-compose.yml -f docker-compose.metrics.yml`), name the same
 > files here: the *installation-guide*, section 3, gives two lines that read
 > them from the running container.
@@ -466,26 +478,23 @@ Full operational reference: `OSCAR - Server Admin Guide.md` §§ 13–14.
 
 ---
 
-## Step 9 — (Optional) Disable Watchtower if you want manual upgrades
+## Step 9 — Moving to a new release
 
-By default Watchtower auto-pulls every new release. If you'd rather pin to
-a specific version and upgrade on your own schedule:
+Nothing updates by itself: you move when you choose. Read the new release's
+digest as in Step 3, then move the checkout to the same release (the
+collection that image was tested with) and start the image:
 
 ```bash
-# Stop Watchtower
-sudo docker compose stop watchtower
-sudo docker compose rm -f watchtower
-
-# Pin OSCAR to a specific tag in docker-compose.yml — change:
-#   image: ghcr.io/top-phe/oscar-server:stable
-# to:
-#   image: ghcr.io/top-phe/oscar-server:server-v1.9.0
-sudo nano /opt/OSCAR/OSCAR_Deploy/docker-compose.yml
-sudo docker compose up -d
+R=release-2026.621   # ← the new release
+D=sha256:...         # ← its digest, read as in Step 3
+cd /opt/OSCAR && sudo git fetch --tags origin && sudo git checkout -q "$R"
+cd /opt/OSCAR/OSCAR_Deploy
+sudo sed -i "s/^OSCAR_IMAGE_DIGEST=.*/OSCAR_IMAGE_DIGEST=$D/" .env
+sudo docker compose up -d oscar
 ```
 
-To upgrade later: bump the tag in compose, `docker compose up -d`, done.
-The full list of available tags is at
+With the observability stack, name the same compose files as when you
+started it (Step 6's note). The full list of available tags is at
 [github.com/TOP-PHE/UIC_OSCAR-…/pkgs/container/oscar-server](https://github.com/TOP-PHE/UIC_OSCAR-OSdm-Compliance-Automation-Runner/pkgs/container/oscar-server).
 
 ---
@@ -522,7 +531,7 @@ docker logs oscar --since 5m -f      # follow live
 
 ```bash
 docker inspect oscar --format '{{.Config.Image}} {{.Image}}'
-# Image hash should change after each Watchtower pull
+# The first part names the digest in .env (OSCAR_IMAGE_DIGEST)
 ```
 
 ### Move to a bigger VPS later

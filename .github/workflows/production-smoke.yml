@@ -59,8 +59,9 @@ jobs:
           node-version: 22
 
       - name: Wait for the promoted release to answer
-        # The promotion publishes :stable; Watchtower takes it within about
-        # five minutes. Values from the event go through the environment.
+        # The promotion starts the image on the VPS before it ends; this checks
+        # that the release answers. Values from the event go through the
+        # environment.
         if: github.event_name == 'workflow_run'
         env:
           TAG: ${{ github.event.workflow_run.head_branch }}
@@ -68,7 +69,7 @@ jobs:
           set -euo pipefail
           WANT="${TAG#release-}"
           if ! printf '%s' "$WANT" | grep -Eq '^[0-9]{4}\.[0-9]{1,6}$'; then
-            echo "Not a release tag: giving Watchtower six minutes, then testing what runs."
+            echo "Not a release tag: waiting six minutes, then testing what runs."
             sleep 360
             exit 0
           fi

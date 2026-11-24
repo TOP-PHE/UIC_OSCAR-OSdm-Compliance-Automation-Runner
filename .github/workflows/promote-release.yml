@@ -8,14 +8,16 @@
 name: Promote · release tag → :stable image
 
 # Triggered when a release-YYYY.MM Git tag is pushed. Builds the server
-# image at that exact tag and publishes it as :stable AND :release-YYYY.MM.
-# This is the ONLY workflow that touches :stable, which is the tag the
-# production VPS Watchtower watches. Everything else (publish-image.yml)
-# only updates :edge / :sha-* / :server-vX.Y.Z.
+# image at that exact tag, publishes it as :stable AND :release-YYYY.MM, then
+# sends the digest it built to the VPS, which starts the server on that
+# digest (refresh-collection.sh). Production runs the image this job built,
+# whatever a tag in the registry names later. (The workflow's name stays:
+# production-smoke.yml follows it by that name.) Everything else
+# (publish-image.yml) only updates :edge / :sha-* / :server-vX.Y.Z.
 #
-# Rationale: keeping :stable promotion as a separate explicit step prevents
-# every commit-to-main from auto-rolling production. You decide when by
-# pushing the release tag.
+# Rationale: keeping promotion as a separate explicit step, behind the
+# "production" environment's reviewer, prevents every commit-to-main from
+# auto-rolling production. You decide when by approving the release.
 on:
   push:
     tags:
@@ -100,6 +102,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push :stable + :<release-label>
+        id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: ./Oscar_Server
@@ -111,10 +114,11 @@ jobs:
           cache-to: type=gha,mode=max
           provenance: false
 
-      # ── Move the host checkout to the release ─────────────────────────────
+      # ── Move the host to the release, and start its image ─────────────────
       # The collection and compatibility.json are bind-mounted from the host
       # checkout, which refresh-collection.sh moves to the newest release tag
-      # on main (never main's head). Idempotent.
+      # on main (never main's head); it then starts the server on the digest
+      # this job built. Idempotent.
       - name: Set up SSH for host refresh
         env:
           KEY: ${{ secrets.SSH_DEPLOY_KEY }}
@@ -126,18 +130,49 @@ jobs:
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
-      - name: Refresh host repo on VPS
+      - name: Refresh host repo and start the image on VPS
+        id: deploy
         # The remote authorized_keys entry forces the locked-down
         # refresh-collection.sh script (its installed copy, outside the
-        # checkout) regardless of the command we send,
-        # so this is safe to run from any workflow holding the deploy key.
-        run: ssh -o StrictHostKeyChecking=yes ubuntu@oscar.uic.org "/usr/local/sbin/oscar-refresh-collection"
+        # checkout) whatever we send; it reads what we send as data: the
+        # digest, checked there again. It waits until the server is healthy
+        # on that image, and fails otherwise.
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'; then
+            echo "::error::The build gave no image digest: nothing deployed."
+            exit 1
+          fi
+          CODE=0
+          OUT=$(ssh -o StrictHostKeyChecking=yes ubuntu@oscar.uic.org "/usr/local/sbin/oscar-refresh-collection $DIGEST" 2>&1) || CODE=$?
+          printf '%s\n' "$OUT"
+          if [ "$CODE" -ne 0 ]; then
+            echo "::error::The VPS did not deploy $DIGEST (exit $CODE): its lines are above, and in journalctl -t oscar-deploy there."
+            exit "$CODE"
+          fi
+          # An installed script older than this workflow ignores the digest.
+          if printf '%s\n' "$OUT" | grep -Fq "deployed ghcr.io/top-phe/oscar-server@$DIGEST"; then
+            echo "started=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::The VPS did not say it started this image: install the new oscar-refresh-collection there (auto-deploy-setup.md, step 4)."
+            echo "started=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Summary
         env:
           TAG: ${{ steps.ref.outputs.tag }}
+          IMAGE: ${{ steps.img.outputs.name }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+          STARTED: ${{ steps.deploy.outputs.started }}
         run: |
-          echo "Promoted $TAG to :stable" >> "$GITHUB_STEP_SUMMARY"
-          echo "Refreshed host repo on oscar.uic.org so the new container reads the freshest compatibility.json at boot." >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Production Watchtower will pick up the new image within its poll interval (default 5 min)." >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "Promoted $TAG: \`$IMAGE@$DIGEST\` (also tagged :stable and :$TAG)."
+            echo ""
+            if [ "$STARTED" = "true" ]; then
+              echo "oscar.uic.org moved to $TAG and runs this digest, healthy."
+            else
+              echo "oscar.uic.org moved to $TAG, but did not say it runs this digest: see the step above."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
