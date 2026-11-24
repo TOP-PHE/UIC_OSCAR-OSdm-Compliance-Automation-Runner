@@ -5,8 +5,8 @@
 //    You may obtain a copy of the License at
 //        http://www.apache.org/licenses/LICENSE-2.0
 //
-// The script of forgot-password.html, moved out of the page unchanged (#1423) so that
-// the content security policy can refuse inline scripts. The page loads it
+// The script of forgot-password.html, moved out of the page (#1423) so that the
+// content security policy can refuse inline scripts. The page loads it
 // where its inline script stood, so it runs at the same moment as before.
 
 async function doRequest(e) {

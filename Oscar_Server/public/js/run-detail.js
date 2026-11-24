@@ -1,4 +1,4 @@
-/* global OscarRunExit, logout, oscarToast, parseServerTs */  // nav.js, run-exit.js, loaded before it by the page
+/* global logout, oscarReportError, OscarRunExit, oscarToast, parseServerTs */  // nav.js, run-exit.js, loaded before it by the page
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -6,8 +6,8 @@
 //    You may obtain a copy of the License at
 //        http://www.apache.org/licenses/LICENSE-2.0
 //
-// The script of run-detail.html, moved out of the page unchanged (#1423) so that
-// the content security policy can refuse inline scripts. The page loads it
+// The script of run-detail.html, moved out of the page (#1423) so that the
+// content security policy can refuse inline scripts. The page loads it
 // where its inline script stood, so it runs at the same moment as before.
 
 const token = localStorage.getItem('oscar_token') || '';
@@ -220,9 +220,9 @@ function updateStatus(run) {
     polling = false;
     if (terminalHandled) return;
     terminalHandled = true;
-    loadArtifacts();
-    loadAssertions();
-    loadRequests();
+    loadArtifacts().catch(oscarReportError);
+    loadAssertions().catch(oscarReportError);
+    loadRequests().catch(oscarReportError);
 
     // Show delete button if user has permission
     const canDelete = user.role === 'administrator' ||
@@ -428,7 +428,7 @@ function copyLogs() {
   navigator.clipboard.writeText(visible).then(() => {
     const btn = document.getElementById('log-copy-btn');
     btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = 'Copy', 2000);
-  });
+  }).catch(oscarReportError);
 }
 
 function downloadLogs() {
@@ -538,7 +538,7 @@ document.getElementById('artifacts-list').addEventListener('click', e => {
   const btn = e.target.closest('[data-action="download-artifact"]');
   if (!btn) return;
   e.preventDefault();
-  downloadArtifact(btn.dataset.artifactId, btn.dataset.filename);
+  downloadArtifact(btn.dataset.artifactId, btn.dataset.filename).catch(oscarReportError);
 });
 
 async function deleteRun() {
@@ -555,11 +555,11 @@ async function deleteRun() {
 }
 
 document.getElementById('delete-btn-wrap').addEventListener('click', function(e) {
-  if (e.target.closest('[data-action="delete-run"]')) deleteRun();
+  if (e.target.closest('[data-action="delete-run"]')) deleteRun().catch(oscarReportError);
 });
 document.getElementById('share-btn-wrap').addEventListener('click', function(e) {
-  if (e.target.closest('[data-action="share-run"]'))   shareRunWithCertifier(true);
-  if (e.target.closest('[data-action="unshare-run"]')) shareRunWithCertifier(false);
+  if (e.target.closest('[data-action="share-run"]'))   shareRunWithCertifier(true).catch(oscarReportError);
+  if (e.target.closest('[data-action="unshare-run"]')) shareRunWithCertifier(false).catch(oscarReportError);
 });
 
 // ── Assertions ──────────────────────────────────────────────────────────────
@@ -1046,7 +1046,7 @@ document.getElementById('requests-content').addEventListener('click', function(e
     if (mode === 'tree') {
       if (rawEl)  rawEl.style.display  = 'none';
       if (treeEl) treeEl.style.display = '';
-      mountJsonTree(msgId);
+      mountJsonTree(msgId).catch(oscarReportError);
     } else {
       if (rawEl)  rawEl.style.display  = '';
       if (treeEl) treeEl.style.display = 'none';
@@ -1061,7 +1061,7 @@ document.getElementById('requests-content').addEventListener('click', function(e
     areq.classList.toggle('open');
     if (areq.classList.contains('open') && !areq.dataset.loaded) {
       areq.dataset.loaded = '1';
-      loadRequestBodies(areq.dataset.reqId, areq.querySelector('.areq-body'));
+      loadRequestBodies(areq.dataset.reqId, areq.querySelector('.areq-body')).catch(oscarReportError);
     }
   }
 });
@@ -1073,7 +1073,7 @@ document.getElementById('requests-card').addEventListener('click', function(e) {
   activeReqFilter = btn.dataset.filter;
   document.querySelectorAll('.req-filter').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
-  loadRequests();
+  loadRequests().catch(oscarReportError);
 });
 
-poll();
+poll().catch(oscarReportError);

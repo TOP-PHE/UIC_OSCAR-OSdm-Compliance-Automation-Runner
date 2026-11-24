@@ -5,8 +5,8 @@
 //    You may obtain a copy of the License at
 //        http://www.apache.org/licenses/LICENSE-2.0
 //
-// The script of index.html, moved out of the page unchanged (#1423) so that
-// the content security policy can refuse inline scripts. The page loads it
+// The script of index.html, moved out of the page (#1423) so that the
+// content security policy can refuse inline scripts. The page loads it
 // where its inline script stood, so it runs at the same moment as before.
 
 /* global OscarMfa */
@@ -177,11 +177,11 @@ document.getElementById('login').addEventListener('submit', doLogin);
 document.getElementById('register-form').addEventListener('submit', doRegister);
 document.getElementById('mfa-verify').addEventListener('submit', (e) => {
   e.preventDefault();
-  sendCode('/v1/auth/mfa/verify', 'mfa-code', document.getElementById('mfa-btn'));
+  sendCode('/v1/auth/mfa/verify', 'mfa-code', document.getElementById('mfa-btn')).catch(oscarReportError);
 });
 document.getElementById('mfa-setup').addEventListener('submit', (e) => {
   e.preventDefault();
-  sendCode('/v1/auth/mfa/setup/confirm', 'mfa-setup-code', document.getElementById('mfa-setup-btn'));
+  sendCode('/v1/auth/mfa/setup/confirm', 'mfa-setup-code', document.getElementById('mfa-setup-btn')).catch(oscarReportError);
 });
 document.querySelectorAll('[data-mfa-cancel]').forEach(a => a.addEventListener('click', (e) => {
   e.preventDefault();
@@ -193,4 +193,10 @@ document.querySelectorAll('[data-mfa-cancel]').forEach(a => a.addEventListener('
 // browser remembers, and going through the home page would lose ?next= (#1199).
 if (localStorage.getItem('oscar_user') && !nextAfterSignIn(window.location.search)) {
   window.location.href = '/welcome.html';
+}
+
+// A promise nothing awaits ends with .catch(oscarReportError) (#1423): the
+// error is logged, as an unhandled one was. This page loads no nav.js.
+function oscarReportError(err) {
+  console.error('[OSCAR]', err);
 }

@@ -1,4 +1,4 @@
-/* global esc, oscarToastAfterNav, parseServerTs */  // esc.js, nav.js, loaded before it by the page
+/* global esc, oscarReportError, oscarToastAfterNav, parseServerTs */  // esc.js, nav.js, loaded before it by the page
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -6,8 +6,8 @@
 //    You may obtain a copy of the License at
 //        http://www.apache.org/licenses/LICENSE-2.0
 //
-// The script of run.html, moved out of the page unchanged (#1423) so that
-// the content security policy can refuse inline scripts. The page loads it
+// The script of run.html, moved out of the page (#1423) so that the
+// content security policy can refuse inline scripts. The page loads it
 // where its inline script stood, so it runs at the same moment as before.
 
 const token = localStorage.getItem('oscar_token') || '';
@@ -364,6 +364,6 @@ async function pollQueueStatus() {
   }
 }
 setInterval(pollQueueStatus, 5000);
-pollQueueStatus();
+pollQueueStatus().catch(oscarReportError);
 
-loadProfile();
+loadProfile().catch(oscarReportError);

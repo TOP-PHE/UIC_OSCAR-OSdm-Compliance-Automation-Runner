@@ -1,4 +1,4 @@
-/* global esc, logout, oscarToast, parseServerTs */  // esc.js, nav.js, loaded before it by the page
+/* global esc, logout, oscarReportError, oscarToast, parseServerTs */  // esc.js, nav.js, loaded before it by the page
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -6,8 +6,8 @@
 //    You may obtain a copy of the License at
 //        http://www.apache.org/licenses/LICENSE-2.0
 //
-// The script of dashboard.html, moved out of the page unchanged (#1423) so that
-// the content security policy can refuse inline scripts. The page loads it
+// The script of dashboard.html, moved out of the page (#1423) so that the
+// content security policy can refuse inline scripts. The page loads it
 // where its inline script stood, so it runs at the same moment as before.
 
 const token = localStorage.getItem('oscar_token') || '';
@@ -510,7 +510,7 @@ async function confirmDelete() {
   if (data.deleted && data.deleted.length) {
     data.deleted.forEach(id => selected.delete(id));
     olderRuns = olderRuns.filter(r => !data.deleted.includes(r.id));
-    loadRuns();
+    loadRuns().catch(oscarReportError);
   }
   if (data.skipped && data.skipped.length) {
     oscarToast(`${data.skipped.length} run(s) could not be flagged:\n` +
@@ -608,12 +608,12 @@ function handleBatchShareClick(e) {
   const share = el.dataset.action.startsWith('share');
   if (certEl) {
     if (confirm(batchCertifierQuestion(share))) {
-      toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(certEl.dataset.batchId)}/share`, share);
+      toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(certEl.dataset.batchId)}/share`, share).catch(oscarReportError);
     }
   } else if (opEl.dataset.batchId) {
-    toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(opEl.dataset.batchId)}/share-with-operator`, share);
+    toggleOperatorShare(`/v1/runs/batch/${encodeURIComponent(opEl.dataset.batchId)}/share-with-operator`, share).catch(oscarReportError);
   } else {
-    toggleOperatorShare(`/v1/runs/${encodeURIComponent(opEl.dataset.runId)}/share-with-operator`, share);
+    toggleOperatorShare(`/v1/runs/${encodeURIComponent(opEl.dataset.runId)}/share-with-operator`, share).catch(oscarReportError);
   }
   return true;
 }
@@ -628,7 +628,7 @@ document.getElementById('runs-list').addEventListener('click', function(e) {
   if (shareEl) {
     e.preventDefault();
     e.stopPropagation();
-    toggleShare(shareEl.dataset.runId, shareEl.dataset.action === 'share-run');
+    toggleShare(shareEl.dataset.runId, shareEl.dataset.action === 'share-run').catch(oscarReportError);
     return;
   }
 
@@ -641,7 +641,7 @@ document.getElementById('runs-list').addEventListener('click', function(e) {
   if (dlEl) {
     e.preventDefault();
     e.stopPropagation();
-    downloadBatch(dlEl.dataset.batchId, dlEl);
+    downloadBatch(dlEl.dataset.batchId, dlEl).catch(oscarReportError);
     return;
   }
 
@@ -785,7 +785,7 @@ document.getElementById('admin-deleted-list').addEventListener('click', function
 });
 
 // The operators first: the share actions are drawn with the runs.
-loadOperators().catch(() => {}).then(loadRuns);
+loadOperators().catch(() => {}).then(loadRuns).catch(oscarReportError);
 loadSharedRuns().catch(() => {});
 
 // ── Live queue status ────────────────────────────────────────────────────────
@@ -828,7 +828,7 @@ async function pollQueueInfo() {
   } catch { /* optional panel: a failure here is not shown to the user */ }
 }
 setInterval(pollQueueInfo, 3000);
-pollQueueInfo();
+pollQueueInfo().catch(oscarReportError);
 
 // ── Emergency stop ────────────────────────────────────────────────────────────
 // Force-cancel active runs. Tester → own runs; test_manager/admin → whole
@@ -853,8 +853,8 @@ async function emergencyStopAll() {
       return;
     }
     oscarToast(`Emergency stop complete — ${data.running_cancelled || 0} running killed, ${data.queued_cancelled || 0} queued cancelled.`, 'success');
-    pollQueueInfo();
-    loadRuns();
+    pollQueueInfo().catch(oscarReportError);
+    loadRuns().catch(oscarReportError);
   } catch (e) {
     oscarToast('Network error during emergency stop: ' + e.message, 'error');
   } finally {

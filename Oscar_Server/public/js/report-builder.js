@@ -1,4 +1,4 @@
-/* global logout, parseServerTs */  // nav.js, loaded before it by the page
+/* global logout, oscarReportError, parseServerTs */  // nav.js, loaded before it by the page
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -6,8 +6,8 @@
 //    You may obtain a copy of the License at
 //        http://www.apache.org/licenses/LICENSE-2.0
 //
-// The script of report-builder.html, moved out of the page unchanged (#1423) so that
-// the content security policy can refuse inline scripts. The page loads it
+// The script of report-builder.html, moved out of the page (#1423) so that the
+// content security policy can refuse inline scripts. The page loads it
 // where its inline script stood, so it runs at the same moment as before.
 
 /* ── Auth check ────────────────────────────────────────────────────────────── */
@@ -149,7 +149,7 @@ function refreshUserDropdown() {
   pool.forEach(function(r) {
     if (r.submitted_by) emails[r.submitted_by] = true;
   });
-  var list = Object.keys(emails).sort();
+  var list = Object.keys(emails).sort(function(a, b) { return a.localeCompare(b); });
   var sel = document.getElementById('filter-user');
   var prev = sel.value;
   sel.innerHTML = '<option value="">All users</option>'
@@ -329,7 +329,7 @@ function renderReport() {
   renderBreakdown('category-breakdown', reportData.by_category || [], 'category');
   renderAssertions(reportData.suites || []);
   renderLogs();
-  renderHttpTraffic();   // Phase C: req/res list + chain navigation
+  renderHttpTraffic().catch(oscarReportError);   // Phase C: req/res list + chain navigation
 
   document.getElementById('report-output').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
@@ -898,7 +898,7 @@ function loadTemplateList() {
   var templates = JSON.parse(localStorage.getItem(TEMPLATE_KEY) || '{}');
   var sel = document.getElementById('template-select');
   sel.innerHTML = '<option value="">-- Load Template --</option>';
-  Object.keys(templates).sort().forEach(function(name) {
+  Object.keys(templates).sort(function(a, b) { return a.localeCompare(b); }).forEach(function(name) {
     var opt = document.createElement('option');
     opt.value = name;
     opt.textContent = name;
@@ -1017,10 +1017,10 @@ var _httpDetailCache = {};// reqId → full detail (parent + children + bodies)
 
 document.getElementById('http-include').addEventListener('change', function() {
   document.getElementById('http-filter-options').style.display = this.checked ? 'block' : 'none';
-  if (reportData) renderHttpTraffic();
+  if (reportData) renderHttpTraffic().catch(oscarReportError);
 });
 document.querySelectorAll('input[name="http_filter"]').forEach(function(r) {
-  r.addEventListener('change', function() { if (reportData) renderHttpTraffic(); });
+  r.addEventListener('change', function() { if (reportData) renderHttpTraffic().catch(oscarReportError); });
 });
 
 async function renderHttpTraffic() {
@@ -1139,7 +1139,7 @@ document.getElementById('http-content').addEventListener('click', function(e) {
     if (dnl) { downloadJsonContent(dnl); return; }
     return;
   }
-  toggleHttpRow(row);
+  toggleHttpRow(row).catch(oscarReportError);
 });
 
 async function toggleHttpRow(row) {
@@ -1325,7 +1325,7 @@ function navigateToHttpRequest(reqId) {
   if (!existing) {
     // Switch filter to "all" so the target is visible
     var allRadio = document.querySelector('input[name="http_filter"][value="all"]');
-    if (allRadio) { allRadio.checked = true; renderHttpTraffic().then(function() { navigateToHttpRequest(reqId); }); }
+    if (allRadio) { allRadio.checked = true; renderHttpTraffic().then(function() { navigateToHttpRequest(reqId); }).catch(oscarReportError); }
     return;
   }
   // Collapse other open rows for clarity (optional — keeps UI focused)
@@ -1336,7 +1336,7 @@ function navigateToHttpRequest(reqId) {
       if (d) d.style.display = 'none';
     }
   });
-  if (!existing.classList.contains('expanded')) toggleHttpRow(existing);
+  if (!existing.classList.contains('expanded')) toggleHttpRow(existing).catch(oscarReportError);
   existing.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
@@ -1349,7 +1349,7 @@ function copyJsonContent(btn) {
   if (navigator.clipboard) navigator.clipboard.writeText(text).then(function() {
     btn.textContent = 'Copied!';
     setTimeout(function() { btn.textContent = 'Copy'; }, 1200);
-  });
+  }).catch(oscarReportError);
 }
 
 // #325: tester-ergonomics — Download a request/response body as a JSON file.
@@ -2631,7 +2631,7 @@ function onPublishedClick(e) {
   if (action === 'view') done = showPublished(id);
   else if (action === 'excel') done = downloadPublished(id, number);
   else if (action === 'share' || action === 'withdraw') done = changePublished(id, action);
-  if (done) done.catch(function(err) { document.getElementById('published-msg').textContent = 'Not done: ' + err.message + '.'; });
+  if (done !== undefined) done.catch(function(err) { document.getElementById('published-msg').textContent = 'Not done: ' + err.message + '.'; });
 }
 
 if (canPublish || isCertifier) {
@@ -2653,4 +2653,4 @@ if (canPublish) {
 }
 
 /* ── Init ──────────────────────────────────────────────────────────────────── */
-loadRuns();
+loadRuns().catch(oscarReportError);

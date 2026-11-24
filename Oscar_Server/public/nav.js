@@ -471,6 +471,15 @@
   };
 })(window);
 
+// ── A promise nothing awaits (#1423) ──────────────────────────────────────────
+// A page's background load or click handler ends its promise with
+// .catch(oscarReportError): the error is logged, as an unhandled one was, and
+// the page goes on. No toast: most of these are loads that run again by
+// themselves.
+function oscarReportError(err) {
+  console.error('[OSCAR]', err);
+}
+
 // ── #363: in-page toasts ──────────────────────────────────────────────────────
 // Native alert() renders in the browser chrome at the very top of the window
 // and testers miss it. oscarToast() renders INSIDE the OSCAR UI — top-centre,

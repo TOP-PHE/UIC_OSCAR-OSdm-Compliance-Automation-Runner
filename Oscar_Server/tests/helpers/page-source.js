@@ -21,7 +21,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const PUBLIC_DIR = path.resolve(__dirname, '../../public');
-const MOVED = 'moved out of the page unchanged (#1423)';
+const MOVED = 'moved out of the page (#1423)';
 
 function pageSource(file) {
   const full = path.resolve(file);

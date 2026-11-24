@@ -5,8 +5,8 @@
 //    You may obtain a copy of the License at
 //        http://www.apache.org/licenses/LICENSE-2.0
 //
-// The script of verify-email.html, moved out of the page unchanged (#1423) so that
-// the content security policy can refuse inline scripts. The page loads it
+// The script of verify-email.html, moved out of the page (#1423) so that the
+// content security policy can refuse inline scripts. The page loads it
 // where its inline script stood, so it runs at the same moment as before.
 
 const token = new URLSearchParams(location.search).get('token');
@@ -65,4 +65,10 @@ async function doConfirm(e) {
 
 document.getElementById('confirm-form').addEventListener('submit', doConfirm);
 
-init();
+init().catch(oscarReportError);
+
+// A promise nothing awaits ends with .catch(oscarReportError) (#1423): the
+// error is logged, as an unhandled one was. This page loads no nav.js.
+function oscarReportError(err) {
+  console.error('[OSCAR]', err);
+}

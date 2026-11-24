@@ -146,7 +146,7 @@ describe('dashboard pages — inline <script> integrity (#291)', () => {
     // off the run-status polling loop. If a stray `</script>` truncates the
     // outer script (as in #287), this tail is NOT in the parser-visible
     // content.
-    expect(outer.content).toContain('poll();');
+    expect(outer.content).toContain('poll().catch(oscarReportError);');   // #1423: its promise is caught
     // Belt-and-braces: also assert one of the deeply-defined functions is
     // in scope, proving the entire script body was parsed as a single
     // element.

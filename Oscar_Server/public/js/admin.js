@@ -1,4 +1,4 @@
-/* global localTzRef, logout, parseServerTs */  // nav.js, loaded before it by the page
+/* global localTzRef, logout, oscarReportError, parseServerTs */  // nav.js, loaded before it by the page
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -6,8 +6,8 @@
 //    You may obtain a copy of the License at
 //        http://www.apache.org/licenses/LICENSE-2.0
 //
-// The script of admin.html, moved out of the page unchanged (#1423) so that
-// the content security policy can refuse inline scripts. The page loads it
+// The script of admin.html, moved out of the page (#1423) so that the
+// content security policy can refuse inline scripts. The page loads it
 // where its inline script stood, so it runs at the same moment as before.
 
 const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
@@ -105,11 +105,11 @@ function switchTab(name) {
 }
 
 function refreshCurrentTab() {
-  if (currentTab === 'users') { loadUsers(); loadAccessRequests(); }
-  if (currentTab === 'reports') loadReports();
-  if (currentTab === 'activity') loadActivity();
-  if (currentTab === 'companies') loadCompaniesPanel();
-  if (currentTab === 'config') loadConfig();
+  if (currentTab === 'users') { loadUsers().catch(oscarReportError); loadAccessRequests().catch(oscarReportError); }
+  if (currentTab === 'reports') loadReports().catch(oscarReportError);
+  if (currentTab === 'activity') loadActivity().catch(oscarReportError);
+  if (currentTab === 'companies') loadCompaniesPanel().catch(oscarReportError);
+  if (currentTab === 'config') loadConfig().catch(oscarReportError);
 }
 
 function toggleNewCompanyField() {
@@ -299,7 +299,7 @@ async function assignAccess(id) {
   }
   if (!res.ok) { showMsg(data.detail || 'The request could not be placed.', false); return; }
   showMsg(data.activated ? 'First Test Manager created: they receive a link to choose their password.' : 'Placed: the company\'s Test Managers are told.', true);
-  loadAccessRequests(); loadUsers();
+  loadAccessRequests().catch(oscarReportError); loadUsers().catch(oscarReportError);
 }
 
 async function confirmAccess(id) {
@@ -307,7 +307,7 @@ async function confirmAccess(id) {
   const { res, data } = await accessPost({ id, action: 'confirm' }, { role });
   if (!res.ok) { showMsg(data.detail || 'The request could not be confirmed.', false); return; }
   showMsg('Confirmed: they receive a link to choose their password.', true);
-  loadAccessRequests(); loadUsers();
+  loadAccessRequests().catch(oscarReportError); loadUsers().catch(oscarReportError);
 }
 
 async function refuseAccess(id, email) {
@@ -315,7 +315,7 @@ async function refuseAccess(id, email) {
   const { res, data } = await accessPost({ id, action: 'refuse' });
   if (!res.ok) { showMsg(data.detail || 'The request could not be refused.', false); return; }
   showMsg('Refused: the person is told.', true);
-  loadAccessRequests();
+  loadAccessRequests().catch(oscarReportError);
 }
 
 async function createUser() {
@@ -339,8 +339,8 @@ async function createUser() {
   if (!res.ok) { showMsg(data.detail || data.title || 'The invitation failed.', false); return; }
   showMsg(data.placed ? data.detail : `Invited: ${data.user.email} receives a link to choose a password.`, true);
   document.getElementById('new-email').value = '';
-  loadUsers();
-  loadAccessRequests();
+  loadUsers().catch(oscarReportError);
+  loadAccessRequests().catch(oscarReportError);
 }
 
 async function saveUser(userId) {
@@ -374,7 +374,7 @@ async function resetMfa(userId, email) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) { showMsg(data.detail || data.title || 'The second factor was not reset.', false); return; }
   showMsg(`Two-factor authentication of ${email} reset. They were told by e-mail.`, true);
-  loadUsers();
+  loadUsers().catch(oscarReportError);
 }
 
 // A company account's password is its owner's (decision 3): they receive a
@@ -436,7 +436,7 @@ async function approveUser(userId, email) {
   const data = await res.json();
   if (!res.ok) { showMsg(data.detail || data.title || 'Approval failed.', false); return; }
   showMsg(`User approved: ${email}`, true);
-  loadUsers();
+  loadUsers().catch(oscarReportError);
 }
 
 async function deleteUser(userId, email) {
@@ -445,7 +445,7 @@ async function deleteUser(userId, email) {
   const data = await res.json();
   if (!res.ok) { showMsg(data.detail || data.title || 'Delete failed.', false); return; }
   showMsg(`User deleted: ${email}`, true);
-  loadUsers();
+  loadUsers().catch(oscarReportError);
 }
 
 async function loadCompaniesPanel() {
@@ -523,7 +523,7 @@ async function decideAiRequest(id, decision) {
   const data = await res.json();
   if (!res.ok) { showMsg(data.detail || data.title || 'The decision failed.', false); return; }
   showMsg(`Request ${data.state}.`, true);
-  loadAiRequests();
+  loadAiRequests().catch(oscarReportError);
 }
 
 function autoSlug() {
@@ -549,7 +549,7 @@ async function createCompany() {
   showMsg(`Company created: ${data.company.name}`, true);
   document.getElementById('new-co-name').value = '';
   document.getElementById('new-co-slug').value = '';
-  loadCompaniesPanel();
+  loadCompaniesPanel().catch(oscarReportError);
 }
 
 async function saveCompany(companyId) {
@@ -563,7 +563,7 @@ async function saveCompany(companyId) {
   const data = await res.json();
   if (!res.ok) { showMsg(data.detail || data.title || 'Company update failed.', false); return; }
   showMsg(`Company updated: ${data.company.name}`, true);
-  loadCompaniesPanel();
+  loadCompaniesPanel().catch(oscarReportError);
 }
 
 async function deleteCompany(companyId, name) {
@@ -572,7 +572,7 @@ async function deleteCompany(companyId, name) {
   const data = await res.json();
   if (!res.ok) { showMsg(data.detail || data.title || 'Delete failed.', false); return; }
   showMsg(`Company deleted: ${name}`, true);
-  loadCompaniesPanel();
+  loadCompaniesPanel().catch(oscarReportError);
 }
 
 // ── Reports tab state ─────────────────────────────────────────────────────────
@@ -628,8 +628,8 @@ async function loadReports() {
   _comparisonsCache = cmpData.comparisons || [];
 
   // ── Populate filter dropdowns from the full data set ──────────────────────
-  const companies = [...new Set(allRuns.map(r => r.company_name).filter(Boolean))].sort();
-  const users     = [...new Set(allRuns.map(r => r.submitted_by).filter(Boolean))].sort();
+  const companies = [...new Set(allRuns.map(r => r.company_name).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const users     = [...new Set(allRuns.map(r => r.submitted_by).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
   const fc = document.getElementById('filter-company');
   const fu = document.getElementById('filter-user');
@@ -842,7 +842,7 @@ async function callBulkAdminAction(action, run_ids) {
     if (chunks.length > 1) msg += ` [${chunks.length} batches]`;
     showMsg(msg, true);
   }
-  loadReports();
+  loadReports().catch(oscarReportError);
 }
 
 // #1017: one row per user and company or provider, with runs going and waiting.
@@ -918,11 +918,11 @@ document.getElementById('btn-refresh').addEventListener('click', refreshCurrentT
 // Server Activity — jump to a specific day, or back to the latest events.
 (function () {
   var dateEl = document.getElementById('activity-date');
-  if (dateEl) dateEl.addEventListener('change', function () { loadActivity(this.value || null); });
+  if (dateEl) dateEl.addEventListener('change', function () { loadActivity(this.value || null).catch(oscarReportError); });
   var latestEl = document.getElementById('btn-activity-latest');
   if (latestEl) latestEl.addEventListener('click', function () {
     var d = document.getElementById('activity-date'); if (d) d.value = '';
-    loadActivity(null);
+    loadActivity(null).catch(oscarReportError);
   });
 })();
 document.getElementById('new-role').addEventListener('change', toggleNewCompanyField);
@@ -930,12 +930,12 @@ document.getElementById('btn-create-user').addEventListener('click', createUser)
 document.getElementById('user-search').addEventListener('input', debouncedLoadUsers);
 document.getElementById('new-co-name').addEventListener('input', autoSlug);
 document.getElementById('btn-create-company').addEventListener('click', createCompany);
-document.getElementById('btn-bulk-restore-pending').addEventListener('click', function() { bulkAdminAction('restore','pending'); });
-document.getElementById('btn-bulk-confirm-pending').addEventListener('click', function() { bulkAdminAction('confirm_delete','pending'); });
+document.getElementById('btn-bulk-restore-pending').addEventListener('click', function() { bulkAdminAction('restore','pending').catch(oscarReportError); });
+document.getElementById('btn-bulk-confirm-pending').addEventListener('click', function() { bulkAdminAction('confirm_delete','pending').catch(oscarReportError); });
 document.getElementById('chk-all-pending').addEventListener('change', function() { toggleAllPending(this); });
-document.getElementById('btn-bulk-restore-runs').addEventListener('click', function() { bulkAdminAction('restore','runs'); });
-document.getElementById('btn-bulk-softdel-runs').addEventListener('click', function() { bulkAdminAction('soft_delete','runs'); });
-document.getElementById('btn-bulk-purge-runs').addEventListener('click', function() { bulkAdminAction('purge','runs'); });
+document.getElementById('btn-bulk-restore-runs').addEventListener('click', function() { bulkAdminAction('restore','runs').catch(oscarReportError); });
+document.getElementById('btn-bulk-softdel-runs').addEventListener('click', function() { bulkAdminAction('soft_delete','runs').catch(oscarReportError); });
+document.getElementById('btn-bulk-purge-runs').addEventListener('click', function() { bulkAdminAction('purge','runs').catch(oscarReportError); });
 document.getElementById('chk-all-runs').addEventListener('change', function() { toggleAllRuns(this); });
 
 // Filter dropdowns — re-render from cache without re-fetching
@@ -963,7 +963,7 @@ document.getElementById('access-tbody').addEventListener('click', function(e) {
   if (action === 'assign') done = assignAccess(id);
   else if (action === 'confirm') done = confirmAccess(id);
   else if (action === 'refuse') done = refuseAccess(id, el.dataset.email);
-  if (done) done.catch(function(err) { console.error('Access request action failed:', err); showMsg('Server unreachable.', false); });
+  if (done !== undefined) done.catch(function(err) { console.error('Access request action failed:', err); showMsg('Server unreachable.', false); });
 });
 
 // Users table delegation (click + change)
@@ -972,13 +972,13 @@ document.getElementById('users-tbody').addEventListener('click', function(e) {
   if (!el) return;
   var action = el.dataset.action;
   var userId = el.dataset.userId;
-  if (action === 'save-user') saveUser(userId);
-  else if (action === 'approve-user') approveUser(userId, el.dataset.email);
-  else if (action === 'send-reset') sendReset(userId, el.dataset.email);
-  else if (action === 'reset-pwd') resetPwd(userId, el.dataset.email);
-  else if (action === 'reset-link') generateResetLink(userId, el.dataset.email);
-  else if (action === 'reset-mfa') resetMfa(userId, el.dataset.email);
-  else if (action === 'delete-user') deleteUser(userId, el.dataset.email);
+  if (action === 'save-user') saveUser(userId).catch(oscarReportError);
+  else if (action === 'approve-user') approveUser(userId, el.dataset.email).catch(oscarReportError);
+  else if (action === 'send-reset') sendReset(userId, el.dataset.email).catch(oscarReportError);
+  else if (action === 'reset-pwd') resetPwd(userId, el.dataset.email).catch(oscarReportError);
+  else if (action === 'reset-link') generateResetLink(userId, el.dataset.email).catch(oscarReportError);
+  else if (action === 'reset-mfa') resetMfa(userId, el.dataset.email).catch(oscarReportError);
+  else if (action === 'delete-user') deleteUser(userId, el.dataset.email).catch(oscarReportError);
 });
 document.getElementById('users-tbody').addEventListener('change', function(e) {
   var el = e.target.closest('[data-action]');
@@ -992,14 +992,14 @@ document.getElementById('companies-tbody').addEventListener('click', function(e)
   if (!el) return;
   var action = el.dataset.action;
   var companyId = el.dataset.companyId;
-  if (action === 'save-company') saveCompany(companyId);
-  else if (action === 'delete-company') deleteCompany(companyId, el.dataset.name);
+  if (action === 'save-company') saveCompany(companyId).catch(oscarReportError);
+  else if (action === 'delete-company') deleteCompany(companyId, el.dataset.name).catch(oscarReportError);
 });
 
 // #801: AI analysis requests
 document.getElementById('ai-requests-tbody').addEventListener('click', function(e) {
   var el = e.target.closest('[data-action="ai-decide"]');
-  if (el) decideAiRequest(el.dataset.requestId, el.dataset.decision);
+  if (el) decideAiRequest(el.dataset.requestId, el.dataset.decision).catch(oscarReportError);
 });
 
 // Pending deletion table delegation (click + change)
@@ -1007,7 +1007,7 @@ document.getElementById('pending-del-tbody').addEventListener('click', function(
   var el = e.target.closest('[data-action]');
   if (!el) return;
   if (el.dataset.action === 'single-admin') {
-    singleAdminAction(el.dataset.adminAction, el.dataset.runId);
+    singleAdminAction(el.dataset.adminAction, el.dataset.runId).catch(oscarReportError);
   }
 });
 document.getElementById('pending-del-tbody').addEventListener('change', function(e) {
@@ -1021,7 +1021,7 @@ document.getElementById('runs-tbody').addEventListener('click', function(e) {
   var el = e.target.closest('[data-action]');
   if (!el) return;
   if (el.dataset.action === 'single-admin') {
-    singleAdminAction(el.dataset.adminAction, el.dataset.runId);
+    singleAdminAction(el.dataset.adminAction, el.dataset.runId).catch(oscarReportError);
   }
 });
 document.getElementById('runs-tbody').addEventListener('change', function(e) {
@@ -1454,4 +1454,4 @@ document.getElementById('btn-emergency-stop-all').addEventListener('click', emer
     console.error('Admin page failed to load:', e);
     showMsg('Failed to load admin data.', false);
   }
-})();
+})().catch(oscarReportError);

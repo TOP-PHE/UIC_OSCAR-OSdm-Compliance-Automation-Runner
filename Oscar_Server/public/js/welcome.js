@@ -1,3 +1,4 @@
+/* global oscarReportError */  // nav.js, loaded before it by the page
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -5,8 +6,8 @@
 //    You may obtain a copy of the License at
 //        http://www.apache.org/licenses/LICENSE-2.0
 //
-// The script of welcome.html, moved out of the page unchanged (#1423) so that
-// the content security policy can refuse inline scripts. The page loads it
+// The script of welcome.html, moved out of the page (#1423) so that the
+// content security policy can refuse inline scripts. The page loads it
 // where its inline script stood, so it runs at the same moment as before.
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
@@ -190,4 +191,4 @@ function goToNews(idx) {
 document.getElementById('btn-prev').addEventListener('click', () => moveNews(-1));
 document.getElementById('btn-next').addEventListener('click', () => moveNews(1));
 
-loadNews();
+loadNews().catch(oscarReportError);
