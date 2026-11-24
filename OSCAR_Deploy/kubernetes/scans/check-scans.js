@@ -32,8 +32,24 @@ const TOOLS = ['kubescape', 'kube-bench'];
 // ── Kubescape ────────────────────────────────────────────────────────────────
 function resourceName(object) {
   const kind = object?.kind || '?';
-  const meta = object?.metadata || {};
+  // A related object (an RBAC subject) names itself without metadata.
+  const meta = object?.metadata || object || {};
   return `${kind}/${meta.namespace || '-'}/${meta.name || '?'}`;
+}
+
+// What the control found wrong: its failed, fix, review and delete paths.
+function pathsOf(control) {
+  const out = [];
+  const walk = (value, depth) => {
+    if (depth > 6 || out.length >= 6 || value === null || typeof value !== 'object') return;
+    for (const [key, x] of Object.entries(value)) {
+      if (key === 'fixPath' && x && typeof x.path === 'string' && x.path) out.push(`${x.path}=${x.value}`);
+      else if (typeof x === 'string' && /Path$/.test(key) && x) out.push(x);
+      else walk(x, depth + 1);
+    }
+  };
+  walk(control, 0);
+  return [...new Set(out)];
 }
 
 function statusOf(control) {
@@ -57,6 +73,7 @@ function kubescapeFindings(report) {
         id: control.controlID,
         name: control.name || names.get(control.controlID) || '',
         where: resource,
+        detail: pathsOf(control).join('; '),
       });
     }
   }
@@ -81,7 +98,8 @@ function kubeBenchFindings(report) {
     for (const group of section.tests || []) {
       for (const r of group.results || []) {
         if (r.status !== 'FAIL' && r.status !== 'WARN') continue;
-        findings.push({ id: r.test_number, name: r.test_desc || '', where: section.text || '', warn: r.status === 'WARN' });
+        const detail = String(r.actual_value || r.reason || '').replace(/s+/g, ' ').slice(0, 300);
+        findings.push({ id: r.test_number, name: r.test_desc || '', where: section.text || '', warn: r.status === 'WARN', detail });
       }
     }
   }
@@ -98,7 +116,10 @@ function check(tool, report, accepted) {
   }
   const used = new Set();
   const rows = [];
+  const seen = new Map();
   for (const f of all) {
+    const key = `${f.id}|${f.where}`;
+    if (seen.has(key)) { seen.get(key).times += 1; continue; }
     let entry;
     if (tool === 'kubescape') {
       entry = entries.find((e) => e.control === f.id && (e.resources || []).some((p) => matchesResource(p, f.where)));
@@ -107,7 +128,9 @@ function check(tool, report, accepted) {
     }
     if (entry) used.add(entry);
     const state = f.warn ? 'manual' : entry ? 'accepted' : 'NEW';
-    rows.push({ ...f, state, reason: entry?.reason || '' });
+    const row = { ...f, state, reason: entry?.reason || '', times: 1 };
+    seen.set(key, row);
+    rows.push(row);
   }
   for (const e of entries) {
     if (!used.has(e)) problems.push(`accepted ${e.control || e.check} matched nothing: remove it from accepted.json`);
@@ -118,12 +141,13 @@ function check(tool, report, accepted) {
 }
 
 function markdown(tool, { rows, problems }) {
-  const cell = (s) => String(s).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  // Markdown table cell: backslash first, then the column bar.
+  const cell = (s) => String(s).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
   const lines = [`### ${tool}`, ''];
   if (rows.length === 0) lines.push('No finding.');
   else {
-    lines.push('| State | Check | What | Where | Reason |', '|---|---|---|---|---|');
-    for (const r of rows) lines.push(`| ${r.state} | ${cell(r.id)} | ${cell(r.name)} | ${cell(r.where)} | ${cell(r.reason)} |`);
+    lines.push('| State | Check | What | Where | Found | Reason |', '|---|---|---|---|---|---|');
+    for (const r of rows) lines.push(`| ${r.state} | ${cell(r.id)} | ${cell(r.name)} | ${cell(r.where)}${r.times > 1 ? ` (×${r.times})` : ''} | ${cell(r.detail || '')} | ${cell(r.reason)} |`);
   }
   lines.push('', problems.length ? `**${problems.length} to look at.**` : '**Nothing new.**', '');
   return lines.join('\n');
@@ -137,7 +161,10 @@ function main(argv) {
   }
   const accepted = JSON.parse(fs.readFileSync(path.join(__dirname, 'accepted.json'), 'utf8'));
   const result = check(tool, JSON.parse(fs.readFileSync(file, 'utf8')), accepted);
-  for (const r of result.rows) console.log(`${r.state.padEnd(8)} ${r.id}  ${r.name}  [${r.where}]`);
+  for (const r of result.rows) {
+    console.log(`${r.state.padEnd(8)} ${r.id}  ${r.name}  [${r.where}${r.times > 1 ? ` ×${r.times}` : ''}]`);
+    if (r.detail && r.state !== 'manual') console.log(`         found: ${r.detail}`);
+  }
   for (const p of result.problems) console.log(`::error::${tool}: ${p}`);
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, markdown(tool, result));
   console.log(`${tool}: ${result.rows.length} findings, ${result.fresh} new, ${result.problems.length} to look at`);
@@ -146,4 +173,4 @@ function main(argv) {
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));
 
-module.exports = { check, kubescapeFindings, kubeBenchFindings, matchesResource, resourceName, markdown, main };
+module.exports = { check, kubescapeFindings, kubeBenchFindings, matchesResource, resourceName, pathsOf, markdown, main };
