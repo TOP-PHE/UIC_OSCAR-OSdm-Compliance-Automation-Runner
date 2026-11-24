@@ -35,7 +35,10 @@ const { launchLocal } = require('../worker/launcher');
 const { childBaseEnv } = require('../worker/childEnv');
 
 // What the agent must never hold: the server's secrets, and its database.
-const SERVER_SECRETS = Object.freeze(['ENCRYPTION_KEY', 'JWT_SECRET', 'SMTP_PASS', 'METRICS_TOKEN', 'BOOTSTRAP_TOKEN']);
+// A server secret, or the file holding one (#1430): seeing either, the agent
+// does not start.
+const SERVER_SECRET_NAMES = ['ENCRYPTION_KEY', 'JWT_SECRET', 'SMTP_PASS', 'METRICS_TOKEN', 'BOOTSTRAP_TOKEN', 'PLATFORM_BOOTSTRAP_TOKEN'];
+const SERVER_SECRETS = Object.freeze([...SERVER_SECRET_NAMES, ...SERVER_SECRET_NAMES.map(name => `${name}_FILE`)]);
 const SERVER_DATABASES = Object.freeze(['/app/data/oscar.db']);
 
 /** Why the agent may not start with these settings, or null. */
@@ -124,6 +127,12 @@ function createAgent({ token, workspacesDir, maxProcesses = 60, log = console })
 
 /* istanbul ignore next: the process entry point */
 if (require.main === module) {
+  try {
+    require('../utils/secretFiles').loadSecretFiles(process.env, { names: ['RUN_AGENT_TOKEN'] });
+  } catch (err) {
+    console.error(`[runner-agent] Not started: ${err.message}`);
+    process.exit(1);
+  }
   const problem = startupProblem();
   if (problem) {
     console.error(`[runner-agent] Not started: ${problem}`);

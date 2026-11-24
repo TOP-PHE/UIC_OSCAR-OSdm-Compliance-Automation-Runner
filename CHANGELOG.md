@@ -660,6 +660,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.584] — 2026-11-24
+
+**The server's secrets may be given as files** (#1430; maintainer's choices, 2026-11-24: every secret of the `.env`, the mechanism and the guide now, the VPS switched after the release). Not released on its own: listed in `compatibility.json` (2026.625) without moving `current_release`. Collection unchanged at OTST_V2.0.270. Nothing changes on an installation until it is switched.
+
+- **`NAME_FILE`** for `ENCRYPTION_KEY`, `SMTP_PASS`, `PLATFORM_BOOTSTRAP_TOKEN`, `METRICS_TOKEN` and `RUN_AGENT_TOKEN`: a file holding the value (a Docker Compose secret at `/run/secrets/…`, a Kubernetes Secret mounted as a volume), read once by `utils/secretFiles.js` right after `.env`, before anything uses a secret. The value is then not in the container's configuration, where `docker inspect` shows every environment variable.
+  - `NAME` keeps working. Both set is refused at start.
+  - A file that is missing, empty, not a file or longer than 4 KB stops the start, naming it. One line end at its end is not part of the value.
+  - A file others than its owner can read is reported in the log.
+- **The runner agent and the dispatcher** read their `RUN_AGENT_TOKEN_FILE` the same way, and refuse to start when they see a server secret or its file (`SERVER_SECRETS` now holds the `_FILE` names and `PLATFORM_BOOTSTRAP_TOKEN`). A run's child processes never get a `_FILE` name (`childBaseEnv()` is an allowlist).
+- **`OSCAR_Deploy/docker-compose.secrets.yml`** (optional, chosen with `COMPOSE_FILE` in `.env`) mounts `ENCRYPTION_KEY` and `SMTP_PASS` from `OSCAR_Deploy/secrets/`, which `.gitignore` keeps out of git.
+- **Backup and restore carry `secrets/`** as they carry `.env`: `oscar-backup.sh` puts it in the archive when it exists, and `oscar-restore.sh` puts it back for the container's user alone (folder 700, files 400, uid 1000).
+- Documentation:
+  - *Server Admin Guide* 13.7: switching an installation, checking it, Kubernetes;
+  - *Security Operations Policy* 3.2: where the key may live, and what stays on the machine on purpose (OSCAR restarts by itself, so it reads its key without a person);
+  - *Disaster Recovery*;
+  - the `.env.example` header.
+- Tests: `secret-files.test.js` (the reading and its refusals, the server's, agent's and dispatcher's order, the agent's refusal, the child processes, the Compose file, `.gitignore`, the restore) and `backup-status.test.js` (a `secrets/` folder goes into the archive).
+
+---
+
 ## [server-1.11.583] — 2026-11-24
 
 **The content security policy refuses every inline script** (#1423, PR 2 of 2). Not released on its own: listed in `compatibility.json` (2026.624) without moving `current_release`. Collection unchanged at OTST_V2.0.270. Nothing changes for a user.

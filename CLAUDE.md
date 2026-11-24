@@ -4668,6 +4668,15 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   and taint rules** (it skipped them inside HTML): 109 findings in #1424, all
   fixed there. A page's `const esc = window.esc` must come before any code
   run at load that uses it (TDZ; only a browser shows it).
+- **A secret may come from a file** (#1430, 1.11.584): `NAME_FILE` for
+  every secret of the `.env` (`SECRET_NAMES` in `utils/secretFiles.js`),
+  read by `loadSecretFiles()` in `server.js` right after dotenv, before the
+  required variables are checked; both `NAME` and `NAME_FILE` is refused.
+  **A new secret read from the environment goes in `SECRET_NAMES`**, and in
+  the runner agent's `SERVER_SECRETS` (with its `_FILE` name) if the
+  agent must not see it. `docker-compose.secrets.yml` (optional) mounts
+  files from `OSCAR_Deploy/secrets/` (git-ignored); backup and restore carry
+  that folder.
 - **Every image a page shows is served by OSCAR** (#805, 1.11.319). The
   banner's UIC and OSDM logos were loaded from uic.org and broke on every page
   when uic.org stopped serving them. They are `public/uic-logo.png` and

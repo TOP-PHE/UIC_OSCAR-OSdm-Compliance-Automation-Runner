@@ -101,6 +101,14 @@ cp -a "$STAGE/data/datafiles"  "$COMPOSE_DIR/data/datafiles"
 cp -a "$STAGE/data/artifacts"  "$COMPOSE_DIR/data/artifacts"
 cp -a "$STAGE/.env"            "$COMPOSE_DIR/.env"
 chmod 600 "$COMPOSE_DIR/.env"
+# The secrets given as files (docker-compose.secrets.yml, #1430): read by the
+# container's user (uid 1000) alone.
+if [ -d "$STAGE/secrets" ]; then
+  rm -rf "$COMPOSE_DIR/secrets"
+  cp -a "$STAGE/secrets" "$COMPOSE_DIR/secrets"
+  chmod 700 "$COMPOSE_DIR/secrets" && chmod 400 "$COMPOSE_DIR/secrets/"* 2>/dev/null || true
+  chown -R 1000:1000 "$COMPOSE_DIR/secrets" 2>/dev/null || log "WARN: could not chown $COMPOSE_DIR/secrets to 1000:1000 (run restore as root)"
+fi
 
 # --- 4) drill hostname -------------------------------------------------------
 if [ -n "$HOSTNAME_OVERRIDE" ]; then

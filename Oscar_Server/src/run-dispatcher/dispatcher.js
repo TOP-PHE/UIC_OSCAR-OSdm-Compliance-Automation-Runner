@@ -473,6 +473,12 @@ function createDispatcher({ kube, settings, log = console, pollMs = 1000, retryM
 
 /* istanbul ignore next: the process entry point */
 if (require.main === module) {
+  try {
+    require('../utils/secretFiles').loadSecretFiles(process.env, { names: ['RUN_AGENT_TOKEN'] });
+  } catch (err) {
+    console.error(`[run-dispatcher] Not started: ${err.message}`);
+    process.exit(1);
+  }
   const settings = settingsOf(process.env);
   const problem = startupProblem(process.env, settings);
   if (problem) {

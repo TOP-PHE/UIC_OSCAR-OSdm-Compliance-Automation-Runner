@@ -31,6 +31,17 @@ if (loaded.error && fs.existsSync(ENV_FALLBACK)) {
   dotenv.config({ path: ENV_FALLBACK });
 }
 
+// ── Secrets given as files (#1430) ─────────────────────────────────────────────
+// NAME_FILE (a Docker or Kubernetes secret) becomes NAME here, before anything
+// reads it: the value is then not in the container's environment.
+try {
+  const fromFiles = require('./utils/secretFiles').loadSecretFiles();
+  if (fromFiles.length > 0) console.log(`[server] read from files: ${fromFiles.join(', ')}`);
+} catch (err) {
+  console.error(`[server] FATAL: ${err.message}`);
+  process.exit(1);
+}
+
 // ── Validate required env vars before anything else ───────────────────────────
 const REQUIRED_ENV = ['ENCRYPTION_KEY', 'COLLECTION_PATH', 'BRU_CMD'];
 const missing = REQUIRED_ENV.filter(k => !process.env[k]);

@@ -824,6 +824,31 @@ Besides the limit per IP address (`AUTH_RATE_LIMIT_MAX`, 50 attempts in 15 minut
 - **Where to see it:** the authentication log keeps `login_locked:<seconds>s` when an address is locked and `login_refused_locked` for each attempt refused meanwhile; the metric `oscar_login_attempts_total` counts the refusals as `result="locked"` (Grafana → *OSCAR · Overview*, the login panel).
 - The table `login_lock` holds the SHA-256 of each address, never the address, and loses a row once it no longer matters.
 
+### 13.7 Secrets as files (server 1.11.584, #1430)
+
+Every secret of the `.env` (`ENCRYPTION_KEY`, `SMTP_PASS`, `PLATFORM_BOOTSTRAP_TOKEN`, `METRICS_TOKEN`, `RUN_AGENT_TOKEN`) may be given as a file instead: `NAME_FILE` names a file holding the value, read once when the server starts. The value is then not in the container's configuration, where `docker inspect` shows every environment variable. `NAME` keeps working, and setting both stops the start with a clear message. A file that others than its owner can read is reported in the log.
+
+**Switching a Docker installation** (the VPS), as root on the machine, once its release is 1.11.584 or later. The `ENCRYPTION_KEY` line of `.env` is moved into a file, the same value, never a new one:
+
+```bash
+cd /opt/OSCAR/OSCAR_Deploy
+install -d -m 700 -o 1000 -g 1000 secrets
+for NAME in ENCRYPTION_KEY SMTP_PASS; do
+  FILE="secrets/$(echo "$NAME" | tr 'A-Z' 'a-z')"
+  install -m 400 -o 1000 -g 1000 /dev/null "$FILE"
+  # The value as dotenv reads it: one pair of surrounding quotes is not part of it.
+  grep -E "^$NAME=" .env | head -1 | cut -d= -f2- | sed -E "s/^([\"'])(.*)\1\$/\2/" | tr -d '\n' > "$FILE"
+  test -s "$FILE" && sed -i -E "s/^$NAME=.*/$NAME=/" .env
+done
+grep -q '^COMPOSE_FILE=' .env || echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.secrets.yml' >> .env
+docker compose up -d oscar
+docker compose logs --tail 20 oscar | grep -E 'read from files|FATAL'
+```
+
+The log says `[server] read from files: ENCRYPTION_KEY, SMTP_PASS`. `docker inspect oscar --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E '^(ENCRYPTION_KEY|SMTP_PASS)='` then shows both lines empty. The backup carries `secrets/` with `.env`, and the restore puts it back (`oscar-restore.sh`). Keep the vault copy of the key (*Security Operations Policy*, 3.2).
+
+**On Kubernetes** the Secret `oscar-secrets` stays as it is (`envFrom`). A cluster that wants files mounts that Secret as a volume and sets `ENCRYPTION_KEY_FILE` and the others to its paths.
+
 ## 14. Operational Monitoring & Alerting (v1.8)
 
 OSCAR ships a self-healing + paging stack so production incidents get caught and (where possible) fixed before an admin notices.

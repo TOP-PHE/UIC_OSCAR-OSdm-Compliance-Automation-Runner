@@ -133,9 +133,22 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 #### Storage
 
-- Primary: `/opt/OSCAR/OSCAR_Deploy/.env` on the VPS, mode 600
+- Primary: `/opt/OSCAR/OSCAR_Deploy/.env` on the VPS, mode 600, or, from
+  server 1.11.584 (#1430), the file `OSCAR_Deploy/secrets/encryption_key`
+  (folder 700, file 400, owned by the container's user) mounted as a Docker
+  secret by `docker-compose.secrets.yml`: the key is then not in the
+  container's configuration (*Server Admin Guide*, 13.7)
 - Backup: in a 1Password (or equivalent) vault entry owned by both Tier A
   operators. The vault entry's audit log shows every access.
+
+**What stays, on purpose.** The key is on the same machine as the database
+it protects. OSCAR restarts by itself (an update, a crash, the host's
+reboot), so it must read its key without a person: a key typed at each start
+would leave OSCAR down until someone comes. What limits the exposure: the file
+is readable by root and the container's user only; the backup archive that
+holds it is encrypted (GnuPG, AES-256) with a passphrase kept apart; the vault
+copy is the way back if the machine is lost. Someone who holds root on the
+machine holds the data and the key alike, whatever is done here.
 
 **Never** commit this key to git. **Never** paste it into chat, email,
 ticket systems, or screenshots. **Never** copy it to a developer's laptop.

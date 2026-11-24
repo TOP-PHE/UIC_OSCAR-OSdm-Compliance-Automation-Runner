@@ -39,6 +39,7 @@ One self-contained, GPG-encrypted archive — `oscar-backup-YYYYMMDD-HHMMSS.tar.
 | `data/datafiles/` | per-company scenarios (AES-256-GCM at rest) |
 | `data/artifacts/` | past run reports/results (encrypted at rest) |
 | `.env` | configuration **including `ENCRYPTION_KEY`** |
+| `secrets/` | the secrets given as files, when the installation uses `docker-compose.secrets.yml` (#1430): then **`ENCRYPTION_KEY` is here**, not in `.env` |
 | `manifest.json` | release tag, collection + schema version, user/company counts |
 
 **The linchpin is `ENCRYPTION_KEY`.** Password hashes are self-contained, so a
