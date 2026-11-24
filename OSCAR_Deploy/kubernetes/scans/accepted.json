@@ -1,0 +1,5 @@
+{
+  "about": "Findings of the Kubernetes scans accepted on purpose, each with its reason (#1438). check-scans.js fails on any other finding, and on an entry here that no longer matches anything. Kubescape: control + resources (Kind/namespace/name, * for any part). kube-bench: check number.",
+  "kubescape": [],
+  "kube-bench": []
+}

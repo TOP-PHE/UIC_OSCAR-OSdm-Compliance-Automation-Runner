@@ -14,6 +14,10 @@ name: CI · Kubernetes
 # Two jobs check the VPS's own set-up on the runner: nginx (its proxy
 # example) and docker-host (restarts and logs with no Docker socket in a
 # container, #1434).
+# Two scans read the set-up (#1438): Kubescape the manifests an operator
+# applies (job kubescape), kube-bench the k3s the guide installs (job k3s).
+# A finding fails unless OSCAR_Deploy/kubernetes/scans/accepted.json accepts
+# it, with its reason.
 #
 # Not a required check: it runs when what it tests changes, and every week
 # (a change elsewhere, a new runner image), so that a failure here never holds
@@ -668,6 +672,29 @@ jobs:
           done
           OSCAR_URL=http://127.0.0.1:3001 SMOKE_ACCOUNT_FILE="$RUNNER_TEMP/smoke-account.json" OSCAR_Deploy/kubernetes/ci/kept-pods.sh
 
+      # #1438: the CIS benchmark of k3s, on the k3s installed as the guide
+      # installs it (k3s/config.yaml), with the overlay, the runs and the
+      # monitoring deployed. A FAIL that scans/accepted.json does not accept
+      # fails the job; the benchmark's manual checks (WARN) are listed.
+      - name: kube-bench, the CIS benchmark of k3s
+        env:
+          KUBE_BENCH_VERSION: 0.16.0
+          KUBE_BENCH_SHA256: 82dbc7e598740dc9344d41f8ad0b8210d57c4c00bdb2c5f1d8a69a2b98baddcf
+          # The latest k3s benchmark that kube-bench holds.
+          KUBE_BENCH_BENCHMARK: k3s-cis-1.9
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/kube-bench"
+          mkdir -p "$dir"
+          curl -fsSL -o "$dir/kube-bench.tar.gz" \
+            "https://github.com/aquasecurity/kube-bench/releases/download/v${KUBE_BENCH_VERSION}/kube-bench_${KUBE_BENCH_VERSION}_linux_amd64.tar.gz"
+          echo "${KUBE_BENCH_SHA256}  $dir/kube-bench.tar.gz" | sha256sum -c -
+          tar -xzf "$dir/kube-bench.tar.gz" -C "$dir"
+          ls "$dir"
+          (cd "$dir" && sudo env KUBECONFIG=/etc/rancher/k3s/k3s.yaml ./kube-bench run \
+            --config-dir cfg --config cfg/config.yaml --benchmark "$KUBE_BENCH_BENCHMARK" --json) > "$RUNNER_TEMP/kube-bench.json"
+          node OSCAR_Deploy/kubernetes/scans/check-scans.js kube-bench "$RUNNER_TEMP/kube-bench.json"
+
       - name: What the cluster shows (on failure)
         if: failure()
         run: |
@@ -879,3 +906,42 @@ jobs:
             echo "the file's path is a label"; exit 1
           fi
           echo "Promtail: names, compose labels and streams from the files, no socket"
+
+  kubescape:
+    name: Kubescape (the Kubernetes manifests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      KUBESCAPE_VERSION: 4.0.17
+      KUBESCAPE_SHA256: 9ed580e7c9b1e2e5b8f0adcfdf2bf2fd8856e7297125fc9aa10cdcb97813a4fa
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: What an operator applies, rendered (scans/render.sh)
+        run: bash OSCAR_Deploy/kubernetes/scans/render.sh "$RUNNER_TEMP/rendered"
+
+      - name: Kubescape, its pinned release checked
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/kubescape"
+          mkdir -p "$dir"
+          curl -fsSL -o "$dir/kubescape.tar.gz" \
+            "https://github.com/kubescape/kubescape/releases/download/v${KUBESCAPE_VERSION}/kubescape_${KUBESCAPE_VERSION}_linux_amd64.tar.gz"
+          echo "${KUBESCAPE_SHA256}  $dir/kubescape.tar.gz" | sha256sum -c -
+          tar -xzf "$dir/kubescape.tar.gz" -C "$dir"
+          bin=$(find "$dir" -type f -name kubescape | head -n 1)
+          test -n "$bin"
+          sudo install -m 0755 "$bin" /usr/local/bin/kubescape
+          kubescape version
+
+      - name: Kubescape on the rendered manifests (NSA and MITRE frameworks)
+        run: |
+          set -euo pipefail
+          kubescape scan framework nsa,mitre "$RUNNER_TEMP/rendered" --format json --output "$RUNNER_TEMP/kubescape.json"
+          node OSCAR_Deploy/kubernetes/scans/check-scans.js kubescape "$RUNNER_TEMP/kubescape.json"
