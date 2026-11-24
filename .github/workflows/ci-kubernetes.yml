@@ -853,17 +853,29 @@ jobs:
             -v /var/lib/docker/containers:/var/lib/docker/containers:ro \
             -v "$RUNNER_TEMP/positions:/promtail" \
             "$image" -config.file=/etc/promtail/promtail-config.yaml -dry-run > /dev/null
+          # -dry-run prints each entry as "time<TAB>{labels}<TAB>line" on
+          # Promtail's own output, which is a log file it then reads too: keep
+          # the entries whose line is one the test's containers wrote.
+          entries() {
+            docker logs promtail-check 2>&1 \
+              | awk -F '\t' '$3 ~ /^(hello on (stdout|stderr)|a line naming nothing)$/' > "$RUNNER_TEMP/entries.txt" || true
+          }
           for i in $(seq 1 30); do
-            docker logs promtail-check > "$RUNNER_TEMP/promtail.out" 2>&1 || true
-            grep -q 'a line naming nothing' "$RUNNER_TEMP/promtail.out" && grep -q 'hello on stderr' "$RUNNER_TEMP/promtail.out" && break
+            entries
+            [ "$(wc -l < "$RUNNER_TEMP/entries.txt")" -ge 3 ] && break
             sleep 2
           done
-          grep -E 'hello on|a line naming nothing' "$RUNNER_TEMP/promtail.out" || { cat "$RUNNER_TEMP/promtail.out"; exit 1; }
-          has() { grep -F "$1" "$RUNNER_TEMP/promtail.out" | grep -qF "$2"; }
+          docker stop promtail-check > /dev/null
+          entries
+          cat "$RUNNER_TEMP/entries.txt"
+          # has LINE LABEL: an entry of that line carries that label.
+          has() { awk -F '\t' -v line="$1" -v want="$2" '$3 == line && index($2, want) { found = 1 } END { exit !found }' "$RUNNER_TEMP/entries.txt"; }
           for want in 'container="oscar-like"' 'compose_service="oscar"' 'compose_project="oscar_deploy"' 'stream="stdout"'; do
             has 'hello on stdout' "$want" || { echo "the stdout line lacks $want"; exit 1; }
           done
           has 'hello on stderr' 'stream="stderr"' || { echo "the stderr line lacks its stream"; exit 1; }
           has 'a line naming nothing' "container=\"${plain:0:12}\"" || { echo "a nameless line lacks its container id"; exit 1; }
-          if grep -F 'hello on' "$RUNNER_TEMP/promtail.out" | grep -q 'filename='; then echo "the file's path is a label"; exit 1; fi
+          if awk -F '\t' 'index($2, "filename=") { bad = 1 } END { exit !bad }' "$RUNNER_TEMP/entries.txt"; then
+            echo "the file's path is a label"; exit 1
+          fi
           echo "Promtail: names, compose labels and streams from the files, no socket"
