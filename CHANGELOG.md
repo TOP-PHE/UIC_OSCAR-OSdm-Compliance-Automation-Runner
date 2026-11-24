@@ -673,6 +673,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.585] / [collection-OTST_V2.0.271] — 2026-11-24
+
+Issue #1436, part of #1266, asked by the maintainer: the system request for product tags did not work on the simulator, and no scenario sold a product without a trip asked by its product tag. Simulator 0.74.0. Listed as release 2026.626; `current_release` is not moved (a release PR follows the run of #1266 PRs).
+
+OSDM (3.6 to 3.12): `GET /product-tags` answers a `ProductTagsResponse`, `productTagNames` [{ tag, description }] and `productTagGroups` [{ code, description, productTags }], both required. A `ProductTag` is any product type ("All product types can be used as Product Tags in the search"), or `SPLIT_RESERVATION`, `CARD_LOST`, `TICKET_LOST`, which only ask for something. `Product.productTags` "can be omitted outside of the product master data service".
+
+Decided with the maintainer:
+- the simulator lists everything it sells, in three groups, and `GET /products` names each product's tag;
+- one sale per tag without a trip: a single ride, a day pass, a ten-ride card;
+- in a sale asking a product type by its tag, the offer chosen holds that tag when one does, and a booking holding no product of it fails;
+- `GET /product-tags` is checked for its shape only: a tag a scenario asks need not be listed (every product type is a tag).
+- OSDM 3.6.0 requires two members of `ProductTagsResponse` it does not declare: `alpha` answers as 3.7 does, and the simulator's schema check excuses that defect only.
+
+### Added
+- **The offer of the tag asked** (`library-bruno/products.js`, `offers.js`): a sale whose `offerSearchCriteria` asks a product type by its tag (`productTags`, or a `productSelections` entry naming a tag; `productTagsAsked()`) chooses among the offers holding a product of that tag, by its `type` or its `productTags` (`offersWithTag()`, `offersOfTagAsked()`), when one does; a flexibility that leaves none falls back to an offer of the tag before any other. `TICKET_LOST`, `CARD_LOST` and `SPLIT_RESERVATION` choose nothing (`SEARCH_ONLY_TAGS`): the replacement of a lost item is checked by `lostItems.js`, as before.
+- **The booking holds a product of the tag asked** (07, `checkBookingTag()`): a FAIL otherwise, naming what was booked; a WARNING when the booked products name neither a type nor a tag.
+- **Coverage**: a sale asking a product by its tag counts under *Named products and tariff choice* (`sale.products`), as a sale by product code does; the server's `SEARCH_ONLY_TAGS` (`capabilities.js`) is pinned to the collection's.
+- **Catalogue**: `OTST_NONTRIP_SALE_SINGLE_RIDE_BY_TAG_1ADT` (245 checks), `OTST_NONTRIP_SALE_PASS_BY_TAG_1ADT` (287), `OTST_NONTRIP_SALE_MULTI_RIDE_BY_TAG_1ADT` (245).
+- **Simulator scenarios** (gamma, with their version copies, in the run list): `SIM_NONTRIP_SALE_TAG_SINGLE_RIDE_1ADT_38` (trip 45), `SIM_NONTRIP_SALE_TAG_PASS_1ADT_38` (trip 47), `SIM_NONTRIP_SALE_TAG_MULTI_RIDE_1ADT_38` (trip 45).
+- **Docs and page**: *What is tested* (the simulator table, the system information, steps 01 and 07, three catalogue rows; the summary of the scenarios without a trip had missed the two NUTS ones), *OSCAR - OSDM Simulator scenarios* (three rows), *OSCAR - OSDM Simulator*, the simulator's README, a welcome-page news entry.
+
+### Simulator 0.74.0
+- **`GET /product-tags` on every provider** (`src/osdm/productTags.js`): `WITHOUT_TRIP` (the types of its `nonTrip.products`), `REPLACEMENT` (`TICKET_LOST`, `CARD_LOST`), `WITH_TRIP` (`ADMISSION_POINT2POINT`, then `UPGRADE_POINT2POINT` with `secondClassOnlyCategories`, `RESERVATION` with `reservations`); each tag named once, each description a Text with a short text. Until now it answered 501.
+- **`GET /products` names each product's tag** (`productTags`); the offers do not change.
+- **OSDM 3.6.0's `ProductTagsResponse`** requires `productTagGroupNames` and `productTagGroupings`, which it does not declare, with `additionalProperties: false`: no answer can conform. 3.7.0 requires `productTagNames` and `productTagGroups`. `alpha` answers in that form, which 3.6's own properties describe and the collection checks; `tests/osdm-conformance.js` excuses that exact issue only (`KNOWN_SPEC_DEFECTS`).
+
+### Changed
+- **Every scenario run on the simulator has 11 more checks** (the product tags answer, at `10. GET Product Tags`, was a 501): every catalogue `checks` moved, as did *OSCAR - Checks by scenario* (regenerated) and the simulator hints of the finding drafts (`src/utils/simulator-checks.json`).
+- Every simulator reference changes (the run list). A company following one reads "not up to date" until it updates.
+
+### Checked
+- **Replay** with the real Bruno CLI 4.2.1, of the 223 scenarios of *Checks by scenario*, before (main, simulator 0.73.0) and after (simulator 0.74.0), in chunks: with `10. GET Product Tags` set aside, the two recordings are the same; there, every scenario now gives 12 passing checks. The three new scenarios pass with no failed check. `replay.js catalogue` agrees with all 113 entries.
+- **Simulator**: `app.test.js` covers `GET /product-tags` on the six providers and on a provider with no optional function, and the tags of `GET /products`; every answer is checked against the OSDM response schema of its version. `version-shapes.test.js` pins the 3.6.0 defect and that nothing else is excused.
+- **Collection**: `bruno-products.test.js` covers the tags asked, the offer of a tag, the fallback, the booking check and its warning.
+- **Server**: `catalogue-match.test.js` covers the capability and pins the search-only tags to the collection's.
+- **Mutation checks**: each new rule (17), removed one by one, fails a test.
+
+---
+
 ## [server-1.11.584] — 2026-11-24
 
 **The server's secrets may be given as files** (#1430; maintainer's choices, 2026-11-24: every secret of the `.env`, the mechanism and the guide now, the VPS switched after the release). Collection unchanged at OTST_V2.0.270. Nothing changes on an installation until it is switched.
