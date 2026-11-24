@@ -670,7 +670,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-1.11.584] — 2026-11-24
 
-**The server's secrets may be given as files** (#1430; maintainer's choices, 2026-11-24: every secret of the `.env`, the mechanism and the guide now, the VPS switched after the release). Not released on its own: listed in `compatibility.json` (2026.625) without moving `current_release`. Collection unchanged at OTST_V2.0.270. Nothing changes on an installation until it is switched.
+**The server's secrets may be given as files** (#1430; maintainer's choices, 2026-11-24: every secret of the `.env`, the mechanism and the guide now, the VPS switched after the release). Collection unchanged at OTST_V2.0.270. Nothing changes on an installation until it is switched.
+
+**Release 2026.625 (`current_release`)**, with everything merged since 2026.621: the sign-in locked per e-mail address after ten wrong passwords (1.11.581, #1421), the pages' scripts moved into files (1.11.582) and a content security policy without inline script (1.11.583, #1423), the secrets given as files (1.11.584, this section), and two changes without version, under *Unreleased*: the nginx example (#1426) and production started by digest (#1428).
+
+**What to do with this release.**
+- **Before approving the promotion:** nothing. The VPS was moved to deploy by digest on 2026-11-24 (#1428: the new `oscar-refresh-collection` installed, `OSCAR_IMAGE_DIGEST` in `.env`, no Watchtower), and its nginx no longer names its version nor sets a content security policy of its own (#1426).
+- **The promotion is the first deployed by digest:** its step *Refresh host repo and start the image on VPS* pulls the image it built, starts the server and the runner on it, and ends with `deployed ghcr.io/top-phe/oscar-server@sha256:…: oscar is healthy`. Red otherwise: its lines, and `journalctl -t oscar-deploy` on the VPS, say why.
+- **At the start:** migration 63 adds the table `login_lock`. Nothing to do.
+- **After it:** the production smoke test runs three scenarios through the API by itself. Switching the VPS's secrets to files is a step of its own, when you choose (*OSCAR - Server Admin Guide*, 13.7).
 
 - **`NAME_FILE`** for `ENCRYPTION_KEY`, `SMTP_PASS`, `PLATFORM_BOOTSTRAP_TOKEN`, `METRICS_TOKEN` and `RUN_AGENT_TOKEN`: a file holding the value (a Docker Compose secret at `/run/secrets/…`, a Kubernetes Secret mounted as a volume), read once by `utils/secretFiles.js` right after `.env`, before anything uses a secret. The value is then not in the container's configuration, where `docker inspect` shows every environment variable.
   - `NAME` keeps working. Both set is refused at start.
