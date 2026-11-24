@@ -48,7 +48,7 @@ That is the same program as on the VPS (where the runner is the optional
 | Way in | nginx on the host, TLS | an Ingress (ingress-nginx) or an OpenShift Route |
 | `/metrics` | nginx answers 404 from outside | OSCAR asks for `METRICS_TOKEN` |
 | Updates | each approved promotion starts its image by digest | you change the image tag and apply |
-| Restarts | autoheal sidecar | Kubernetes, from the liveness probe |
+| Restarts | the host's `oscar-autoheal` timer | Kubernetes, from the liveness probe |
 | Backups | `oscar-backup.sh` on the host | volume snapshots, or `oscar-data.sh save` (section 9) |
 
 **One replica, always.** A second pod would open the same SQLite file and run

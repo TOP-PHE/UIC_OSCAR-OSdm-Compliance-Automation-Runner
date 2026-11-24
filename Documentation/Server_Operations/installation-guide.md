@@ -169,6 +169,13 @@ cd /opt/OSCAR/OSCAR_Deploy
 sudo docker compose up -d --build
 ```
 
+The restarts of an unhealthy container are the host's, not a container's
+(no container holds the Docker socket, #1434): a systemd timer, every 30 s.
+
+```bash
+sudo bash /opt/OSCAR/OSCAR_Deploy/scripts/oscar-autoheal-schedule.sh install
+```
+
 Watch the boot logs:
 
 ```bash
@@ -425,7 +432,7 @@ section 3) and everything done in OSCAR's pages afterwards.
 | HTTPS | nginx on the host (section 6) | the cluster's Ingress or Route |
 | `/metrics` | nginx hides it from outside | OSCAR asks for `METRICS_TOKEN` |
 | Updates | each approved promotion starts its image by digest | you change the image tag and apply |
-| Restarts | the autoheal sidecar | Kubernetes, from the liveness probe |
+| Restarts | the host's `oscar-autoheal` timer | Kubernetes, from the liveness probe |
 | Backups | `oscar-backup.sh` on the host | volume snapshots of `oscar-data` |
 
 **Outline**, from a checkout of the release to deploy:

@@ -11,6 +11,9 @@ name: CI · Kubernetes
 # it. A kind cluster on the runner; the base under an OpenShift-style uid
 # (restricted pod security), driven through the API by ci/smoke.sh against
 # the OSDM simulator; then the plain Kubernetes overlay.
+# Two jobs check the VPS's own set-up on the runner: nginx (its proxy
+# example) and docker-host (restarts and logs with no Docker socket in a
+# container, #1434).
 #
 # Not a required check: it runs when what it tests changes, and every week
 # (a change elsewhere, a new runner image), so that a failure here never holds
@@ -37,6 +40,11 @@ on:
       - 'OSCAR_Deploy/prometheus/alerts/**'
       # The VPS's proxy: its example file is run on a real nginx (job nginx).
       - 'OSCAR_Deploy/nginx/**'
+      # The VPS's Docker host: restarts and logs without the Docker socket in a
+      # container (job docker-host, #1434).
+      - 'OSCAR_Deploy/docker-compose*.yml'
+      - 'OSCAR_Deploy/promtail/**'
+      - 'OSCAR_Deploy/scripts/oscar-autoheal*.sh'
       - 'Oscar_Server/src/api/routes/auth.js'
       - '.github/workflows/ci-kubernetes.yml'
   push:
@@ -60,6 +68,11 @@ on:
       - 'OSCAR_Deploy/prometheus/alerts/**'
       # The VPS's proxy: its example file is run on a real nginx (job nginx).
       - 'OSCAR_Deploy/nginx/**'
+      # The VPS's Docker host: restarts and logs without the Docker socket in a
+      # container (job docker-host, #1434).
+      - 'OSCAR_Deploy/docker-compose*.yml'
+      - 'OSCAR_Deploy/promtail/**'
+      - 'OSCAR_Deploy/scripts/oscar-autoheal*.sh'
       - 'Oscar_Server/src/api/routes/auth.js'
       - '.github/workflows/ci-kubernetes.yml'
   schedule:
@@ -760,3 +773,97 @@ jobs:
             echo "the proxy adds a Content-Security-Policy of its own"; exit 1
           fi
           echo "no Content-Security-Policy added by the proxy"
+
+  docker-host:
+    name: Docker host (the VPS's restarts and logs, no Docker socket in a container)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # A small image with a shell, by digest, from Google's mirror of Docker
+      # Hub (Docker Hub limits shared addresses).
+      BUSYBOX: mirror.gcr.io/library/busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: The compose files, as Docker Compose reads them
+        run: |
+          set -euo pipefail
+          cd OSCAR_Deploy
+          cp .env.example .env
+          mkdir -p secrets
+          : > secrets/encryption_key
+          : > secrets/smtp_pass
+          OSCAR_IMAGE_DIGEST="sha256:$(printf '%064d' 0)" docker compose \
+            -f docker-compose.yml -f docker-compose.metrics.yml -f docker-compose.secrets.yml \
+            --profile isolated config --format json > "$RUNNER_TEMP/compose.json"
+          jq -r '.services | keys | join(", ")' "$RUNNER_TEMP/compose.json"
+          # No service mounts the Docker socket.
+          jq -e '[.services[] | .volumes[]? | select((.source // "") | test("docker\\.sock"))] | length == 0' "$RUNNER_TEMP/compose.json"
+          # Every service writes json-file logs naming its container: one block for all.
+          jq -e '[.services[].logging] | unique | length == 1' "$RUNNER_TEMP/compose.json"
+          jq -e '.services.oscar.logging | .driver == "json-file" and .options.tag == "{{.Name}}"' "$RUNNER_TEMP/compose.json"
+
+      - name: Restarts from the host, by the installed timer
+        run: |
+          set -euo pipefail
+          sudo bash OSCAR_Deploy/scripts/oscar-autoheal-schedule.sh install
+          systemctl is-active oscar-autoheal.timer
+          sudo cmp OSCAR_Deploy/scripts/oscar-autoheal.sh /usr/local/sbin/oscar-autoheal
+          stat -c '%U %a' /usr/local/sbin/oscar-autoheal | grep -qx 'root 755'
+          # Two containers whose check fails at once; only one has the label.
+          sick() { docker run -d --name "$1" "${@:2}" --health-cmd 'test -f /tmp/ok' --health-interval 2s \
+            --health-timeout 2s --health-retries 1 --health-start-period 0s "$BUSYBOX" sleep 3600 > /dev/null; }
+          sick labelled --label autoheal=true
+          sick unlabelled
+          started() { docker inspect --format '{{.State.StartedAt}}' "$1"; }
+          first=$(started labelled); other=$(started unlabelled)
+          for i in $(seq 1 60); do
+            [ "$(started labelled)" != "$first" ] && break
+            sleep 2
+          done
+          echo "labelled: started $first, then $(started labelled)"
+          test "$(started labelled)" != "$first"
+          # Left alone: unhealthy, never restarted.
+          test "$(started unlabelled)" = "$other"
+          test "$(docker inspect --format '{{.State.Health.Status}}' unlabelled)" = unhealthy
+          sudo journalctl -t oscar-autoheal --no-pager | tee "$RUNNER_TEMP/autoheal.log"
+          grep -q 'restarted labelled' "$RUNNER_TEMP/autoheal.log"
+          if grep -q unlabelled "$RUNNER_TEMP/autoheal.log"; then echo "restarted a container without the label"; exit 1; fi
+          docker rm -f labelled unlabelled > /dev/null
+          sudo bash OSCAR_Deploy/scripts/oscar-autoheal-schedule.sh remove
+          test ! -e /usr/local/sbin/oscar-autoheal
+          if systemctl is-active --quiet oscar-autoheal.timer; then echo "the timer is still active"; exit 1; fi
+
+      - name: Promtail reads the log files, and finds each container's name in its lines
+        run: |
+          set -euo pipefail
+          # A container made with the compose files' logging block, as compose makes it.
+          opts=()
+          while IFS= read -r o; do opts+=(--log-opt "$o"); done < <(jq -r '.services.oscar.logging.options | to_entries[] | "\(.key)=\(.value)"' "$RUNNER_TEMP/compose.json")
+          docker run -d --name oscar-like --label com.docker.compose.service=oscar --label com.docker.compose.project=oscar_deploy \
+            --log-driver json-file "${opts[@]}" "$BUSYBOX" sh -c 'echo "hello on stdout"; echo "hello on stderr" >&2; sleep 3600' > /dev/null
+          # A container made without it: its lines name no container.
+          plain=$(docker run -d "$BUSYBOX" sh -c 'echo "a line naming nothing"; sleep 3600')
+          image=$(jq -r '.services.promtail.image' "$RUNNER_TEMP/compose.json")
+          echo "Promtail: $image"
+          mkdir -p "$RUNNER_TEMP/positions"
+          docker run -d --name promtail-check \
+            -v "$PWD/OSCAR_Deploy/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro" \
+            -v /var/lib/docker/containers:/var/lib/docker/containers:ro \
+            -v "$RUNNER_TEMP/positions:/promtail" \
+            "$image" -config.file=/etc/promtail/promtail-config.yaml -dry-run > /dev/null
+          for i in $(seq 1 30); do
+            docker logs promtail-check > "$RUNNER_TEMP/promtail.out" 2>&1 || true
+            grep -q 'a line naming nothing' "$RUNNER_TEMP/promtail.out" && grep -q 'hello on stderr' "$RUNNER_TEMP/promtail.out" && break
+            sleep 2
+          done
+          grep -E 'hello on|a line naming nothing' "$RUNNER_TEMP/promtail.out" || { cat "$RUNNER_TEMP/promtail.out"; exit 1; }
+          has() { grep -F "$1" "$RUNNER_TEMP/promtail.out" | grep -qF "$2"; }
+          for want in 'container="oscar-like"' 'compose_service="oscar"' 'compose_project="oscar_deploy"' 'stream="stdout"'; do
+            has 'hello on stdout' "$want" || { echo "the stdout line lacks $want"; exit 1; }
+          done
+          has 'hello on stderr' 'stream="stderr"' || { echo "the stderr line lacks its stream"; exit 1; }
+          has 'a line naming nothing' "container=\"${plain:0:12}\"" || { echo "a nameless line lacks its container id"; exit 1; }
+          if grep -F 'hello on' "$RUNNER_TEMP/promtail.out" | grep -q 'filename='; then echo "the file's path is a label"; exit 1; fi
+          echo "Promtail: names, compose labels and streams from the files, no socket"

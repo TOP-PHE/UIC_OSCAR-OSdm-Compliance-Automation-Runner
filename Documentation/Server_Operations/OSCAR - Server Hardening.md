@@ -57,7 +57,8 @@ getent group sudo docker
 systemctl is-active fail2ban                       # active
 cat /etc/apt/apt.conf.d/20auto-upgrades            # both values "1"
 
-# Containers that can reach the Docker socket (each is root on the host)
+# Containers that can reach the Docker socket (each is root on the host):
+# none since #1434
 docker ps --format '{{.Names}}  {{.Image}}  {{.Mounts}}' | grep docker.sock
 ```
 
@@ -250,12 +251,14 @@ the runner container. On Kubernetes or OpenShift, each run can have a pod of
 its own (`RUN_ISOLATION=pod`): *OSCAR - Kubernetes and OpenShift Deployment
 Guide*, section 10a.
 
+No container holds the Docker socket (#1434). The restarts of an unhealthy
+container are a systemd timer of the host (*Server Admin Guide*, 13.8),
+Promtail reads the containers' log files, and `watchtower` is gone: the
+release workflow starts the image it built through the pinned deploy key
+above. The check of section 2 lists nothing.
+
 ### 4.2 Still open
 
-- `autoheal` (restarts) mounts the Docker socket, so it is root on the OSCAR
-  host (its image is pinned by digest since 2026-11-06). `watchtower`, which
-  did too, is gone: the release workflow starts the image it built through
-  the pinned deploy key above.
 - The OSCAR container's root file system is writable; making it read-only
   needs every place Bruno and the server write (temporary files, the run's
   environment files) to be a volume or a `tmpfs` first.

@@ -1,14 +1,19 @@
 # Copyright [2026] [International Union of Railways (UIC)]
 # Licensed under the Apache License, Version 2.0
 #
-# Promtail config for OSCAR. Discovers Docker containers via the mounted
-# socket, scrapes their stdout/stderr, and pushes to the local Loki.
+# Promtail config for OSCAR. Reads the log files Docker writes for each
+# container (json-file driver, /var/lib/docker/containers, mounted read-only)
+# and pushes them to the local Loki. No Docker socket (#1434): Docker writes
+# the container's name and compose labels into each line, as the `logging`
+# block of docker-compose.yml and docker-compose.metrics.yml asks.
 #
 # Labels every log line with:
-#   - container       (e.g. "oscar", "oscar-grafana", "oscar-autoheal")
+#   - container       (e.g. "oscar", "oscar-grafana", "oscar-promtail")
 #   - compose_project (e.g. "oscar_deploy")
 #   - compose_service (e.g. "oscar")
 #   - stream          (stdout | stderr)
+# A container started without that logging block has no name in its lines:
+# its container label is then the first 12 characters of its id.
 #
 # Filter in Grafana / LogQL with selectors like:
 #   {container="oscar"}                               — just the OSCAR app
@@ -31,19 +36,40 @@ clients:
 
 scrape_configs:
   - job_name: docker
-    docker_sd_configs:
-      - host: unix:///var/run/docker.sock
-        refresh_interval: 5s
-    relabel_configs:
-      # Container name: Docker prefixes with /, strip it.
-      - source_labels: ['__meta_docker_container_name']
-        regex: '/(.*)'
-        target_label: 'container'
-      # docker compose labels — present on any container started via compose.
-      - source_labels: ['__meta_docker_container_label_com_docker_compose_project']
-        target_label: 'compose_project'
-      - source_labels: ['__meta_docker_container_label_com_docker_compose_service']
-        target_label: 'compose_service'
-      # stdout vs stderr — Loki splits on this for filtering.
-      - source_labels: ['__meta_docker_container_log_stream']
-        target_label: 'stream'
+    static_configs:
+      - targets: [localhost]
+        labels:
+          __path__: /var/lib/docker/containers/*/*-json.log
+    pipeline_stages:
+      # One line of Docker's json-file log:
+      #   {"log":"…\n","stream":"stdout","attrs":{"tag":"oscar",
+      #    "com.docker.compose.service":"oscar",…},"time":"2026-…Z"}
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            time: time
+            container: attrs.tag
+            compose_service: 'attrs."com.docker.compose.service"'
+            compose_project: 'attrs."com.docker.compose.project"'
+      # A line naming no container: the container's id, from the file's path.
+      - regex:
+          source: filename
+          expression: '^/var/lib/docker/containers/(?P<container_id>[0-9a-f]{12})[0-9a-f]*/'
+      - template:
+          source: container
+          template: '{{ or .container .container_id }}'
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+      - labels:
+          container:
+          compose_service:
+          compose_project:
+          stream:
+      - output:
+          source: output
+      # The file's path changes each time a container is made again: never a
+      # label of its own.
+      - labeldrop:
+          - filename

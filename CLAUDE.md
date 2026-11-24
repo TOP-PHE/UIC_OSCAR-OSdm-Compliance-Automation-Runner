@@ -4736,6 +4736,13 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   Alertmanager): create it again with both, never a bare `docker compose up -d
   oscar`. The container's label `com.docker.compose.project.config_files`
   names them; the installation guide's two lines read it (#1397).
+- **No container mounts the Docker socket** (#1434): restarts of unhealthy
+  containers are a host timer (`scripts/oscar-autoheal.sh`, installed to
+  `/usr/local/sbin` by `oscar-autoheal-schedule.sh`), and Promtail reads the
+  containers' json-file logs, whose lines name their container through the
+  compose files' shared `logging` block (`x-logging`, one per file: **a new
+  service names `logging: *logging`**). `docker-socket.test.js` and the CI
+  job *Docker host* hold it.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image**. **The VPS checkout follows the
   newest `release-*` tag on `main`, never `main`'s head** (2026-11-06):
