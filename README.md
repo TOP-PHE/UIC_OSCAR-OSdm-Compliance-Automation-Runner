@@ -32,9 +32,9 @@ reports — without requiring testers to install a local toolchain.
 | [`compatibility.json`](compatibility.json) | Tested-together server ↔ collection version matrix |
 | [`CHANGELOG.md`](CHANGELOG.md) | Combined release history |
 
-The deployed runtime is a single container (`ghcr.io/top-phe/oscar-server:stable`)
-plus its sidecars: Watchtower auto-updates, autoheal restarts on
-healthcheck failure, and an opt-in metrics overlay (Prometheus + Grafana +
+The deployed runtime is a single container (`ghcr.io/top-phe/oscar-server`,
+named by the digest each approved promotion built and started) plus its
+sidecars: autoheal restarts on healthcheck failure, and an opt-in metrics overlay (Prometheus + Grafana +
 Loki + Alertmanager) for production-grade observability.
 
 ---
@@ -49,7 +49,7 @@ Loki + Alertmanager) for production-grade observability.
 - [Server Admin Guide](Documentation/Server_Operations/OSCAR%20-%20Server%20Admin%20Guide.md) — day-2 operations, Server Config UI, observability + alerting
 - [Metrics & Monitoring](Documentation/Server_Operations/metrics-and-monitoring.md) — Prometheus / Grafana / Loki stack
 - [OSDM Simulator](Documentation/Server_Operations/OSCAR%20-%20OSDM%20Simulator.md) — a stub provider on a host of its own, and how to point a company at it
-- [Auto-Deploy Setup](Documentation/Server_Operations/auto-deploy-setup.md) — Watchtower + CI image promotion
+- [Auto-Deploy Setup](Documentation/Server_Operations/auto-deploy-setup.md) — CI image promotion, started on the VPS by digest
 - [VPS Deployment Guide](Documentation/Server_Operations/OSCAR%20-%20VPS%20Deployment%20Guide.md) — legacy non-Docker manual install
 
 ### For understanding the platform
@@ -71,7 +71,7 @@ Three Git-tag kinds, separately versioned per subsystem with a central compatibi
 
 | Tag | Triggers | Used by |
 |---|---|---|
-| `server-vX.Y.Z` | Server-only release — rebuilds the Docker image | Watchtower auto-promotes `:stable` |
+| `server-vX.Y.Z` | Server-only release — rebuilds the Docker image | An image per server version; production changes only with a release |
 | `collection-v<...>` | Bruno collection change — no image rebuild | Picked up live via the read-only volume mount |
 | `release-YYYY.MM` | Combined release — known-good server + collection combo | Recommended pin point for production |
 

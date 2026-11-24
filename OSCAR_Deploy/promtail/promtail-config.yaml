@@ -5,7 +5,7 @@
 # socket, scrapes their stdout/stderr, and pushes to the local Loki.
 #
 # Labels every log line with:
-#   - container       (e.g. "oscar", "oscar-grafana", "watchtower")
+#   - container       (e.g. "oscar", "oscar-grafana", "oscar-autoheal")
 #   - compose_project (e.g. "oscar_deploy")
 #   - compose_service (e.g. "oscar")
 #   - stream          (stdout | stderr)

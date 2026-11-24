@@ -74,8 +74,8 @@ tags listed.
 | Environment | Protection | Branches / tags | Secrets | Used by |
 |---|---|---|---|---|
 | `production` | **reviewer `TOP-PHE` required** | `main`, tags `release-*` | `SSH_DEPLOY_KEY`, `SSH_KNOWN_HOSTS` | `promote-release.yml`, `refresh-collection.yml` |
-| `release` | none | `main` | `OSCAR_RELEASE_APP_ID`, `OSCAR_RELEASE_APP_PRIVATE_KEY` | `auto-tag-on-release.yml` |
-| `simulator` | none | `main` | `SIMULATOR_SSH_KEY`, `SIMULATOR_KNOWN_HOSTS`, `SIMULATOR_SSH_TARGET`, `SIMULATOR_URL` | `simulator-deploy.yml` |
+| `release` | **reviewer `TOP-PHE` required** | `main` | `OSCAR_RELEASE_APP_ID`, `OSCAR_RELEASE_APP_PRIVATE_KEY` | `auto-tag-on-release.yml` |
+| `simulator` | **reviewer `TOP-PHE` required** | `main` | `SIMULATOR_SSH_KEY`, `SIMULATOR_KNOWN_HOSTS`, `SIMULATOR_SSH_TARGET`, `SIMULATOR_URL` | `simulator-deploy.yml` |
 | `oscar-smoke` | none (it must start by itself) | `main` | `OSCAR_SMOKE_CLIENT_ID`, `OSCAR_SMOKE_PRIVATE_KEY` | `production-smoke.yml` |
 
 - **Every promotion waits for the maintainer's approval**, because of
@@ -117,7 +117,7 @@ secrets and still report green.
 | `labeler.yml` | PR labeler | `pull_request_target` | Labels by path (`.github/labeler.yml`) |
 | `publish-image.yml` | Publish · server image to GHCR | push to `main` | `:edge`, `:sha-…`, `:server-v…`. Production unchanged |
 | `auto-tag-on-release.yml` | Release · auto-tag on merge | push to `main` | When `compatibility.json#current_release` changes, mints `release-YYYY.NNN` |
-| `promote-release.yml` | Promote · release tag → :stable image | tag `release-*` | **Waits for approval** (`production`). Builds `:stable` and moves the VPS checkout to the release. Watchtower takes the image within ~5 minutes |
+| `promote-release.yml` | Promote · release tag → :stable image | tag `release-*` | **Waits for approval** (`production`). Builds the image (`:stable`, `:release-…`), moves the VPS checkout to the release and starts the server on the image's digest; red if it is not healthy |
 | `refresh-collection.yml` | Refresh · Bruno collection on production VPS | manual | Moves the VPS checkout to the newest release. Waits for approval |
 | `publish-cluster-images.yml` | Publish · cluster images to GHCR | tag `release-*` | The bundle and run images for Kubernetes |
 | `simulator-release.yml` | Simulator · tag and release | push to `main` | A new simulator version gets its tag and GitHub release |
@@ -188,7 +188,7 @@ the script.
 
 | What | Where | Used for |
 |---|---|---|
-| **Production** | `oscar.uic.org`, a VPS with Docker; Watchtower follows `:stable` | The real service. Promotion only, after approval |
+| **Production** | `oscar.uic.org`, a VPS with Docker; runs the digest the last promotion built | The real service. Promotion only, after approval |
 | **k3s test machine** | a VPS of its own, OSCAR on k3s | Load and recovery rehearsals (*OSCAR - k3s on one VPS*). Never production data unless decided |
 | **OSDM simulator** | a VPS of its own, behind nginx (*OSCAR - OSDM Simulator*) | Six providers `alpha` … `zeta`, one per OSDM version. Updated by `simulator-deploy.yml`; managed from OSCAR, *Admin → OSDM Simulator* |
 | **Simulator company in OSCAR** | company **UIC Simulateurs** in production, its providers ALPHA … ZETA | Manual tests and the API checks |

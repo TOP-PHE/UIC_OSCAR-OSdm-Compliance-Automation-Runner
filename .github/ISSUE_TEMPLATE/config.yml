@@ -22,4 +22,4 @@ contact_links:
     url: https://github.com/TOP-PHE/UIC_OSCAR_Temporary/blob/main/Documentation/Server_Operations/installation-guide.md
     about: |
       Read the installation and operations guides first. They cover the
-      common Docker / nginx / GHCR / Watchtower questions.
+      common Docker / nginx / GHCR / deployment questions.

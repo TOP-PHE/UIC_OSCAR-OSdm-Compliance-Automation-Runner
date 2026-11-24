@@ -13,8 +13,8 @@ name: Publish · server image to GHCR
 # immutable image per server release).
 #
 # Production-grade rollout (the :stable tag) is owned by promote-release.yml
-# and only fires when a release-YYYY.MM tag is pushed. Watchtower on the VPS
-# watches :stable, so :edge updates here do NOT auto-deploy to production.
+# and only fires when a release-YYYY.MM tag is pushed. Production runs the
+# digest that workflow built, so :edge updates here do NOT deploy anything.
 on:
   push:
     branches: [main]
@@ -82,4 +82,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          provenance: false   # avoids the multi-arch attestation that breaks Watchtower diffing
+          provenance: false   # one image manifest per tag, no attestation index

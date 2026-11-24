@@ -165,6 +165,9 @@ into `main` cannot change what the key runs:
 | OSCAR | `ubuntu` | `/usr/local/sbin/oscar-refresh-collection` | `OSCAR_Deploy/scripts/refresh-collection.sh` | `auto-deploy-setup.md`, step 4 |
 | Simulator | `simdeploy` | `/usr/local/sbin/osdm-simulator-update` | `OSDM_Simulator/deploy/update.sh` | `OSCAR - OSDM Simulator.md`, §7 "Automatic update" |
 
+The OSCAR key's script also starts the image whose digest the promotion
+sends, after checking its form (`auto-deploy-setup.md`, step 4).
+
 When the source changes on `main`, read it, then copy it again by hand with
 the same `install -m 0755 -o root -g root …` line. The OSCAR script logs a
 `NOTE` (`journalctl -t oscar-deploy`) while the two differ.
@@ -183,7 +186,7 @@ deploy key without `command=`.
 | Processes | at most 2048 (`pids_limit`) | at most 64; 256 MB of memory |
 | Root file system | writable (Bruno and the server write outside `/app/data`) | read-only |
 | Port | `127.0.0.1:3001` | `127.0.0.1:3002` |
-| Image | `ghcr.io/top-phe/oscar-server:stable`, built from a base image named by digest | `node:22-slim` by digest, the same as OSCAR's Dockerfile |
+| Image | `ghcr.io/top-phe/oscar-server` by the digest the promotion built (`OSCAR_IMAGE_DIGEST` in `.env`), itself built from a base image named by digest | `node:22-slim` by digest, the same as OSCAR's Dockerfile |
 
 The OSCAR settings were checked with the real server and the real Bruno CLI
 under those limits: `/health` answers 200, and two complete scenarios against
@@ -249,11 +252,10 @@ Guide*, section 10a.
 
 ### 4.2 Still open
 
-- `watchtower` (automatic updates) and `autoheal` (restarts) mount the Docker
-  socket, so each of them is root on the OSCAR host (their images are pinned
-  by digest since 2026-11-06). Replacing `watchtower` with a deployment triggered by
-  the release workflow, through a pinned deploy key like the one above, is a
-  separate change: it changes how releases reach production.
+- `autoheal` (restarts) mounts the Docker socket, so it is root on the OSCAR
+  host (its image is pinned by digest since 2026-11-06). `watchtower`, which
+  did too, is gone: the release workflow starts the image it built through
+  the pinned deploy key above.
 - The OSCAR container's root file system is writable; making it read-only
   needs every place Bruno and the server write (temporary files, the run's
   environment files) to be a volume or a `tmpfs` first.

@@ -31,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Production starts the image the promotion built, by digest** (#1428). Deployment files, CI and guides, no version. *OSCAR - Server Hardening* § 4.2 listed it as still open.
+  - **Seen:** the promotion pushed `:stable` and moved the VPS checkout; Watchtower, polling `:stable` every five minutes, then pulled and started the image. The smoke test waited up to 20 minutes for the release, and a second container held the Docker socket.
+  - **Now:** `promote-release.yml` sends the digest its build gave to the VPS's forced command. `refresh-collection.sh` reads it as data (nothing, or `sha256:` and 64 hex digits; anything else is refused before anything moves), moves the checkout, pulls the image by that digest, writes it as `OSCAR_IMAGE_DIGEST` in `.env`, creates the server again from the compose files the running one was made from, and waits for it to be healthy on that image: the promotion goes red otherwise, and its summary names the digest.
+  - `docker-compose.yml` names the server image (and the runner's) by `OSCAR_IMAGE_DIGEST`; compose refuses to start without it. No Watchtower service.
+  - **On the VPS, once:** install the new script, name the running digest in `.env`, remove the Watchtower container (*auto-deploy-setup.md*, step 4). An installed script older than the workflow ignores the digest: the step warns.
+  - Guides: *auto-deploy-setup.md* (*Which image to run*, rolling back), the Self-Hosted Quick Start (Step 9 is now moving to a new release), and the pages that named Watchtower. The Quick Start's PDF is not regenerated.
+  - `deploy-by-digest.test.js` runs the script on a real git checkout with a stub docker: what it accepts and refuses, the `.env` line, the compose call, a failed pull, compose or health check.
+
 - **The nginx site names no version, and leaves the security headers to OSCAR** (#1426). Deployment files, guides, CI and a test, no version.
   - `server_tokens off;` in `OSCAR_Deploy/nginx/oscar.conf.example` and in the sites of *installation-guide.md* and *OSCAR - Self-Hosted Quick Start*: `Server` reads `nginx`, and nginx's own error pages name no version.
   - A note in each: OSCAR sends its own `Content-Security-Policy`, HSTS and the rest, so a proxy adds none and hides none; a policy written in a proxy stays as it was written when OSCAR's changes (#1423). The installation guide says how to check an installed server with `curl -sI`.

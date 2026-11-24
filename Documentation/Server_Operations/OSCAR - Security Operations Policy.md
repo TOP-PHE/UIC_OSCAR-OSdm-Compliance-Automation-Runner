@@ -318,11 +318,9 @@ docker logs oscar --tail 80
 # 3. Quick remediation if container is restart-looping
 sudo docker compose -f /opt/OSCAR/OSCAR_Deploy/docker-compose.yml restart oscar
 
-# 4. If a recent Watchtower update broke things, roll back to :edge image
-docker images ghcr.io/top-phe/oscar-server
-sudo docker tag ghcr.io/top-phe/oscar-server:edge \
-                ghcr.io/top-phe/oscar-server:stable
-sudo docker compose up -d --force-recreate oscar
+# 4. If the last release broke things, start the image deployed before it
+#    (auto-deploy-setup.md, "Rolling back production")
+journalctl -t oscar-deploy | grep deployed
 
 # 5. If a migration crashed, mark it complete in the DB to skip it on next boot
 sudo apt install -y sqlite3  # one-time
@@ -392,7 +390,8 @@ If any of the four long-lived secrets is suspected leaked:
   connection, every `sudo` command
 - **Container logs** (Loki via Promtail since v1.7) — OSCAR stdout /
   stderr, all dependent containers, indefinite retention by default
-- **Watchtower** — every image pull and container update
+- **Deployments** (`journalctl -t oscar-deploy`) — every checkout move and
+  every image started, by digest
 
 ### 6.2 Periodic reviews
 

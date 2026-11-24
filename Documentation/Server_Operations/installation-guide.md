@@ -136,9 +136,7 @@ cd /opt/OSCAR/OSCAR_Deploy && sudo docker compose exec oscar printenv JSON_SCHEM
 > are baked into a container when it is **created**. `docker compose
 > restart` keeps the existing container, so an edited `.env` is silently
 > ignored. `docker compose up -d oscar` detects the config change and
-> recreates the container with the new value. (Watchtower image updates
-> don't pick up `.env` edits either — it clones the old container's
-> environment — so an explicit `up -d` is the only path.) If `printenv`
+> recreates the container with the new value. If `printenv`
 > still shows the old URL, the container was not recreated.
 
 **With the monitoring stack, name both compose files.** Compose builds a
@@ -426,7 +424,7 @@ section 3) and everything done in OSCAR's pages afterwards.
 | Test collection | a folder beside the container, updated with `git pull` | inside the image, built from the release you deploy |
 | HTTPS | nginx on the host (section 6) | the cluster's Ingress or Route |
 | `/metrics` | nginx hides it from outside | OSCAR asks for `METRICS_TOKEN` |
-| Updates | Watchtower follows `:stable` | you change the image tag and apply |
+| Updates | each approved promotion starts its image by digest | you change the image tag and apply |
 | Restarts | the autoheal sidecar | Kubernetes, from the liveness probe |
 | Backups | `oscar-backup.sh` on the host | volume snapshots of `oscar-data` |
 
