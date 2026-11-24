@@ -441,6 +441,7 @@ jobs:
           # guide does, so the conversion is proved, not only a new install.
           sudo sed -i '/^cluster-init:/d' /etc/rancher/k3s/config.yaml
           sudo cp OSCAR_Deploy/kubernetes/k3s/traefik-config.yaml /var/lib/rancher/k3s/server/manifests/traefik-config.yaml
+          sudo install -D -m 0644 OSCAR_Deploy/kubernetes/k3s/cert-permissions.conf /etc/systemd/system/k3s.service.d/oscar-cert-permissions.conf
           # k3s comes from GitHub's releases: a download that times out there
           # ("Download failed") is tried again, as the guide says to.
           for attempt in 1 2 3; do
@@ -465,6 +466,8 @@ jobs:
           # Secrets are encrypted in k3s's datastore (k3s/config.yaml).
           sudo k3s secrets-encrypt status | tee "$RUNNER_TEMP/encryption.txt"
           grep -q 'Encryption Status: Enabled' "$RUNNER_TEMP/encryption.txt"
+          # The guide's section 3 (#1438): k3s's default ServiceAccounts mount no token.
+          for ns in $(kubectl get namespaces -o name); do kubectl -n "${ns#namespace/}" patch serviceaccount default -p '{"automountServiceAccountToken": false}'; done
 
       - name: k3s converted to etcd, as the guide converts a machine (#1271)
         run: |
@@ -693,6 +696,15 @@ jobs:
           ls "$dir"
           (cd "$dir" && sudo env KUBECONFIG=/etc/rancher/k3s/k3s.yaml ./kube-bench run \
             --config-dir cfg --config cfg/config.yaml --benchmark "$KUBE_BENCH_BENCHMARK" --json) > "$RUNNER_TEMP/kube-bench.json"
+          # 1.2.23 is accepted because the benchmark reads the first start of
+          # the API server (on SQLite here, before the move to etcd): its
+          # latest start must name both arguments.
+          last=$(sudo journalctl -u k3s | grep 'Running kube-apiserver' | tail -n 1)
+          for flag in --etcd-certfile= --etcd-keyfile=; do
+            printf '%s' "$last" | grep -q -- "$flag" || { echo "the API server's latest start has no $flag"; exit 1; }
+          done
+          # 1.1.20: the drop-in closed k3s's certificates after its last start.
+          test -z "$(sudo find /var/lib/rancher/k3s/server/tls -name '*.crt' -perm /077)"
           node OSCAR_Deploy/kubernetes/scans/check-scans.js kube-bench "$RUNNER_TEMP/kube-bench.json"
 
       - name: What the cluster shows (on failure)

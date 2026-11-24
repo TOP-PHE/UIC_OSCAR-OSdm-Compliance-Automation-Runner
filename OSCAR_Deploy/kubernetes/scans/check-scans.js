@@ -16,10 +16,12 @@
 // to the job summary when $GITHUB_STEP_SUMMARY is set. No dependency.
 //
 //  - Kubescape (JSON output): a finding is a control that failed on a
-//    resource: { control: "C-0017", resource: "Deployment/oscar/oscar" }
-//    (kind/namespace/name, the namespace "-" for none). An accepted entry
-//    names its control and the resources it covers, each "Kind/namespace/name"
-//    with "*" for any part: ["Deployment/oscar/*"], or ["*"] for all.
+//    resource of a rendered file: "overlays-k3s:Deployment/-/oscar"
+//    (file:kind/namespace/name, the namespace "-" for none). An accepted
+//    entry names its control and the resources it covers, each
+//    "Kind/namespace/name" (in any file) or "file:Kind/namespace/name", "*"
+//    for any part: ["Deployment/oscar/*"], ["overlays-openshift:*/*/*"], or
+//    ["*"] for all.
 //  - kube-bench (--json): a finding is a check that FAILED, by number
 //    ("1.1.1"). WARN checks are the benchmark's manual ones: listed, never
 //    failing.
@@ -61,18 +63,20 @@ function kubescapeFindings(report) {
   if (!Array.isArray(report?.results)) {
     throw new Error(`not a Kubescape JSON report: no "results" list (keys: ${Object.keys(report || {}).join(', ')})`);
   }
-  const objects = new Map((report.resources || []).map((r) => [r.resourceID, r.object]));
+  const resources = new Map((report.resources || []).map((r) => [r.resourceID, r]));
   const names = new Map(Object.entries(report.summaryDetails?.controls || {})
     .map(([id, c]) => [id, c.name]));
   const findings = [];
   for (const result of report.results) {
-    const resource = resourceName(objects.get(result.resourceID));
+    const resource = resources.get(result.resourceID);
+    const file = fileOf(resource?.source);
+    const where = `${file ? `${file}:` : ''}${resourceName(resource?.object)}`;
     for (const control of result.controls || []) {
       if (statusOf(control) !== 'failed') continue;
       findings.push({
         id: control.controlID,
         name: control.name || names.get(control.controlID) || '',
-        where: resource,
+        where,
         detail: pathsOf(control).join('; '),
       });
     }
@@ -80,10 +84,19 @@ function kubescapeFindings(report) {
   return findings;
 }
 
+// The rendered file a resource comes from, without its folder or extension.
+function fileOf(source) {
+  const p = source?.relativePath || source?.path || '';
+  return p ? path.basename(p).replace(/\.(ya?ml|json)$/, '') : '';
+}
+
 function matchesResource(pattern, resource) {
   if (pattern === '*') return true;
-  const want = pattern.split('/');
-  const have = resource.split('/');
+  const [wantFile, wantName] = pattern.includes(':') ? pattern.split(':') : ['*', pattern];
+  const [haveFile, haveName] = resource.includes(':') ? resource.split(':') : ['', resource];
+  if (wantFile !== '*' && wantFile !== haveFile) return false;
+  const want = wantName.split('/');
+  const have = haveName.split('/');
   return want.length === 3 && want.every((part, i) => part === '*' || part === have[i]);
 }
 
@@ -173,4 +186,4 @@ function main(argv) {
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));
 
-module.exports = { check, kubescapeFindings, kubeBenchFindings, matchesResource, resourceName, pathsOf, markdown, main };
+module.exports = { check, kubescapeFindings, kubeBenchFindings, matchesResource, resourceName, pathsOf, fileOf, markdown, main };
