@@ -377,6 +377,20 @@ account.
 - **Lost your phone:** ask an OSCAR administrator to reset it; you then sign
   in with your password alone and can turn it on again.
 
+### 2.6 When sign-in is paused
+
+After ten wrong passwords within 15 minutes for your e-mail address
+(server 1.11.581, #1421), OSCAR pauses its sign-in: every password is
+refused for 15 minutes, the right one too, and the page says how long to
+wait. If it happens again within the day, the pause doubles each time
+(30 minutes, an hour…, at most 24 hours). You receive an e-mail when it
+starts.
+
+- **To sign in at once:** *Forgot password?* on the sign-in page. Setting a
+  new password from the link lifts the pause.
+- **If you did not type those passwords**, someone may be trying to guess
+  yours: reset it, and turn on two-factor authentication (2.5).
+
 ## 3. Provider setup — Framework, Test data & Discovery
 
 Everything in this section is the **provider setup** a `test_manager` does

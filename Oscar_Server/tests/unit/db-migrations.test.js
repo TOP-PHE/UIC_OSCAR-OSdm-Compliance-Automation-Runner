@@ -317,6 +317,26 @@ describe('DB migrations — upgrade from an existing DB (the #208 regression cla
       d.close();
     }
   });
+
+  // #1421: the sign-in's lock per address, a table of its own and its index.
+  test('the login_lock table on an existing DB (migration 63)', () => {
+    const dbFile = tempDbPath();
+    bootDbAgainst(dbFile);
+    {
+      const d = new DatabaseSync(dbFile);
+      d.exec('DROP TABLE login_lock; DELETE FROM schema_version WHERE version >= 63;');
+      d.close();
+    }
+    bootDbAgainst(dbFile);
+    expect(columnsOf(dbFile, 'login_lock')).toEqual(['email_hash', 'failures', 'failures_since', 'locked_until', 'lock_level', 'expires_at']);
+    const d = new DatabaseSync(dbFile);
+    try {
+      const indexes = d.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'login_lock'").all().map(r => r.name);
+      expect(indexes).toContain('idx_login_lock_expires');
+    } finally {
+      d.close();
+    }
+  });
 });
 
 function readExtraHeaders(dbFile) {

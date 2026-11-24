@@ -1144,6 +1144,17 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   `otpauthUri()` writes every value with `encodeURIComponent` (a space
   `%20`, as the Key Uri Format's own example), never `URLSearchParams`'
   `+`. Nothing is stored: an entry made before keeps the name `OSCAR`.
+- **The sign-in is locked per e-mail address** (#1421, 1.11.581; maintainer
+  2026-11-24): ten wrong passwords in 15 minutes lock it 15 minutes,
+  doubled within a 24-hour series, 24 hours at most; every password is
+  refused meanwhile, before bcrypt runs. Rules `utils/loginLock.js` (pure),
+  table `login_lock` (migration 63, SHA-256 of the address, `expires_at`)
+  in `api/helpers/loginLock.js`. **An address without an account is counted
+  the same way and must answer the same** (a test compares statuses, waits
+  and bodies): never answer from whether the account exists. An attempt is
+  counted at `beginAttempt()`, before the `await`, and taken back by
+  `finishAttempt(ok)`, so attempts in flight cannot pass the limit. Only a
+  password reset carried through lifts it (`clearLock()`).
 - **A run's secret works from the run only; an answer meant to attack OSCAR
   stops the run** (1.11.458 / OTST_V2.0.249, 1.11.460 / OTST_V2.0.250).
   `fromThisMachine()` (`server.js`): the two loopback routes take

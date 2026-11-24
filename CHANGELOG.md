@@ -654,6 +654,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.581] — 2026-11-24
+
+**The sign-in is locked per e-mail address after ten wrong passwords** (#1421; maintainer's rules, 2026-11-24). Not released on its own: listed in `compatibility.json` (2026.622) without moving `current_release`. Collection unchanged at OTST_V2.0.270.
+
+- **Before:** the sign-in counted attempts per IP address only (`AUTH_RATE_LIMIT_MAX`, 50 in 15 minutes).
+- **Now, per e-mail address as well:** ten wrong passwords within 15 minutes lock it for 15 minutes. A lock within 24 hours of the end of the last one lasts twice as long (15, 30, 60 minutes… up to 24 hours).
+- **During the lock every password is refused**, the right one too, before any is checked: 429, `Retry-After`, and a sentence the sign-in page shows. The attempt that locks the address answers so already.
+- **An address without an account is counted and answered the same way**: statuses, waits and words are the same (a test compares them), so the answers never tell which addresses have an account.
+- **An attempt is counted when it starts** and taken back when its password proves right, so attempts sent together cannot pass the limit while bcrypt checks them.
+- **A password reset carried through lifts the lock** and ends its series. Nothing else does, by decision.
+- **The owner of an account gets an e-mail** when it is locked, once per lock, with the wait and the reset link. Not a Company API account.
+- **Seen in the logs and metrics:** `login_locked:<seconds>s` and `login_refused_locked` in the authentication log; `oscar_login_attempts_total{result="locked"}`.
+- **Migration 63:** table `login_lock`, one row per address by its SHA-256 (the address is never stored), removed once its window and the series it could start have passed (`expires_at`, indexed; looked at once a minute at most).
+- Code: the rules in `utils/loginLock.js` (pure), the table in `api/helpers/loginLock.js`, the sign-in in `routes/auth.js` (`refuseWrongPassword()`, `noticeLocked()`).
+- Documentation: *Server Admin Guide* 13.6 and the `OscarLoginAttackBurst` row, *Security Operations Policy* 2.2, *Tester User Guide* 2.6, a news entry, the OpenAPI description of `/v1/auth/login`.
+- Tests: `login-lock.test.js` (unit: counting, the series, attempts in flight; integration: the sign-in, the same answers without an account, the e-mail, the reset, the series, the table), migration 63 in `db-migrations.test.js`.
+
+---
+
 ## [server-1.11.580] — 2026-11-23
 
 **The authenticator app's entry names the server** (#1418). Collection unchanged at OTST_V2.0.270.
