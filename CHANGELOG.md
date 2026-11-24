@@ -654,6 +654,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.583] — 2026-11-24
+
+**The content security policy refuses every inline script** (#1423, PR 2 of 2). Not released on its own: listed in `compatibility.json` (2026.624) without moving `current_release`. Collection unchanged at OTST_V2.0.270. Nothing changes for a user.
+
+- `script-src` is `'self'` alone: `'unsafe-inline'` is gone. A script injected into a page, a `<script>` inside an `<iframe srcdoc>` or a `javascript:` link does not run. `script-src-attr 'none'` (inline event handlers) was already there.
+- The pages hold no inline script since 1.11.582, and `page-scripts.test.js` keeps it so. Every page was checked in a browser under this very policy before 1.11.582 was merged, and again after its fixes.
+- `style-src` keeps `'unsafe-inline'`: the pages hold `style` attributes, and a style runs no code.
+- `server.test.js` pins the header: `script-src`, `script-src-attr`, `object-src`, `frame-ancestors`, `style-src`.
+- Documentation: the Specification's security headers (9.1), `SECURITY_FIXES.md`.
+
+---
+
 ## [server-1.11.582] — 2026-11-24
 
 **The pages carry no script of their own** (#1423, PR 1 of 2; maintainer's choice, 2026-11-24: scripts in files rather than hashes or nonces). Not released on its own: listed in `compatibility.json` (2026.623) without moving `current_release`. Collection unchanged at OTST_V2.0.270. Nothing changes for a user.

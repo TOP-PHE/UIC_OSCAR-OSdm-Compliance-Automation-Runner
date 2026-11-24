@@ -298,7 +298,12 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc:    ["'self'"],
-      scriptSrc:     ["'self'", "'unsafe-inline'"],   // inline <script> blocks in HTML pages
+      // No inline script (#1423): every page's code is a file of public/js,
+      // and page-scripts.test.js refuses an inline script, handler or
+      // javascript: address in a page. helmet adds script-src-attr 'none'.
+      scriptSrc:     ["'self'"],
+      // Still 'unsafe-inline': the pages hold style attributes, and a style
+      // runs no code.
       styleSrc:      ["'self'", "'unsafe-inline'"],
       imgSrc:        ["'self'", 'data:'],
       connectSrc:    ["'self'"],

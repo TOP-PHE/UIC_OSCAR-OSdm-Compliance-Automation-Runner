@@ -197,6 +197,20 @@ describe('request bodies the JSON parser refuses', () => {
   });
 });
 
+describe('the content security policy (#1423)', () => {
+  test('refuses every inline script: script-src is the server alone', async () => {
+    const res = await request(app).get('/index.html');
+    const policy = Object.fromEntries(String(res.headers['content-security-policy']).split(';')
+      .map(d => d.trim().split(/\s+/)).map(([name, ...values]) => [name, values]));
+    expect(policy['script-src']).toEqual(["'self'"]);
+    expect(policy['script-src-attr']).toEqual(["'none'"]);
+    expect(policy['object-src']).toEqual(["'none'"]);
+    expect(policy['frame-ancestors']).toEqual(["'none'"]);
+    // Styles keep 'unsafe-inline': the pages hold style attributes.
+    expect(policy['style-src']).toEqual(["'self'", "'unsafe-inline'"]);
+  });
+});
+
 describe('CORS', () => {
   test('an arbitrary Origin is not reflected when no allowlist is configured', async () => {
     const res = await request(app).get('/health').set('Origin', 'https://evil.example');
