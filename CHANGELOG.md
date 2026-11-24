@@ -656,7 +656,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-1.11.580] — 2026-11-23
 
-**The authenticator app's entry names the server** (#1418). Not released on its own: listed in `compatibility.json` (2026.621) without moving `current_release`. Collection unchanged at OTST_V2.0.270.
+**The authenticator app's entry names the server** (#1418). Collection unchanged at OTST_V2.0.270.
+
+**Release 2026.621 (`current_release`)**, with everything merged since 2026.620: this section. Nothing to do on a server: no migration, no setting. An authenticator entry set up from now on is named `OSCAR (<host of APP_URL>)`; the entries already set up keep the name *OSCAR* and their codes, and their owners may rename them in the app. After the promotion, the production smoke test runs three scenarios through the API by itself.
 
 - **Seen:** an administrator using the production server and a test server had two entries named *OSCAR* in the authenticator app, with the same e-mail under each, and nothing to tell them apart.
 - **Now:** a factor set up from this version is named `OSCAR (<host>)`, the host of `APP_URL`: *OSCAR (oscar.uic.org)*, *OSCAR (oscartest.trackonpath.com)*. Without `APP_URL`, or for a host that is not a plain name, it stays `OSCAR` (`issuerFor()` in `utils/totp.js`).
