@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.621",
+  "current_release": "2026.625",
   "releases": [
     {
       "release": "2026.625",
@@ -11,7 +11,8 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.584 (#1430): every secret of the .env (ENCRYPTION_KEY, SMTP_PASS, PLATFORM_BOOTSTRAP_TOKEN, METRICS_TOKEN, RUN_AGENT_TOKEN) may be given as a file instead, NAME_FILE, read once at the start: the value is then not in the container's configuration. NAME keeps working; both is refused. Optional docker-compose.secrets.yml mounts ENCRYPTION_KEY and SMTP_PASS from OSCAR_Deploy/secrets/ (ignored by git); backup and restore carry secrets/. The runner agent and the dispatcher read their RUN_AGENT_TOKEN_FILE and refuse a server secret's file. Nothing changes on an installation until it is switched (Server Admin Guide, 13.7). Not released on its own: current_release is not moved. Collection unchanged."
+        "Release 2026.625 (current_release): everything merged since 2026.621. Server 1.11.581 (2026.622, #1421) locks an e-mail address's sign-in after ten wrong passwords (migration 63, table login_lock); 1.11.582 (2026.623) and 1.11.583 (2026.624) move the pages' scripts into files and make the content security policy script-src 'self' (#1423); 1.11.584 (#1430), this entry, lets the secrets be given as files. Without version: the nginx example names no version and sets no security header of its own (#1426), and production starts the image the promotion built, by digest (#1428). The VPS was moved for both before this release. This promotion is the first deployed by digest: its deploy step ends with deployed ghcr.io/top-phe/oscar-server@sha256:…: oscar is healthy. Switching the VPS's secrets to files comes after it (Server Admin Guide, 13.7). Collection unchanged at OTST_V2.0.270.",
+        "Server 1.11.584 (#1430): every secret of the .env (ENCRYPTION_KEY, SMTP_PASS, PLATFORM_BOOTSTRAP_TOKEN, METRICS_TOKEN, RUN_AGENT_TOKEN) may be given as a file instead, NAME_FILE, read once at the start: the value is then not in the container's configuration. NAME keeps working; both is refused. Optional docker-compose.secrets.yml mounts ENCRYPTION_KEY and SMTP_PASS from OSCAR_Deploy/secrets/ (ignored by git); backup and restore carry secrets/. The runner agent and the dispatcher read their RUN_AGENT_TOKEN_FILE and refuse a server secret's file. Nothing changes on an installation until it is switched (Server Admin Guide, 13.7). Collection unchanged."
       ]
     },
     {
