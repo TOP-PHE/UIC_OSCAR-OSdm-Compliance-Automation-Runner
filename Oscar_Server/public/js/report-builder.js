@@ -2232,8 +2232,8 @@ function publishedOwnerText(r) {
 }
 
 function publishedButtonHtml(action, id, number, label) {
-  return '<button class="btn btn-secondary btn-sm" type="button" data-report-action="' + action + '" data-report-id="' + id
-    + '" data-report-number="' + number + '">' + escHtml(label) + '</button>';
+  return '<button class="btn btn-secondary btn-sm" type="button" data-report-action="' + escHtml(action) + '" data-report-id="' + escHtml(id)
+    + '" data-report-number="' + escHtml(number) + '">' + escHtml(label) + '</button>';
 }
 
 function publishedRowHtml(r, canChange) {
@@ -2244,7 +2244,7 @@ function publishedRowHtml(r, canChange) {
   if (canChange && !r.sharedAt) actions.push(publishedButtonHtml('share', id, number, 'Share with the certifier'));
   if (canChange && r.sharedAt && !r.withdrawnAt) actions.push(publishedButtonHtml('withdraw', id, number, 'Withdraw'));
   var owner = publishedOwnerText(r);
-  return '<tr><td><strong>#' + number + '</strong>' + (owner ? '<br><small>' + escHtml(owner) + '</small>' : '') + '</td>'
+  return '<tr><td><strong>#' + escHtml(number) + '</strong>' + (owner ? '<br><small>' + escHtml(owner) + '</small>' : '') + '</td>'
     + '<td>' + escHtml(r.createdAt || '') + (r.createdBy ? '<br><small>' + escHtml(r.createdBy) + '</small>' : '') + '</td>'
     + '<td>' + escHtml(publishedStateText(r)) + '</td>'
     + '<td>' + escHtml(publishedCountsText(r.summary)) + '</td>'

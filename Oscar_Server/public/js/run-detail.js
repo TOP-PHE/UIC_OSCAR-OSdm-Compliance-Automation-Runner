@@ -1,4 +1,4 @@
-/* global logout, oscarReportError, OscarRunExit, oscarToast, parseServerTs */  // nav.js, run-exit.js, loaded before it by the page
+/* global esc, logout, oscarReportError, OscarRunExit, oscarToast, parseServerTs */  // esc.js, nav.js, run-exit.js, loaded before it by the page
 // Copyright [2026] [International Union of Railways (UIC)]
 //
 //    Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,7 +25,9 @@ const _rawRunId = new URLSearchParams(location.search).get('id');
 if (!_rawRunId || !RUNID_RE.test(_rawRunId)) {
   window.location.href = '/dashboard.html';
 }
-const runId = _rawRunId;
+// The id checked above, or '' while the page leaves for the dashboard: only a
+// UUID goes into a request address (#1423).
+const runId = RUNID_RE.test(_rawRunId || '') ? _rawRunId : '';
 
 let lastEventId = 0;
 let polling     = true;
@@ -207,7 +209,7 @@ function updateStatus(run) {
         <div class="auth-icon">⚠️</div>
         <div class="auth-body">
           <div class="auth-title">OAuth2 authentication failed</div>
-          <div class="auth-msg">${run.error_message.replace(/</g,'&lt;')}</div>
+          <div class="auth-msg">${esc(run.error_message)}</div>
           <a href="/profile.html" class="auth-link">Update OAuth2 Credentials →</a>
         </div>`;
     }
@@ -609,7 +611,7 @@ function renderAssertions() {
   const s = assertionsData.summary;
   const passRate = s.total > 0 ? Math.round(s.passed / s.total * 1000) / 10 : 0;
   document.getElementById('assertion-summary').innerHTML =
-    `<strong>${s.total}</strong> assertions — <span class="a-pass">${s.passed} passed</span> · <span class="a-fail">${s.failed} failed</span> · <strong>${passRate}%</strong> pass rate
+    `<strong>${esc(s.total)}</strong> assertions — <span class="a-pass">${esc(s.passed)} passed</span> · <span class="a-fail">${esc(s.failed)} failed</span> · <strong>${esc(passRate)}%</strong> pass rate
      <span style="color:#90a4ae;font-size:11px;margin-left:6px">(click an area to expand)</span>`;
 
   const catFilter = document.getElementById('assertion-category-filter').value;
@@ -746,7 +748,7 @@ function renderRequests() {
   if (!requestsData) return;
   const reqs = requestsData.requests || [];
   document.getElementById('requests-summary').innerHTML =
-    `<strong>${reqs.length}</strong> request${reqs.length!==1?'s':''} <span style="color:#90a4ae;font-size:11px;margin-left:6px">(click an endpoint to load its request &amp; response)</span>`;
+    `<strong>${esc(reqs.length)}</strong> request${reqs.length!==1?'s':''} <span style="color:#90a4ae;font-size:11px;margin-left:6px">(click an endpoint to load its request &amp; response)</span>`;
 
   // Group by suite, preserving first-seen order.
   const order = [];

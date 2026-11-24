@@ -9,7 +9,13 @@
 // content security policy can refuse inline scripts. The page loads it
 // where its inline script stood, so it runs at the same moment as before.
 
-const token = new URLSearchParams(location.search).get('token');
+// The link's token: a UUID (the server makes them with crypto.randomUUID), else ''.
+// Only that goes into a request address (#1423).
+function tokenOf(value) {
+  const text = typeof value === 'string' ? value : '';
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text) ? text : '';
+}
+const token = tokenOf(new URLSearchParams(location.search).get('token'));
 // An access just given (accessRequests.js) uses this page to choose the first password.
 if (new URLSearchParams(location.search).get('welcome') === '1') {
   document.getElementById('main-title').textContent = 'Choose your password';
@@ -34,8 +40,11 @@ async function init() {
 function showExpired(msg) {
   document.getElementById('loading').style.display  = 'none';
   document.getElementById('expired').style.display  = 'block';
-  if (msg) document.querySelector('#expired .error').innerHTML =
-    msg + '<br>Please <a href="/forgot-password.html" style="color:#c62828">request a new reset link</a>.';
+  if (!msg) return;
+  // The server's words as text; the link is the page's own (#1423).
+  const box = document.querySelector('#expired .error');
+  box.textContent = msg;
+  box.insertAdjacentHTML('beforeend', '<br>Please <a href="/forgot-password.html" style="color:#c62828">request a new reset link</a>.');
 }
 
 async function doConfirm(e) {

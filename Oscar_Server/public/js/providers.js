@@ -83,7 +83,9 @@ async function loadProviders() {
   providers = (await res.json()).providers || [];
   renderProviders();
   await Promise.all(providers.map(async p => {
-    const r = await fetch('/v1/company/providers/' + encodeURIComponent(p.id) + '/access', {});
+    const id = providerIdOf(p.id);
+    if (!id) return;
+    const r = await fetch('/v1/company/providers/' + encodeURIComponent(id) + '/access', {});
     if (r.ok) accessCounts[p.id] = ((await r.json()).testers || []).length;
   }));
   renderProviders();
@@ -268,4 +270,11 @@ if (user.role === 'test_manager') {
   document.getElementById('create-card').style.display = 'none';
   document.getElementById('providers-list').innerHTML =
     '<div class="empty">Providers are managed by your company\'s Test Managers.</div>';
+}
+
+// A provider id from an answer: a UUID (the server makes them with crypto.randomUUID), else ''.
+// Only that goes into a request address (#1423).
+function providerIdOf(value) {
+  const text = typeof value === 'string' ? value : '';
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text) ? text : '';
 }

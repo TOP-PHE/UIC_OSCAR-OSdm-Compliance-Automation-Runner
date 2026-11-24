@@ -130,13 +130,13 @@ async function loadCompanies() {
   allCompanies = data.companies || [];
   companies = allCompanies.filter(c => c.slug !== 'platform-root');
 
-  const options = companies.map(c => `<option value="${c.id}">${esc(c.name)} (${esc(c.slug)})</option>`).join('');
+  const options = companies.map(c => `<option value="${esc(c.id)}">${esc(c.name)} (${esc(c.slug)})</option>`).join('');
   document.getElementById('new-company').innerHTML = options;
 }
 
 function companyOptions(selectedId) {
   const none = `<option value="" ${!selectedId ? 'selected' : ''}>\u2014 None \u2014</option>`;
-  return none + allCompanies.map(c => `<option value="${c.id}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join('');
+  return none + allCompanies.map(c => `<option value="${esc(c.id)}" ${c.id===selectedId?'selected':''}>${esc(c.name)}</option>`).join('');
 }
 
 // Returns either an editable <select> (Tester or Certifier) or a read-only label (Administrator).
@@ -148,7 +148,7 @@ function companyCellHtml(u) {
   // Company-bound roles (Tester, Test Manager) and Certifier get an editable
   // company select so an admin can keep or change the company (issue #128).
   if (u.role === 'company_user' || u.role === 'certification_user' || u.role === 'test_manager') {
-    return `<select id="company-${u.id}">${companyOptions(u.company_id)}</select>`;
+    return `<select id="company-${esc(u.id)}">${companyOptions(u.company_id)}</select>`;
   }
   return `<span style="color:#78909c;font-size:12px;font-style:italic">${esc(u.company_name || 'Platform')}</span>`;
 }
@@ -195,8 +195,8 @@ function debouncedLoadUsers() {
 // certifiers) only. The server refuses both for a company account.
 function platformPasswordButtons(u) {
   if (isTestMgr || u.role === 'company_user' || u.role === 'test_manager') return '';
-  return `<button class="btn btn-small btn-secondary" data-action="reset-pwd" data-user-id="${u.id}" data-email="${esc(u.email)}">Reset PWD</button>
-        <button class="btn btn-small btn-secondary" data-action="reset-link" data-user-id="${u.id}" data-email="${esc(u.email)}" title="Generate a self-service reset URL the user can click to set their own password — useful when SMTP is broken.">Reset Link</button>`;
+  return `<button class="btn btn-small btn-secondary" data-action="reset-pwd" data-user-id="${esc(u.id)}" data-email="${esc(u.email)}">Reset PWD</button>
+        <button class="btn btn-small btn-secondary" data-action="reset-link" data-user-id="${esc(u.id)}" data-email="${esc(u.email)}" title="Generate a self-service reset URL the user can click to set their own password — useful when SMTP is broken.">Reset Link</button>`;
 }
 
 async function loadUsers() {
@@ -209,16 +209,16 @@ async function loadUsers() {
     <tr>
       <td class="mono">${esc(u.email)}</td>
       <td>${u.status === 'pending' ? '<span class="status-badge sb-pending">Pending</span>' : ''}${u.mfa_enabled ? ' <span class="status-badge sb-mfa" title="Two-factor authentication is on">2FA</span>' : ''}</td>
-      <td><select id="role-${u.id}" data-action="role-change" data-user-id="${u.id}" data-company-id="${esc(u.company_id || '')}">${roleOptions(u.role)}</select></td>
-      <td id="company-cell-${u.id}">${companyCellHtml(u)}</td>
-      <td>${fmtDate(u.created_at)}</td>
+      <td><select id="role-${esc(u.id)}" data-action="role-change" data-user-id="${esc(u.id)}" data-company-id="${esc(u.company_id || '')}">${roleOptions(u.role)}</select></td>
+      <td id="company-cell-${esc(u.id)}">${companyCellHtml(u)}</td>
+      <td>${esc(fmtDate(u.created_at))}</td>
       <td>
-        ${u.status === 'pending' ? `<button class="btn btn-small btn-success" data-action="approve-user" data-user-id="${u.id}" data-email="${esc(u.email)}">Approve</button>` : ''}
-        <button class="btn btn-small btn-secondary" data-action="save-user" data-user-id="${u.id}">Save</button>
-        <button class="btn btn-small btn-secondary" data-action="send-reset" data-user-id="${u.id}" data-email="${esc(u.email)}">Send reset e-mail</button>
+        ${u.status === 'pending' ? `<button class="btn btn-small btn-success" data-action="approve-user" data-user-id="${esc(u.id)}" data-email="${esc(u.email)}">Approve</button>` : ''}
+        <button class="btn btn-small btn-secondary" data-action="save-user" data-user-id="${esc(u.id)}">Save</button>
+        <button class="btn btn-small btn-secondary" data-action="send-reset" data-user-id="${esc(u.id)}" data-email="${esc(u.email)}">Send reset e-mail</button>
         ${platformPasswordButtons(u)}
-        ${!isTestMgr && u.mfa_enabled ? `<button class="btn btn-small btn-secondary" data-action="reset-mfa" data-user-id="${u.id}" data-email="${esc(u.email)}" title="A lost phone: remove the account's second factor and sign it out everywhere">Reset 2FA</button>` : ''}
-        <button class="btn btn-small btn-danger" data-action="delete-user" data-user-id="${u.id}" data-email="${esc(u.email)}">Delete</button>
+        ${!isTestMgr && u.mfa_enabled ? `<button class="btn btn-small btn-secondary" data-action="reset-mfa" data-user-id="${esc(u.id)}" data-email="${esc(u.email)}" title="A lost phone: remove the account's second factor and sign it out everywhere">Reset 2FA</button>` : ''}
+        <button class="btn btn-small btn-danger" data-action="delete-user" data-user-id="${esc(u.id)}" data-email="${esc(u.email)}">Delete</button>
       </td>
     </tr>
   `).join('');
@@ -454,13 +454,13 @@ async function loadCompaniesPanel() {
   const tbody = document.getElementById('companies-tbody');
   tbody.innerHTML = (data.companies || []).map(c => `
     <tr>
-      <td><input id="coname-${c.id}" value="${esc(c.name)}" style="width:100%;min-width:120px;border:1px solid #ddd;border-radius:4px;padding:4px 6px"></td>
-      <td><input id="coslug-${c.id}" value="${esc(c.slug)}" class="mono" style="width:100%;min-width:120px;border:1px solid #ddd;border-radius:4px;padding:4px 6px"></td>
-      <td>${c.user_count}</td>
-      <td>${fmtDate(c.created_at)}</td>
+      <td><input id="coname-${esc(c.id)}" value="${esc(c.name)}" style="width:100%;min-width:120px;border:1px solid #ddd;border-radius:4px;padding:4px 6px"></td>
+      <td><input id="coslug-${esc(c.id)}" value="${esc(c.slug)}" class="mono" style="width:100%;min-width:120px;border:1px solid #ddd;border-radius:4px;padding:4px 6px"></td>
+      <td>${esc(c.user_count)}</td>
+      <td>${esc(fmtDate(c.created_at))}</td>
       <td>
-        <button class="btn btn-small btn-secondary" data-action="save-company" data-company-id="${c.id}">Save</button>
-        <button class="btn btn-small btn-danger" data-action="delete-company" data-company-id="${c.id}" data-name="${esc(c.name)}">Delete</button>
+        <button class="btn btn-small btn-secondary" data-action="save-company" data-company-id="${esc(c.id)}">Save</button>
+        <button class="btn btn-small btn-danger" data-action="delete-company" data-company-id="${esc(c.id)}" data-name="${esc(c.name)}">Delete</button>
       </td>
     </tr>
   `).join('');
@@ -724,7 +724,7 @@ function renderReportsTables() {
       <td>${esc(c.company_name || '-')}</td>
       <td class="mono">${esc((c.run_a_id || '').slice(0,8))}</td>
       <td class="mono">${esc((c.run_b_id || '').slice(0,8))}</td>
-      <td>${fmtDate(c.created_at)}</td>
+      <td>${esc(fmtDate(c.created_at))}</td>
     </tr>`).join('');
 }
 
@@ -870,18 +870,18 @@ async function loadActivity(date) {
   const data = await res.json();
 
   document.getElementById('activity-kpis').innerHTML = `
-    <div class="kpi"><div class="n">${data.totals.users}</div><div class="l">Users</div></div>
-    <div class="kpi"><div class="n">${data.totals.companies}</div><div class="l">Companies</div></div>
-    <div class="kpi"><div class="n">${data.totals.runs}</div><div class="l">Total Runs</div></div>
-    <div class="kpi"><div class="n">${data.runs_last_24h}</div><div class="l">Runs (24h)</div></div>
-    <div class="kpi"><div class="n">${data.logins_last_24h}</div><div class="l">Logins (24h)</div></div>
-    <div class="kpi"><div class="n">${data.failed_logins_last_24h}</div><div class="l">Failed Logins (24h)</div></div>
+    <div class="kpi"><div class="n">${esc(data.totals.users)}</div><div class="l">Users</div></div>
+    <div class="kpi"><div class="n">${esc(data.totals.companies)}</div><div class="l">Companies</div></div>
+    <div class="kpi"><div class="n">${esc(data.totals.runs)}</div><div class="l">Total Runs</div></div>
+    <div class="kpi"><div class="n">${esc(data.runs_last_24h)}</div><div class="l">Runs (24h)</div></div>
+    <div class="kpi"><div class="n">${esc(data.logins_last_24h)}</div><div class="l">Logins (24h)</div></div>
+    <div class="kpi"><div class="n">${esc(data.failed_logins_last_24h)}</div><div class="l">Failed Logins (24h)</div></div>
   `;
 
   document.getElementById('runs-in-progress-tbody').innerHTML = runsInProgressRows(data.runs_in_progress);
 
   document.getElementById('submitters-tbody').innerHTML = (data.top_submitters_last_7d || []).map(x => `
-    <tr><td class="mono">${esc(x.email)}</td><td>${x.runs}</td></tr>
+    <tr><td class="mono">${esc(x.email)}</td><td>${esc(x.runs)}</td></tr>
   `).join('');
 
   document.getElementById('auth-events-tbody').innerHTML = (data.latest_auth_events || []).map(e => `
@@ -1117,7 +1117,7 @@ function mailSettingsNote(source, replaced) {
     const names = (Array.isArray(replaced) ? replaced : []).filter(name => /^[A-Z_]{1,30}$/.test(name));
     const html = '📌 <strong>Set in the server\'s environment.</strong> These settings are shown here, not changed here. To change them, edit them ' + change + '. Then send a test e-mail below.';
     if (names.length === 0) return { warn: false, html: html };
-    return { warn: true, html: html + ' <strong>Check them:</strong> the settings saved from this page earlier are no longer read, and held another value for ' + names.join(', ') + '. If the environment still holds an older mail server, e-mails fail until it is corrected there.' };
+    return { warn: true, html: html + ' <strong>Check them:</strong> the settings saved from this page earlier are no longer read, and held another value for ' + esc(names.join(', ')) + '. If the environment still holds an older mail server, e-mails fail until it is corrected there.' };
   }
   if (source === 'stored') {
     return { warn: true, html: '⚠️ <strong>Saved from this page by an earlier version.</strong> These settings are still in use and can no longer be changed here. To change them, set <code>SMTP_HOST</code> and the other <code>SMTP_*</code> values ' + change + '. From then on the environment\'s values are the ones used, and the ones kept here are no longer read.' };
@@ -1192,28 +1192,28 @@ async function loadConfig() {
     const isNum = cfg.type === 'number';
     const isEnum = cfg.type === 'enum';
     const isSensitive = cfg.sensitive;
-    const rangeHint = isNum && cfg.min != null ? `(${cfg.min} – ${cfg.max})` : '';
+    const rangeHint = isNum && cfg.min != null ? `(${esc(cfg.min)} – ${esc(cfg.max)})` : '';
     const fieldId = configFieldId(key, cfg);
 
     let control;
     if (cfg.read_only) {
       // Shown, never sent back (#1363). A sensitive value arrives masked.
-      control = `<input id="${fieldId}" type="text" readonly value="${esc(cfg.value || '')}" style="font-size:14px;font-weight:600;background:#f5f7f8;color:#546e7a" placeholder="not set">`;
+      control = `<input id="${esc(fieldId)}" type="text" readonly value="${esc(cfg.value || '')}" style="font-size:14px;font-weight:600;background:#f5f7f8;color:#546e7a" placeholder="not set">`;
     } else if (isEnum) {
       const opts = (cfg.options || []).map(o =>
         `<option value="${esc(o)}"${o === cfg.value ? ' selected' : ''}>${esc(o)}</option>`
       ).join('');
-      control = `<select id="${fieldId}" style="font-size:14px;font-weight:600;padding:9px 10px;border:1px solid #cfd8dc;border-radius:6px;width:100%">${opts}</select>`;
+      control = `<select id="${esc(fieldId)}" style="font-size:14px;font-weight:600;padding:9px 10px;border:1px solid #cfd8dc;border-radius:6px;width:100%">${opts}</select>`;
     } else {
       const inputType = configInputType(isSensitive, isNum);
-      const attrs = isNum ? `min="${cfg.min}" max="${cfg.max}"` : '';
-      control = `<input id="${fieldId}" type="${inputType}" ${attrs} value="${esc(cfg.value || '')}" style="font-size:14px;font-weight:600" placeholder="${esc(configPlaceholder(cfg))}">`;
+      const attrs = isNum ? `min="${esc(cfg.min)}" max="${esc(cfg.max)}"` : '';
+      control = `<input id="${esc(fieldId)}" type="${inputType}" ${attrs} value="${esc(cfg.value || '')}" style="font-size:14px;font-weight:600" placeholder="${esc(configPlaceholder(cfg))}">`;
     }
 
     return `
     <div class="row" style="margin-bottom:12px;align-items:start">
       <div class="field" style="max-width:320px">
-        <label for="${fieldId}">${esc(CONFIG_LABELS[key] || key)}</label>
+        <label for="${esc(fieldId)}">${esc(CONFIG_LABELS[key] || key)}</label>
         ${control}
       </div>
       <div style="flex:1;font-size:12px;color:#78909c;padding-top:22px">

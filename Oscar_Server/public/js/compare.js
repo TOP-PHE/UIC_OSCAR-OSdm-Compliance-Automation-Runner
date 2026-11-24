@@ -43,30 +43,30 @@ function renderDiff(data) {
       <div class="run-card">
         <h4>Run A (baseline)</h4>
         <div class="url">${esc(data.run_a.api_base || '-')}</div>
-        <div style="color:#90a4ae;font-size:12px;margin-top:4px">${fmtDate(data.run_a.queued_at)}</div>
+        <div style="color:#90a4ae;font-size:12px;margin-top:4px">${esc(fmtDate(data.run_a.queued_at))}</div>
       </div>
       <div style="display:flex;align-items:center;font-size:22px;color:#90a4ae;padding-top:8px">→</div>
       <div class="run-card">
         <h4>Run B (latest)</h4>
         <div class="url">${esc(data.run_b.api_base || '-')}</div>
-        <div style="color:#90a4ae;font-size:12px;margin-top:4px">${fmtDate(data.run_b.queued_at)}</div>
+        <div style="color:#90a4ae;font-size:12px;margin-top:4px">${esc(fmtDate(data.run_b.queued_at))}</div>
       </div>
     </div>
 
     <div class="summary">
-      <div class="tile tile-p2f"><div class="n">${s.passed_to_failed}</div><div class="l">Passed → Failed</div></div>
-      <div class="tile tile-f2p"><div class="n">${s.failed_to_passed}</div><div class="l">Failed → Passed</div></div>
-      <div class="tile tile-add"><div class="n">${s.added}</div><div class="l">Added</div></div>
-      <div class="tile tile-rem"><div class="n">${s.removed}</div><div class="l">Removed</div></div>
-      <div class="tile tile-uf" ><div class="n">${s.unchanged_fail}</div><div class="l">Unchanged Fail</div></div>
-      <div class="tile tile-up" ><div class="n">${s.unchanged_pass}</div><div class="l">Unchanged Pass</div></div>
+      <div class="tile tile-p2f"><div class="n">${esc(s.passed_to_failed)}</div><div class="l">Passed → Failed</div></div>
+      <div class="tile tile-f2p"><div class="n">${esc(s.failed_to_passed)}</div><div class="l">Failed → Passed</div></div>
+      <div class="tile tile-add"><div class="n">${esc(s.added)}</div><div class="l">Added</div></div>
+      <div class="tile tile-rem"><div class="n">${esc(s.removed)}</div><div class="l">Removed</div></div>
+      <div class="tile tile-uf" ><div class="n">${esc(s.unchanged_fail)}</div><div class="l">Unchanged Fail</div></div>
+      <div class="tile tile-up" ><div class="n">${esc(s.unchanged_pass)}</div><div class="l">Unchanged Pass</div></div>
     </div>
 
     <div class="filter-bar">
       <span style="font-size:12px;color:#546e7a;font-weight:700">Filter:</span>
       ${['ALL','PASSED_TO_FAILED','FAILED_TO_PASSED','ADDED','REMOVED','UNCHANGED_FAIL','UNCHANGED_PASS'].map(f =>
         `<button class="filter-btn fb-${f} ${f==='ALL'?'active':''}" data-filter="${f}" id="fb-${f}">
-          ${f === 'ALL' ? `All (${s.total})` : LABELS[f]}
+          ${f === 'ALL' ? `All (${esc(s.total)})` : LABELS[f]}
         </button>`
       ).join('')}
     </div>
@@ -101,7 +101,7 @@ function renderItems() {
     const error = diffErrorHtml(item);
     return `<div class="diff-item">
       <div class="diff-header">
-        <span class="cat-badge cat-${item.category}">${LABELS[item.category] || item.category}</span>
+        <span class="cat-badge cat-${esc(item.category)}">${esc(LABELS[item.category] || item.category)}</span>
         <div class="diff-path">
           <div class="suite">${esc(item.suite)} › ${esc(item.request)}</div>
           <div style="margin-top:2px">${esc(item.assertion)}</div>

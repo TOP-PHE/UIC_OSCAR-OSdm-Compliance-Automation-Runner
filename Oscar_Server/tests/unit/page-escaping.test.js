@@ -100,3 +100,32 @@ describe('CSV export', () => {
     expect(csvCell('OTST_SALE')).toBe('"OTST_SALE"');
   });
 });
+
+// #1423: once the pages' code became files, SonarCloud traced values of an
+// answer, the address or browser storage to innerHTML without esc(). The
+// queue panel was the one that mattered: a Test Manager sees the scenario
+// codes of the company's testers there, and a code is text a tester writes.
+describe('values traced to innerHTML (#1423)', () => {
+  test('run: the queue panel escapes the scenario code, the e-mail and the counts', () => {
+    const src = read('run.html');
+    expect(src).toContain("<td style=\"padding:6px 8px\">' + esc(scenario) + '</td>'");
+    expect(src).toContain("<td style=\"padding:6px 8px\">' + esc(email) + youBadge + '</td>'");
+    expect(src).toContain("' + esc(used) + '/' + esc(total) + ' slots used</div>'");
+  });
+
+  test("reset-password: the server's message is set as text, the link is the page's own", () => {
+    const src = read('reset-password.html');
+    expect(src).toContain('box.textContent = msg;');
+    expect(src).not.toMatch(/innerHTML\s*=\s*\n?\s*msg/);
+  });
+
+  test('admin: user and company ids reach the page through esc()', () => {
+    const src = read('admin.html');
+    expect(src).not.toMatch(/\$\{(u|c)\.id\}/);
+    expect(src).toContain('data-user-id="${esc(u.id)}"');
+  });
+
+  test('welcome: the name taken from the stored e-mail goes through esc()', () => {
+    expect(read('welcome.html')).toContain('heading.innerHTML = `Welcome, ${esc(displayName)}! ${pill}`;');
+  });
+});

@@ -9,7 +9,13 @@
 // content security policy can refuse inline scripts. The page loads it
 // where its inline script stood, so it runs at the same moment as before.
 
-const token = new URLSearchParams(location.search).get('token');
+// The link's token: a UUID (the server makes them with crypto.randomUUID), else ''.
+// Only that goes into a request address (#1423).
+function tokenOf(value) {
+  const text = typeof value === 'string' ? value : '';
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text) ? text : '';
+}
+const token = tokenOf(new URLSearchParams(location.search).get('token'));
 
 async function init() {
   if (!token) { showExpired(); return; }

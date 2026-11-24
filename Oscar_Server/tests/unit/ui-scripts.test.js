@@ -873,7 +873,7 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
   describe("admin.html — the mail server's settings are shown, not saved (#1363)", () => {
     const esc = require('../../public/js/esc.js').esc;
     const configFieldId = loadFunction('admin.html', 'configFieldId');
-    const mailSettingsNote = loadFunction('admin.html', 'mailSettingsNote');
+    const mailSettingsNote = loadFunction('admin.html', 'mailSettingsNote', { esc: require('../../public/js/esc.js').esc });
     const mailWarningsHtml = loadFunction('admin.html', 'mailWarningsHtml', { esc });
     const page = read('admin.html');
 
@@ -889,7 +889,7 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
     test('a read-only setting is drawn as a field that cannot be typed in', () => {
       const row = page.slice(page.indexOf('if (cfg.read_only) {'), page.indexOf('} else if (isEnum) {'));
       expect(row).toContain('readonly');
-      expect(row).toContain('id="${fieldId}"');
+      expect(row).toContain('id="${esc(fieldId)}"');
       expect(row).toContain('esc(cfg.value');
     });
 

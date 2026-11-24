@@ -127,13 +127,13 @@ async function loadProfile() {
         let toRunDesc, toRunBadgeClass;
 
         if (toRun === 'ALL' || !Array.isArray(toRun)) {
-          toRunDesc     = `All ${totalCount} scenario(s) — <a href="/scenarios.html">use Test Config to narrow this down</a>`;
+          toRunDesc     = `All ${esc(totalCount)} scenario(s) — <a href="/scenarios.html">use Test Config to narrow this down</a>`;
           toRunBadgeClass = 'badge-warn';
         } else if (toRun.length === 0) {
           toRunDesc     = '⚠ 0 scenarios selected — run will fall back to ALL. <a href="/scenarios.html">Fix in Test Config</a>';
           toRunBadgeClass = 'badge-warn';
         } else {
-          toRunDesc     = toRun.length + ' of ' + totalCount + ' scenario(s) in your run list';
+          toRunDesc     = esc(toRun.length) + ' of ' + esc(totalCount) + ' scenario(s) in your run list';
           toRunBadgeClass = 'badge-ok';
         }
         // #1029: a batch is chosen below, from the whole file or the run list.
@@ -142,7 +142,7 @@ async function loadProfile() {
         dfEl.innerHTML =
           `<span class="badge ${toRunBadgeClass}">✓ Configured</span> ` +
           `<span style="color:#546e7a;font-size:12px"> · ${toRunDesc}</span>` +
-          `<div style="font-size:11px;color:#90a4ae;margin-top:4px">Saved ${parseServerTs(c.datafile_updated_at).toLocaleString()}</div>`;
+          `<div style="font-size:11px;color:#90a4ae;margin-top:4px">Saved ${esc(parseServerTs(c.datafile_updated_at).toLocaleString())}</div>`;
         dfEl.classList.remove('missing');
       } else {
         dfEl.innerHTML = '<span class="badge badge-warn">⚠ File missing on server</span>';
@@ -314,9 +314,9 @@ async function pollQueueStatus() {
     var html = '';
     // Slot usage bar
     html += '<div style="margin-bottom:14px">';
-    html += '<div style="font-size:12px;font-weight:700;color:#546e7a;margin-bottom:6px">' + used + '/' + total + ' slots used</div>';
+    html += '<div style="font-size:12px;font-weight:700;color:#546e7a;margin-bottom:6px">' + esc(used) + '/' + esc(total) + ' slots used</div>';
     html += '<div style="background:#eceff1;border-radius:4px;height:8px;overflow:hidden">';
-    html += '<div style="background:#0090D4;height:100%;width:' + pct + '%;border-radius:4px;transition:width .3s"></div>';
+    html += '<div style="background:#0090D4;height:100%;width:' + esc(pct) + '%;border-radius:4px;transition:width .3s"></div>';
     html += '</div></div>';
 
     // Runs table
@@ -350,9 +350,9 @@ async function pollQueueStatus() {
       }
 
       html += '<tr style="border-bottom:1px solid #f5f5f5">';
-      html += '<td style="padding:6px 8px;color:#90a4ae;font-weight:700">' + pos + '</td>';
-      html += '<td style="padding:6px 8px">' + scenario + '</td>';
-      html += '<td style="padding:6px 8px">' + email + youBadge + '</td>';
+      html += '<td style="padding:6px 8px;color:#90a4ae;font-weight:700">' + esc(pos) + '</td>';
+      html += '<td style="padding:6px 8px">' + esc(scenario) + '</td>';
+      html += '<td style="padding:6px 8px">' + esc(email) + youBadge + '</td>';
       html += '<td style="padding:6px 8px">' + statusBadge + '</td>';
       html += '</tr>';
     });

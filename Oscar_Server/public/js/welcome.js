@@ -85,6 +85,10 @@ function getRoleConfig() {
   return ROLE_CONFIG[role] || ROLE_CONFIG['_tester'];
 }
 
+// S11: the one shared escaper (js/esc.js). Was {&,<,>}-only; now also " and '. Declared before the
+// welcome banner is drawn, which uses it at once (#1423).
+const esc = window.esc;
+
 // ── Render welcome banner ─────────────────────────────────────────────────────
 (function renderWelcome() {
   const cfg = getRoleConfig();
@@ -98,7 +102,7 @@ function getRoleConfig() {
 
   const displayName = user.email ? user.email.split('@')[0] : 'there';
   const pill = `<span class="role-pill ${cfg.cssClass}">${cfg.label}</span>`;
-  heading.innerHTML = `Welcome, ${displayName}! ${pill}`;
+  heading.innerHTML = `Welcome, ${esc(displayName)}! ${pill}`;
   desc.innerHTML = `You are acting as <strong>${cfg.label}</strong>. ${cfg.desc}`;
 })();
 
@@ -119,8 +123,6 @@ function getRoleConfig() {
 let newsItems = [];
 let newsIndex = 0;
 
-// S11: the one shared escaper (js/esc.js). Was {&,<,>}-only; now also " and '.
-const esc = window.esc;
 
 function renderNewsItem(idx) {
   const item = newsItems[idx];

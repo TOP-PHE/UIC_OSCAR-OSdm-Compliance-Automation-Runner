@@ -11,7 +11,7 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.582 (#1423, PR 1 of 2): the pages carry no script of their own. Each page's inline code (14 pages, about 8,200 lines) is moved unchanged into public/js/<page>.js, loaded where the inline block stood; the menu's one-line call of the other pages is a data-page attribute that nav.js draws. Nothing changes for a user. The content security policy still allows inline scripts: PR 2 removes 'unsafe-inline' from script-src. Not released on its own: current_release is not moved. Collection unchanged."
+        "Server 1.11.582 (#1423, PR 1 of 2): the pages carry no script of their own. Each page's inline code (14 pages, about 8,200 lines) is moved unchanged into public/js/<page>.js, loaded where the inline block stood; the menu's one-line call of the other pages is a data-page attribute that nav.js draws. The 109 findings SonarCloud then reported in that code are fixed: promises nothing awaited, values put into HTML without escaping, ids put into a request address unchecked, string sorts. Nothing else changes for a user. The content security policy still allows inline scripts: PR 2 removes 'unsafe-inline' from script-src. Not released on its own: current_release is not moved. Collection unchanged."
       ]
     },
     {
