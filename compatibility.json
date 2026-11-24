@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.620",
+  "current_release": "2026.621",
   "releases": [
     {
       "release": "2026.621",
@@ -11,7 +11,8 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.580 (#1418): the authenticator app's entry names the server, OSCAR (<host of APP_URL>), so that the entries of a production server and of a test server are told apart; OSCAR alone without APP_URL. An entry added before keeps the name OSCAR and its codes. The otpauth:// address writes a space as %20. Not released on its own: current_release is not moved. Collection unchanged."
+        "Release 2026.621 (current_release): everything merged since 2026.620, which is #1418, this entry. Nothing to do on a server with this release: no migration, no setting. An authenticator entry set up from now on is named OSCAR (<host of APP_URL>); the entries already set up keep the name OSCAR and their codes, and their owners may rename them in the app. After the promotion, the production smoke test runs three scenarios through the API by itself.",
+        "Server 1.11.580 (#1418): the authenticator app's entry names the server, OSCAR (<host of APP_URL>), so that the entries of a production server and of a test server are told apart; OSCAR alone without APP_URL. An entry added before keeps the name OSCAR and its codes. The otpauth:// address writes a space as %20. Collection unchanged."
       ]
     },
     {
