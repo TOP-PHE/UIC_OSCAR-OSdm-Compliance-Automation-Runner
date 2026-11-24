@@ -813,6 +813,17 @@ Full setup notes: [`metrics-and-monitoring.md`](metrics-and-monitoring.md).
 - **Limits:** ten wrong codes in 15 minutes stop the account's codes until the window ends; a code is never accepted twice; the steps of the sign-in share the sign-in's limit per address (`AUTH_RATE_LIMIT_MAX`).
 - **Scripts that sign in as an administrator** must send the code: `OSCAR_Deploy/scripts/oscar-user-management.ps1` asks for it; an administrator without a factor yet must first sign in once on the page.
 
+### 13.6 Sign-in lock per address (server 1.11.581, #1421)
+
+Besides the limit per IP address (`AUTH_RATE_LIMIT_MAX`, 50 attempts in 15 minutes), the sign-in counts wrong passwords **per e-mail address**:
+
+- **Ten wrong passwords within 15 minutes lock the address** for 15 minutes. A lock that comes within 24 hours of the end of the last one lasts twice as long: 15, 30, 60 minutes… up to 24 hours.
+- **While it lasts, every password is refused**, the right one too (429 with `Retry-After`; the page says how long). An address without an account is counted and answered the same way, so the answers never tell which addresses have one.
+- **A password reset carried through lifts it at once**: *Forgot password* on the sign-in page, or *Send reset e-mail* on *Manage Users*. There is no other way, by decision.
+- **The owner is told by e-mail**, once per lock, with the wait and the way to reset. A Company API account (signed assertions) gets no such e-mail.
+- **Where to see it:** the authentication log keeps `login_locked:<seconds>s` when an address is locked and `login_refused_locked` for each attempt refused meanwhile; the metric `oscar_login_attempts_total` counts the refusals as `result="locked"` (Grafana → *OSCAR · Overview*, the login panel).
+- The table `login_lock` holds the SHA-256 of each address, never the address, and loses a row once it no longer matters.
+
 ## 14. Operational Monitoring & Alerting (v1.8)
 
 OSCAR ships a self-healing + paging stack so production incidents get caught and (where possible) fixed before an admin notices.
@@ -836,7 +847,7 @@ OSCAR ships a self-healing + paging stack so production incidents get caught and
 | `OscarQueueStuck` | warning | `oscar_queue_depth > 0` AND no run ended in 10 min, for 5 min (could not fire before #1286) | Hung Bruno child: restart the OSCAR container, which kills zombie children. A campaign of long scenarios (expiry probes) holding every slot for over 10 min sets it off too: check the Dashboard before restarting. |
 | `OscarRunFailureRateHigh` | warning | >50 % of runs FAILED over 15 min, for 10 min (before #1286, 100 % from a single failure) | Vendor outage, expired OAuth credentials, or a bad collection update. A campaign including deliberately wrong `SIM_WRONG_…` scenarios counts their failures too. |
 | `OscarSmtpDegraded` | warning | Any SMTP failure in last 10 min | Read the mail settings in use on the Server Config tab (they are set in the server's environment). Use **Send test email** to reproduce. |
-| `OscarLoginAttackBurst` | warning | >50 failed logins in 5 min | Possible brute force / credential stuffing. Check Server Activity for source IP, block at firewall. |
+| `OscarLoginAttackBurst` | warning | >50 failed logins in 5 min | Possible brute force / credential stuffing. Check Server Activity for source IP, block at firewall. Each address under attack is locked after ten wrong passwords (13.6): `login_locked` lines in the authentication log name them. |
 | `OscarHighMemory` | warning | RSS >1 GB for 15 min | Likely a leak. Snapshot heap before restarting if you want to investigate. |
 | `OscarEventLoopLag` | warning | p99 lag >200 ms for 10 min (could not fire before server 1.11.502, #1205) | Heavy synchronous work: many runs at once, or a giant report-builder query. Grafana → *OSCAR · Overview* → row *OSCAR's thread* says which; lower *Max Concurrent Runs* if it is the runs. |
 

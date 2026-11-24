@@ -1390,6 +1390,22 @@ const MIGRATIONS = [
       _safeAlter('ALTER TABLE users ADD COLUMN mfa_failures_since INTEGER');
       db.exec("UPDATE users SET sessions_valid_after = CAST(strftime('%s','now') AS INTEGER) WHERE role = 'administrator'");
   }},
+  { version: 63, name: 'login-lock', up: () => {
+      // The sign-in's lock per e-mail address (#1421, api/helpers/loginLock.js):
+      // one row per address, by the SHA-256 of the address, whether it has an
+      // account or not: wrong passwords of the window, the lock's end, its
+      // place in a series. A row is removed once it no longer matters
+      // (expires_at), so addresses typed at random do not pile up.
+      db.exec(`CREATE TABLE IF NOT EXISTS login_lock (
+        email_hash     TEXT PRIMARY KEY,
+        failures       INTEGER NOT NULL DEFAULT 0,
+        failures_since INTEGER NOT NULL DEFAULT 0,
+        locked_until   INTEGER NOT NULL DEFAULT 0,
+        lock_level     INTEGER NOT NULL DEFAULT 0,
+        expires_at     INTEGER NOT NULL
+      )`);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_login_lock_expires ON login_lock(expires_at)');
+  }},
 ];
 
 // Tolerant ALTER wrapper: SQLite throws on a duplicate column, which is

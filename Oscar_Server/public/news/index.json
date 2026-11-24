@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-24-sign-in-paused-after-wrong-passwords",
+    "date": "November 24, 2026",
+    "tag": "Security",
+    "title": "Sign-in is paused after ten wrong passwords",
+    "summary": "After ten wrong passwords within 15 minutes for one e-mail address, OSCAR refuses every password for it for a while. A password reset lifts the pause.",
+    "content": "OSCAR now protects each account against password guessing. After ten wrong passwords within 15 minutes for one e-mail address, its sign-in is paused: every password is refused for 15 minutes, the right one too, and the sign-in page says how long to wait. If it happens again within the day, the pause doubles each time, up to 24 hours.\n\nYou receive an e-mail when your account's sign-in is paused. If you typed those passwords yourself, wait, or use Forgot password? on the sign-in page: setting a new password lifts the pause at once. If you did not, someone may be trying to guess your password: reset it, and turn on two-factor authentication from My account.\n\nNothing is required of you."
+  },
+  {
     "id": "2026-11-23-authenticator-entry-names-server",
     "date": "November 23, 2026",
     "tag": "Improvement",

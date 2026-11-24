@@ -25,7 +25,7 @@ const crypto  = require('node:crypto');
 const { randomUUID: uuidv4 } = crypto;
 const { get, run, transaction } = require('../../db/db');
 const { requireAuth, normalizeRole, END_SESSIONS_SQL } = require('../middleware/auth');
-const { sendVerificationEmail, sendPasswordResetEmail } = require('../../utils/mailer');
+const { sendVerificationEmail, sendPasswordResetEmail, sendAccountNotice } = require('../../utils/mailer');
 const AccessRequests = require('../../utils/accessRequests');
 const { isApiAccountRole } = require('../../utils/apiAccounts');
 const { resolveRole, ensurePlatformCompany } = require('../helpers/shared');
@@ -33,6 +33,8 @@ const bootstrapToken = require('../../utils/bootstrapToken');
 const { loginAttempts } = require('../../utils/metrics');
 const { validate, v } = require('../middleware/validate');
 const Mfa = require('../helpers/mfa');
+const LoginLock = require('../helpers/loginLock');
+const { durationText } = require('../../utils/loginLock');
 const { authClientMeta, logAuthEvent, logUserEvent, issueSession } = require('../helpers/sessions');
 const log = require('../../utils/logger').child({ module: 'auth' });
 
@@ -324,6 +326,8 @@ router.post('/password-reset/confirm',
       run('DELETE FROM password_reset_tokens WHERE id = ?', [row.id]);
     });
 
+    // A reset carried through proves the mailbox: the address's sign-in lock goes (#1421).
+    LoginLock.clearLock(String(user.email).toLowerCase());
     logAuthEvent({ userId: user.id, companyId: null, email: user.email, eventType: 'password_reset_confirmed' });
     log.info({ email: user.email }, 'Password reset confirmed — user can now sign in with new password');
 
@@ -406,6 +410,38 @@ router.post('/bootstrap/platform-user', bootstrapLimiter,
   });
 });
 
+// ── The sign-in's lock per address (#1421) ──────────────────────────────────
+// A wrong password, or an address without an account: 401, or 429 when this
+// attempt is the one that locks the address. The owner of an account learns
+// of the lock by e-mail, once per lock; a Company API account has no owner
+// reading that address.
+function refuseWrongPassword(res, { email, user = null, clientMeta }) {
+  const meta = { userId: user?.id, companyId: user?.company_id, email: user?.email || email, ip: clientMeta.ip, userAgent: clientMeta.userAgent };
+  logAuthEvent({ ...meta, eventType: 'login_failed' });
+  loginAttempts.inc({ result: 'failure' });
+  const locked = LoginLock.finishAttempt(email, false);
+  if (!locked) return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid credentials.' });
+  logAuthEvent({ ...meta, eventType: `login_locked:${locked}s` });
+  if (user && !isApiAccountRole(normalizeRole(user.role))) noticeLocked(user, locked);
+  return LoginLock.lockedAnswer(res, locked);
+}
+
+/** The e-mail to the owner of a locked account, never awaited: the answer does not wait for the mail. */
+function noticeLocked(user, seconds) {
+  let appUrl = process.env.APP_URL || 'http://localhost:3001';
+  while (appUrl.endsWith('/')) appUrl = appUrl.slice(0, -1);
+  const until = new Date(Date.now() + seconds * 1000).toISOString().replace('T', ' ').slice(0, 16);
+  sendAccountNotice({
+    to: user.email,
+    subject: 'OSCAR — sign-in to your account is paused',
+    heading: 'Sign-in to your account is paused',
+    lines: [`Several wrong passwords were typed for your account in a short time, so OSCAR refuses every password for it for ${durationText(seconds)}, until ${until} UTC.`,
+      'If it was you, wait, or reset your password from the sign-in page: a reset lifts the pause at once.',
+      'If it was not you, someone may be trying to guess your password: reset it, and turn on two-factor authentication from your account page if it is not on yet.'],
+    url: `${appUrl}/forgot-password.html`,
+  }).catch(err => log.warn({ err: err.message }, 'Sign-in lock notice not sent'));
+}
+
 // ── POST /v1/auth/login ───────────────────────────────────────────────────────
 router.post('/login',
   validate([
@@ -421,31 +457,31 @@ router.post('/login',
   const normalizedEmail = email.toLowerCase();
   const clientMeta = authClientMeta(req);
 
+  // The lock per address (#1421), before anything is read: the same answer
+  // whether the address has an account or not, and no password checked.
+  const wait = LoginLock.beginAttempt(normalizedEmail);
+  if (wait) {
+    logAuthEvent({ email: normalizedEmail, eventType: 'login_refused_locked', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
+    loginAttempts.inc({ result: 'locked' });
+    return LoginLock.lockedAnswer(res, wait);
+  }
+
   const user = get('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
   if (!user) {
     // As long as a wrong password takes: the answer's time does not tell
     // whether the address has an account.
     await bcrypt.compare(password, UNKNOWN_USER_HASH);
-    logAuthEvent({ email: normalizedEmail, eventType: 'login_failed', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
-    loginAttempts.inc({ result: 'failure' });
-    return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid credentials.' });
+    return refuseWrongPassword(res, { email: normalizedEmail, clientMeta });
   }
 
   const match = await bcrypt.compare(password, user.password_hash);
-  if (!match) {
-    logAuthEvent({ userId: user.id, companyId: user.company_id, email: user.email, eventType: 'login_failed', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
-    loginAttempts.inc({ result: 'failure' });
-    return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid credentials.' });
-  }
-
   // A Company API account (#1342) signs in to no page. Its password is made
   // up and known to nobody; should one ever match, the answer is the same as
   // for a wrong password.
-  if (isApiAccountRole(normalizeRole(user.role))) {
-    logAuthEvent({ userId: user.id, companyId: user.company_id, email: user.email, eventType: 'login_failed', ip: clientMeta.ip, userAgent: clientMeta.userAgent });
-    loginAttempts.inc({ result: 'failure' });
-    return res.status(401).json({ status: 401, title: 'Unauthorized', detail: 'Invalid credentials.' });
+  if (!match || isApiAccountRole(normalizeRole(user.role))) {
+    return refuseWrongPassword(res, { email: normalizedEmail, user, clientMeta });
   }
+  LoginLock.finishAttempt(normalizedEmail, true);
 
   // Issue #449 — self-registered accounts stay locked out until a Test
   // Manager (or administrator) of their company approves them.

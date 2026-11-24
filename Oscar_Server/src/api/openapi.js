@@ -186,7 +186,7 @@ module.exports = {
       post: {
         tags: ['Auth'],
         summary: 'Authenticate with email + password',
-        description: 'An account with a second factor, or an administrator who must set one up (#1414), gets no session yet: the answer is { mfa: "verify" | "setup", mfa_token }, and the sign-in goes on at /v1/auth/mfa/verify or /v1/auth/mfa/setup.',
+        description: 'An account with a second factor, or an administrator who must set one up (#1414), gets no session yet: the answer is { mfa: "verify" | "setup", mfa_token }, and the sign-in goes on at /v1/auth/mfa/verify or /v1/auth/mfa/setup. Ten wrong passwords within 15 minutes for one address lock its sign-in (#1421): 15 minutes, doubled when locks follow each other within 24 hours, 24 hours at most; every password is refused meanwhile (429, Retry-After), whether the address has an account or not. A password reset carried through lifts the lock.',
         requestBody: { required: true, content: { 'application/json': { schema: {
           type: 'object', required: ['email', 'password'],
           properties: { email: { type: 'string' }, password: { type: 'string' } },
@@ -200,6 +200,7 @@ module.exports = {
             },
           } } } },
           401: { description: 'Invalid credentials' },
+          429: { description: 'Too many attempts from this address, or the e-mail address locked after ten wrong passwords (Retry-After)' },
         },
       },
     },

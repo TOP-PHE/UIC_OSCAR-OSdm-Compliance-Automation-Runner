@@ -367,7 +367,7 @@ const runStepSeconds = new promClient.Histogram({
 const loginAttempts = new promClient.Counter({
   name: 'oscar_login_attempts_total',
   help: 'Login attempts by result',
-  labelNames: ['result'],   // success | failure
+  labelNames: ['result'],   // success | failure | locked (refused, the address locked: #1421)
   registers: [register]
 });
 

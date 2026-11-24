@@ -79,7 +79,10 @@ server 1.11.578 (#1414). A lost phone is reset by another administrator
 (*Manage Users* → *Reset 2FA*, audited, the owner told by e-mail), or, for
 the last administrator, by `node src/cli/reset-mfa.js <e-mail>` run in
 OSCAR's container by the Tier A operator (*OSCAR - Server Admin Guide*,
-13.5). There are no recovery codes.
+13.5). There are no recovery codes. Since server 1.11.581 (#1421) ten wrong
+passwords within 15 minutes lock an e-mail address's sign-in, for 15
+minutes doubled with each lock of a series, up to 24 hours; a password
+reset lifts it (*Server Admin Guide*, 13.6).
 
 ### 2.3 Tier C — UIC Certification Reviewer (certifier role)
 

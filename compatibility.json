@@ -4,6 +4,17 @@
   "current_release": "2026.621",
   "releases": [
     {
+      "release": "2026.622",
+      "date": "2026-11-24",
+      "server": "1.11.581",
+      "collection": "OTST_V2.0.270",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.581 (#1421): ten wrong passwords within 15 minutes lock an e-mail address's sign-in, for 15 minutes, doubled when locks follow each other within 24 hours, 24 hours at most. Every password is refused meanwhile (429 with Retry-After), the right one too; an address without an account is counted and answered the same way. A password reset carried through lifts the lock; the owner of an account is told by e-mail once per lock. Migration 63 adds the table login_lock (the SHA-256 of each address, never the address). Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.621",
       "date": "2026-11-23",
       "server": "1.11.580",
