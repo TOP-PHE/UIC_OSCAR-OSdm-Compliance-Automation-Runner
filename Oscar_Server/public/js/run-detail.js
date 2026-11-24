@@ -27,7 +27,11 @@ if (!_rawRunId || !RUNID_RE.test(_rawRunId)) {
 }
 // The id checked above, or '' while the page leaves for the dashboard: only a
 // UUID goes into a request address (#1423).
-const runId = RUNID_RE.test(_rawRunId || '') ? _rawRunId : '';
+const runId = runIdOf(_rawRunId);
+function runIdOf(value) {
+  const text = typeof value === 'string' ? value : '';
+  return RUNID_RE.test(text) ? text : '';
+}
 
 let lastEventId = 0;
 let polling     = true;
