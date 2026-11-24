@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The nginx site names no version, and leaves the security headers to OSCAR** (#1426). Deployment files, guides, CI and a test, no version.
+  - `server_tokens off;` in `OSCAR_Deploy/nginx/oscar.conf.example` and in the sites of *installation-guide.md* and *OSCAR - Self-Hosted Quick Start*: `Server` reads `nginx`, and nginx's own error pages name no version.
+  - A note in each: OSCAR sends its own `Content-Security-Policy`, HSTS and the rest, so a proxy adds none and hides none; a policy written in a proxy stays as it was written when OSCAR's changes (#1423). The installation guide says how to check an installed server with `curl -sI`.
+  - The CI job *nginx example (the VPS's proxy)* checks, under Ubuntu's nginx, that `Server` is `nginx` alone, that an error page names no version, and that the proxy adds no `Content-Security-Policy`. `nginx-example.test.js` pins the example and the guides' sites.
+  - An installed server needs the same two changes in its own site under `/etc/nginx/`.
+
 - **A new function is held to two limits** (#1385). Tooling and tests, no version: no function changes, and nothing the server runs.
   - **Seen:** 50 new functions over SonarCloud's complexity limit since the clean-up of October (#523). Nothing stopped one: the gate counts ratings, and reports after the push.
   - **Now:** `npm run lint` refuses a function of more than 15 paths (ESLint's `complexity`, a `switch` counting once) or more than 100 lines of code, in the server, the pages' scripts and the Bruno library (`Oscar_Server/eslint.size-rules.js`). Not in the tests.
