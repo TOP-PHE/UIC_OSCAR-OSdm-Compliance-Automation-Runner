@@ -349,10 +349,10 @@ share the same SSO provided by OSCAR (no separate logins).
 | Concern | Component | Role |
 |---|---|---|
 | Metrics scraping | **Prometheus** | Pulls `oscar_*` metrics every 15 s (15-day TSDB retention). |
-| Log aggregation | **Loki + Promtail** | Promtail tails container stdout/stderr via the Docker socket; Loki indexes by container/stream labels. |
+| Log aggregation | **Loki + Promtail** | Promtail reads the log files Docker writes for each container (each line names its container and compose service; no Docker socket, #1434); Loki indexes by container/stream labels. |
 | Visualisation | **Grafana** | Pre-provisioned **OSCAR · Overview** + **OSCAR · Logs** dashboards. SSO via `auth.proxy` + nginx `auth_request`. |
 | Container health probe | **Docker `healthcheck`** | Hits `/health` every 30 s, requires DB + queue + data dir all OK. |
-| Auto-restart | **Autoheal sidecar** | Restarts any `autoheal=true`-labelled container that Docker reports `unhealthy` (transient hangs heal without paging a human). |
+| Auto-restart | **`oscar-autoheal`, a timer of the host** | Restarts any `autoheal=true`-labelled container that Docker reports `unhealthy` (transient hangs heal without paging a human). A systemd timer, so that no container holds the Docker socket (#1434). |
 | Alert routing & email | **Alertmanager** | Receives Prometheus alerts, dedupes, groups, emails OSCAR admins via the production SMTP relay. Re-pages criticals every 1 h, warnings every 4 h. |
 
 **Default alert ruleset:** server unreachable, restart loop, queue stuck,

@@ -926,6 +926,45 @@ Every secret of the `.env` (`ENCRYPTION_KEY`, `SMTP_PASS`, `PLATFORM_BOOTSTRAP_T
 
 **On Kubernetes** the Secret `oscar-secrets` stays as it is (`envFrom`). A cluster that wants files mounts that Secret as a volume and sets `ENCRYPTION_KEY_FILE` and the others to its paths.
 
+### 13.8 Restarts and logs without the Docker socket (#1434)
+
+No container mounts the Docker socket: whoever reaches it is root on the host.
+
+- **Restarts.** A systemd timer of the host runs `oscar-autoheal` every 30 s. It restarts each container labelled `autoheal=true` (`oscar`, `oscar-runner`) that Docker reports `unhealthy`, as the `autoheal` container of earlier versions did. Its lines: `journalctl -t oscar-autoheal`. `scripts/oscar-autoheal-schedule.sh install` copies the script to `/usr/local/sbin/oscar-autoheal` (owned by root, outside the checkout) and starts the timer; `status` shows it, `remove` takes it away. Run `install` again after a release that changes `scripts/oscar-autoheal.sh`.
+- **Logs.** Promtail reads the log files Docker writes for each container (`/var/lib/docker/containers`, read-only). Each line names its container and compose service, because every service of the compose files has the same `logging` block (`x-logging`: Docker's json-file driver, `tag` and `labels`). That block also caps each container's log at five files of 50 MB: Docker sets no cap by default.
+
+**Moving an installed server** (the VPS), once its checkout holds the release that brings this. As the deploy user, when no run is in progress (OSCAR and the monitoring are started again, about a minute):
+
+```bash
+cd /opt/OSCAR/OSCAR_Deploy
+# 1. The restarts from the host, before the container that did them goes.
+sudo bash scripts/oscar-autoheal-schedule.sh install
+# 2. The compose files the running server was made from.
+FILES=$(docker inspect oscar --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}')
+echo "$FILES"
+C="docker compose $(printf -- '-f %s ' ${FILES//,/ })"
+# 3. Promtail stopped first, everything else made again with the logging block
+#    (the old oscar-autoheal container is removed), then Promtail: it reads
+#    the new log files from their first line, so nothing is sent twice.
+sudo $C stop promtail
+sudo $C up -d --remove-orphans $(sudo $C config --services | grep -vx promtail)
+sudo $C up -d promtail
+```
+
+Without the monitoring stack (no `docker-compose.metrics.yml` in `$FILES`), step 3 is `sudo $C up -d --remove-orphans`.
+
+**Then check:**
+
+```bash
+cd /opt/OSCAR/OSCAR_Deploy
+docker ps --format '{{.Names}}  {{.Mounts}}' | grep docker.sock     # nothing
+systemctl list-timers oscar-autoheal.timer --no-pager                # its next run
+docker inspect oscar --format '{{.HostConfig.LogConfig.Type}} {{.HostConfig.LogConfig.Config}}'
+#   json-file map[labels:com.docker.compose.service,com.docker.compose.project max-file:5 max-size:50m tag:{{.Name}}]
+```
+
+In Grafana, *OSCAR · Logs* shows the `oscar` container's new lines. A promotion keeps all of it: it makes the server again from the same compose files (*auto-deploy-setup.md*, step 4).
+
 ## 14. Operational Monitoring & Alerting (v1.8)
 
 OSCAR ships a self-healing + paging stack so production incidents get caught and (where possible) fixed before an admin notices.
@@ -935,17 +974,17 @@ OSCAR ships a self-healing + paging stack so production incidents get caught and
 | Layer | Component | Behaviour |
 |---|---|---|
 | **Health probe** | Docker `healthcheck` on the `oscar` container | Hits `GET /health` every 30 s. Three failures in a row → container marked `unhealthy`. |
-| **Auto-restart** | `willfarrell/autoheal` sidecar (~5 MB) | Polls Docker every 30 s. Any container labelled `autoheal=true` that goes unhealthy is restarted. No human action needed for transient hangs. |
+| **Auto-restart** | `oscar-autoheal`, a systemd timer of the host (#1434) | Every 30 s, any container labelled `autoheal=true` that goes unhealthy is restarted (13.8). No container holds the Docker socket. No human action needed for transient hangs. |
 | **Metrics** | `prom/prometheus` (existing since v1.5) | Scrapes `/metrics` every 15 s. Evaluates the alert rules in `prometheus/alerts/oscar-alerts.yml`. |
 | **Routing + email** | `prom/alertmanager` (new in v1.8) | Receives firing alerts, dedupes, groups, and emails the OSCAR admin distribution list. Re-pages criticals every 1 h until acknowledged, warnings every 4 h. |
-| **Logs** | Loki + Promtail (since v1.7) | Centralised log aggregation — query via Grafana to triage what an alert actually meant. |
+| **Logs** | Loki + Promtail (since v1.7) | Centralised log aggregation — query via Grafana to triage what an alert actually meant. Promtail reads the containers' log files (13.8). |
 
 ### 14.2 The default alert rules
 
 | Alert | Severity | Fires when | Typical fix |
 |---|---|---|---|
-| `OscarServerDown` | critical | `/metrics` unscrapeable for 2 min | Autoheal usually restarts within 60 s. If it didn't, `docker ps` + `docker logs oscar`. |
-| `OscarRestartLoop` | critical | >3 container restarts in 10 min | Persistent boot-time failure — DB corruption, full disk, broken migration, missing env var. Stop autoheal first, debug, fix, restart. |
+| `OscarServerDown` | critical | `/metrics` unscrapeable for 2 min | The host's `oscar-autoheal` timer usually restarts it within 60 s (`journalctl -t oscar-autoheal`). If it didn't, `docker ps` + `docker logs oscar`. |
+| `OscarRestartLoop` | critical | >3 container restarts in 10 min | Persistent boot-time failure — DB corruption, full disk, broken migration, missing env var. Stop the restarts first (`sudo systemctl stop oscar-autoheal.timer`), debug, fix, restart, then `sudo systemctl start oscar-autoheal.timer`. |
 | `OscarQueueStuck` | warning | `oscar_queue_depth > 0` AND no run ended in 10 min, for 5 min (could not fire before #1286) | Hung Bruno child: restart the OSCAR container, which kills zombie children. A campaign of long scenarios (expiry probes) holding every slot for over 10 min sets it off too: check the Dashboard before restarting. |
 | `OscarRunFailureRateHigh` | warning | >50 % of runs FAILED over 15 min, for 10 min (before #1286, 100 % from a single failure) | Vendor outage, expired OAuth credentials, or a bad collection update. A campaign including deliberately wrong `SIM_WRONG_…` scenarios counts their failures too. |
 | `OscarSmtpDegraded` | warning | Any SMTP failure in last 10 min | Read the mail settings in use on the Server Config tab (they are set in the server's environment). Use **Send test email** to reproduce. |
@@ -966,13 +1005,13 @@ After you `git pull` v1.9.0 on the VPS:
 ```bash
 cd /opt/OSCAR/OSCAR_Deploy
 
-# 1. Bring the stack up (autoheal + alertmanager + a shared `alertmanager-config`
+# 1. Bring the stack up (alertmanager + a shared `alertmanager-config`
 #    volume between OSCAR and Alertmanager). Force-recreate oscar + alertmanager
 #    so they pick up the new mount.
 sudo docker compose \
      -f docker-compose.yml \
      -f docker-compose.metrics.yml \
-     up -d --force-recreate oscar autoheal alertmanager prometheus
+     up -d --force-recreate oscar alertmanager prometheus
 
 # 2. Verify the containers.
 docker ps --format 'table {{.Names}}\t{{.Status}}'

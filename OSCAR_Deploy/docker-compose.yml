@@ -5,6 +5,21 @@
 #    You may obtain a copy of the License at
 #        http://www.apache.org/licenses/LICENSE-2.0
 
+# ── Container logs (#1434) ─────────────────────────────────────────────────────
+# Docker's own json-file logs, each line naming its container and compose
+# service: Promtail (docker-compose.metrics.yml) reads these files, read-only,
+# and needs no Docker socket. With a size cap, so that no container's log
+# fills the disk (Docker sets none by default): 5 files of 50 MB each.
+# Every service names it (`logging: *logging`); the same block is in
+# docker-compose.metrics.yml, since a YAML anchor reaches one file only.
+x-logging: &logging
+  driver: json-file
+  options:
+    tag: "{{.Name}}"
+    labels: com.docker.compose.service,com.docker.compose.project
+    max-size: 50m
+    max-file: "5"
+
 services:
   oscar:
     # The image is named by its digest, never by a tag: a tag can be moved to
@@ -63,6 +78,7 @@ services:
       # The runs' working folders, shared with oscar-runner.
       - run-workspaces:/app/run-workspaces
     restart: unless-stopped
+    logging: *logging
     # ── Container hardening ─────────────────────────────────────────────────
     # The image already runs as the unprivileged `node` user (Dockerfile
     # `USER node`); these take away what such a process could still be given.
@@ -81,9 +97,10 @@ services:
     # ── Health check (PR — v1.8.0) ──────────────────────────────────────────
     # Hits OSCAR's /health endpoint, which itself probes the SQLite DB, the
     # data dir, and the queue. Three consecutive failures (90 s total at the
-    # 30 s interval) flip the container to "unhealthy", which the autoheal
-    # sidecar picks up and restarts. start_period gives the app room to boot
-    # — migrations on a large DB can take 5–10 s.
+    # 30 s interval) flip the container to "unhealthy", which the host's
+    # oscar-autoheal timer picks up and restarts (scripts/oscar-autoheal.sh).
+    # start_period gives the app room to boot — migrations on a large DB can
+    # take 5–10 s.
     healthcheck:
       # Use node's built-in fetch (Node 22) — wget/curl are not in the slim image.
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
@@ -92,7 +109,7 @@ services:
       retries: 3
       start_period: 30s
     labels:
-      # Opts this container in to the autoheal sidecar — see service below.
+      # Restarted by the host's oscar-autoheal timer when unhealthy (#1434).
       autoheal: "true"
 
   # ── Runner agent — the runs' processes, isolated (option 2b) ──────────────
@@ -122,6 +139,7 @@ services:
     depends_on:
       - oscar
     restart: unless-stopped
+    logging: *logging
     cap_drop:
       - ALL
     security_opt:
@@ -143,34 +161,12 @@ services:
     labels:
       autoheal: "true"
 
-  # ── Autoheal — restart sidecar (PR — v1.8.0) ──────────────────────────────
-  # Watches the Docker socket every AUTOHEAL_INTERVAL seconds; any container
-  # carrying the `autoheal=true` label that Docker reports as `unhealthy`
-  # gets restarted. Tiny image (~5 MB), no per-container config beyond the
-  # label + healthcheck above. Combined with Alertmanager (metrics overlay)
-  # for the alert side, this gives self-healing + paging without a heavy
-  # external monitoring stack.
-  autoheal:
-    # Pinned by digest, like every image that is given the Docker socket:
-    # a tag can be moved to other content, a digest cannot. Dependabot
-    # (docker-compose ecosystem) proposes the next one.
-    image: willfarrell/autoheal:1.2.0@sha256:31f580ef0279eaced5b38d631b08c474d70d8403c1c2fdd6ddcf2e879d5f3f7c
-    container_name: oscar-autoheal
-    restart: always
-    environment:
-      AUTOHEAL_CONTAINER_LABEL: autoheal
-      AUTOHEAL_INTERVAL: "30"          # poll every 30 s
-      AUTOHEAL_START_PERIOD: "0"       # respect each container's own start_period
-      AUTOHEAL_DEFAULT_STOP_TIMEOUT: "20"
-      # Match the OSCAR app's TZ so "Container restarted at HH:MM" lines
-      # the autoheal logs read in the same timezone as everything else.
-      TZ: ${OSCAR_TZ:-Europe/Paris}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-
-  # No auto-update agent: the release workflow starts the image it built
-  # (notes below). The Watchtower container of earlier versions is gone, and
-  # with it a second holder of the Docker socket.
+  # No container here mounts the Docker socket (#1434): whoever can reach it
+  # is root on the host. Restarts of unhealthy containers are the host's
+  # (scripts/oscar-autoheal-schedule.sh install: a systemd timer, every 30 s,
+  # restarts those labelled autoheal=true), and Promtail reads the log files.
+  # No auto-update agent either: the release workflow starts the image it
+  # built (notes below).
 
 volumes:
   # The runs' working folders: the oscar and oscar-runner containers share

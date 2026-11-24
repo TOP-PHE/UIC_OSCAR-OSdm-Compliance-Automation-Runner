@@ -28,7 +28,7 @@ spec:
             severity: critical
           annotations:
             summary: OSCAR server is unreachable
-            description: Prometheus has been unable to scrape the OSCAR /metrics endpoint for 2 minutes. The container is either down, deadlocked, or its network bridge is broken. The autoheal sidecar will restart it automatically if Docker reports it unhealthy — verify with `docker ps`. If autoheal didn't kick in, the process may still be answering /health while malfunctioning elsewhere; restart manually.
+            description: 'Prometheus has been unable to scrape the OSCAR /metrics endpoint for 2 minutes. The container is either down, deadlocked, or its network bridge is broken. It is restarted once its health check fails (Docker: the host''s oscar-autoheal timer, `journalctl -t oscar-autoheal`; Kubernetes: the liveness probe) — verify with `docker ps` or `kubectl get pods`. If it was not, the process may still be answering /health while malfunctioning elsewhere; restart manually.'
             runbook: Documentation/Server_Operations/OSCAR - Server Admin Guide.md#operational-monitoring--alerting
         - alert: OscarRestartLoop
           expr: changes(oscar_node_process_start_time_seconds{job="oscar-server"}[10m]) > 3

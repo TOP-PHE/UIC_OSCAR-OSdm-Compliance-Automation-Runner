@@ -25,7 +25,8 @@ After ~15 minutes you'll have:
   `ghcr.io/top-phe/oscar-server` image of the release you choose, named by
   its digest, auto-restarting via Docker. You move to a new release when you
   choose (Step 9)
-- **Autoheal sidecar** — restarts OSCAR if its `/health` probe fails
+- **Restarts from the host** — a systemd timer restarts OSCAR if its
+  `/health` probe fails; no container holds the Docker socket
 - **(Optional) Prometheus + Grafana + Loki + Alertmanager** — opt-in metrics
   + log aggregation + email alerts to admins
 
@@ -273,15 +274,18 @@ sudo docker compose up -d
 What happens:
 - Docker pulls `ghcr.io/top-phe/oscar-server@<your digest>` from the public
   GHCR (~150 MB)
-- Docker pulls `willfarrell/autoheal:1.2.0` (~5 MB)
 - The `oscar` container starts, runs DB migrations, opens port 3001 on
   127.0.0.1 (nginx is the only thing reaching it from outside)
 - Without `OSCAR_IMAGE_DIGEST` in `.env`, compose stops here and says so
 
 ```bash
+# Restarts of an unhealthy OSCAR, from the host: a systemd timer, every 30 s
+sudo bash /opt/OSCAR/OSCAR_Deploy/scripts/oscar-autoheal-schedule.sh install
+
 # Verify everything is healthy
 docker ps --format 'table {{.Names}}\t{{.Status}}'
-# oscar should show "(healthy)" after ~30 s; oscar-autoheal "Up"
+# oscar should show "(healthy)" after ~30 s
+systemctl list-timers oscar-autoheal.timer --no-pager
 
 # Check the app responds
 curl -s https://oscar.example.org/health | python3 -m json.tool
