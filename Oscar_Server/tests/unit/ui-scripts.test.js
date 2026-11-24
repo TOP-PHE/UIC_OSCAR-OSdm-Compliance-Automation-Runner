@@ -2241,6 +2241,9 @@ describe('the Report Builder coverage section', () => {
       expect([capabilityOptionsHtml([]), capabilityOptionsHtml(null), capabilityHtml(byCapability).includes('cov-options')]).toEqual(['', '', false]);
       const bare = capabilityOptionsHtml([{ code: 'B', runId: 'nope', text: 't', parameters: [], combinations: [] }]);
       expect(bare).toContain('<summary>B<br><small>t</small></summary><div class="cov-note">Mandatory parameters only: not in the report</div></details>');
+      // #1437: a request without a trip says how it named where.
+      expect(capabilityOptionsHtml([{ code: 'N', runId: 'nope', withoutTrip: 'zones <z>', mandatory: { ok: true, message: '1 offer(s)' }, parameters: [], combinations: [] }]))
+        .toContain('<div class="cov-note">Offers without a trip (zones &#60;z&#62;). Mandatory parameters only: answered — 1 offer(s)</div>');
     });
 
     test('the Markdown has the same, one table per run', () => {

@@ -103,7 +103,7 @@ function optionOf(text) {
   return row;
 }
 
-// "Offer request options (#227) — OSDM v, budget b request(s), u used, seed s."
+// "Offer request options (#227) — OSDM v[, offers without a trip (w)], budget b request(s), u used, seed s."
 function headerOf(text, report) {
   const number = (label) => {
     const at = text.indexOf(label);
@@ -111,6 +111,13 @@ function headerOf(text, report) {
   };
   const osdm = text.indexOf('— OSDM ');
   if (osdm !== -1) report.version = text.slice(osdm + 7, text.indexOf(',', osdm)).trim();
+  // #1437: "…, offers without a trip (<how it names where>), …".
+  const withoutTrip = text.indexOf(', offers without a trip (');
+  if (withoutTrip !== -1) {
+    const from = withoutTrip + ', offers without a trip ('.length;
+    const end = text.indexOf(')', from);
+    if (end !== -1) report.withoutTrip = text.slice(from, end);
+  }
   report.budget = number('budget ');
   report.seed = number('seed ');
   const used = text.indexOf(' used');

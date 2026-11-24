@@ -42,7 +42,9 @@
       "tripResponseParameters": "no-offer-silent",
       "promotionCodes": "refuse-unknown"
     },
-    "promotionCodes": ["SIM-PROMO-10"]
+    "promotionCodes": ["SIM-PROMO-10"],
+    "nonTripFrom": "urn:uic:stn:0000046",
+    "nonTripZone": "SIM-OPTIONS"
   },
   "ageTariffs": {
     "from": "urn:uic:stn:0000093",
@@ -230,12 +232,14 @@
       { "id": "urn:uic:stn:0000042", "name": "Simtown North" },
       { "id": "urn:uic:stn:0000043", "name": "Simtown East" },
       { "id": "urn:uic:stn:0000044", "name": "Simtown West" },
-      { "id": "urn:uic:stn:0000045", "name": "Simtown South" }
+      { "id": "urn:uic:stn:0000045", "name": "Simtown South" },
+      { "id": "urn:uic:stn:0000046", "name": "Optionville" }
     ],
     "zones": [
       { "id": "SIM-CITY", "name": "Simtown city", "zoneId": 100, "nutsCodes": ["XS111"], "places": ["urn:uic:stn:0000040", "urn:uic:stn:0000041"] },
       { "id": "SIM-NORTH", "name": "Simtown north", "zoneId": 101, "nutsCodes": ["XS112"], "places": ["urn:uic:stn:0000042"] },
-      { "id": "SIM-SOUTH", "name": "Simtown south", "zoneId": 102, "places": ["urn:uic:stn:0000045"] }
+      { "id": "SIM-SOUTH", "name": "Simtown south", "zoneId": 102, "places": ["urn:uic:stn:0000045"] },
+      { "id": "SIM-OPTIONS", "name": "Optionville", "zoneId": 103, "places": ["urn:uic:stn:0000046"] }
     ],
     "products": [
       { "code": "SIM_SINGLE_RIDE", "name": "Single ride", "type": "ADMISSION_POINT2POINT", "flexibility": "NON_FLEXIBLE", "factor": 0.25, "validityMinutes": 120, "by": ["PLACES", "ZONES"] },

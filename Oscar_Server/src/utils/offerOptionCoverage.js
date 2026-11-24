@@ -138,6 +138,8 @@ function entryOf({ code, run, report }) {
     runId: run?.id ?? null,
     at: run?.completed_at || run?.queued_at || null,
     version: report.version ?? null,
+    // #1437: how a request without a trip named where ("zones"…); absent for a trip.
+    ...(report.withoutTrip ? { withoutTrip: text(report.withoutTrip) } : {}),
     budget: intOrNull(report.budget),
     used: intOrNull(report.used),
     mandatory: isObj(report.mandatory) ? { ok: report.mandatory.ok === true, message: text(report.mandatory.message) } : null,

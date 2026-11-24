@@ -1449,6 +1449,34 @@
           "nonTripPlaces"
         ]
       }
+    },
+    {
+      "code": "OTST_NONTRIP_OFFER_OPTION_DISCOVERY_PLACES",
+      "source": "SIM_NONTRIP_OFFER_OPTION_DISCOVERY_PLACES_38",
+      "checks": 89,
+      "purpose": "Offer request options without a trip (#1437): the offer request with the mandatory parameters only (the passengers' externalRef and type, and nonTripSearchCriteria naming two stop places, without validFrom) must be answered with offers; then each optional parameter alone (validFrom among them), random combinations of those found supported, and all of them, each answer classified as for a trip. The options of a trip (a return's inboundDate, the trip search, requestedSections, tripResponseParameters) are not tested. The first request can fail, and so can a declared option the provider does not take and a combination of options found supported that it refuses; the rest is a report. The scenario ends after the offer.",
+      "capability": "offers.requestOptions",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1,
+        "providerValues": [
+          "nonTripPlaces"
+        ]
+      }
+    },
+    {
+      "code": "OTST_NONTRIP_OFFER_OPTION_DISCOVERY_ZONES",
+      "source": "SIM_NONTRIP_OFFER_OPTION_DISCOVERY_ZONES_38",
+      "checks": 89,
+      "purpose": "Offer request options without a trip (#1437): the offer request with the mandatory parameters only (the passengers' externalRef and type, and nonTripSearchCriteria naming a zone, without validFrom) must be answered with offers; then each optional parameter alone (validFrom among them), random combinations of those found supported, and all of them, each answer classified as for a trip. The options of a trip (a return's inboundDate, the trip search, requestedSections, tripResponseParameters) are not tested. The first request can fail, and so can a declared option the provider does not take and a combination of options found supported that it refuses; the rest is a report. The scenario ends after the offer.",
+      "capability": "offers.requestOptions",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1,
+        "providerValues": [
+          "nonTripZones"
+        ]
+      }
     }
   ]
 }

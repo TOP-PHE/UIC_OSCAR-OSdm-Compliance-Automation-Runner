@@ -446,6 +446,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     (and for every option at once) answered 4xx/5xx (`refusedCombinations()`,
     `offerOptions.js`). No offer is only stated; a request not sent
     (status 0) is neither. Undeclared parameters stay information only.
+    **Without a trip** (#1437, 1.11.586 / OTST_V2.0.272, simulator 0.75.0;
+    maintainer 2026-11-24): `tripFormOf()` is `NON_TRIP` for a request with
+    `nonTripSearchCriteria`; phase 1 keeps its "where" only (places, zones or
+    NUTS codes, `nonTripWhere()`): **`validFrom` is an option**
+    (`nonTripSearchCriteria.validFrom`, `where.nonTripOnly`: never offered
+    for a trip), honoured when the admissions start then or later. The
+    options of a trip (`tripOnly`: `inboundDate`, `requestedSections`,
+    `tripResponseParameters`; and `searchOnly`) are "not tested: only for
+    a trip". The header says `offers without a trip (<where>)`, read back as
+    `withoutTrip` by `offerOptionReport.js` and shown by the coverage and
+    the Report Builder. Simulator: `requestOptions.nonTripFrom` (0000046
+    Optionville, first stop place) and `nonTripZone` (`SIM-OPTIONS`) apply
+    the trip's behaviours (`appliesTo()`); `tripResponseParameters`' "no
+    offer, nothing said" is not shown without a trip.
   - **Currencies** (#781, 1.11.310): `currencies: { sold, default }` in the
     framework (`utils/currencies.js`; the default is always among those sold;
     nothing declared = every currency, none tested). Warning `currency:<C>`

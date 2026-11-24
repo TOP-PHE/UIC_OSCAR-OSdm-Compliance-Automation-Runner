@@ -341,3 +341,115 @@ describe('the Bruno glue', () => {
     expect(logs.some((l) => /could not be sent: socket hang up/.test(l))).toBe(true);
   });
 });
+
+describe('#1437: a request without a trip', () => {
+  const zone = { id: 'SIM-OPTIONS', carrier: 'urn:x_osdm_simulator:carrier:gamma' };
+  const nonTripRequest = (where = { zones: [zone] }) => ({
+    anonymousPassengerSpecifications: [{ externalRef: 'P1', type: 'PERSON', dateOfBirth: '1980-01-01' }],
+    nonTripSearchCriteria: { ...where, validFrom: '2026-11-10T00:00:00+01:00' },
+    offerSearchCriteria: { currency: 'CZK' },
+  });
+  const nonTripRows = (version = '3.8.0', request = nonTripRequest()) => o.optionsFor({ request, version, seed: 3, travelDay: '2026-11-10' });
+
+  test('its form, and where it names', () => {
+    expect(o.tripFormOf(nonTripRequest())).toBe('NON_TRIP');
+    expect(o.nonTripWhereOf(nonTripRequest())).toBe('zones');
+    expect(o.nonTripWhereOf(nonTripRequest({ places: [place('0000046')] }))).toBe('stop places');
+    expect(o.nonTripWhereOf(nonTripRequest({ nutsCodes: ['XS111'] }))).toBe('NUTS codes');
+    expect(o.nonTripWhereOf(searchRequest())).toBeNull();
+  });
+
+  test('phase 1 keeps the passengers and where, not validFrom nor anything else', () => {
+    expect(o.mandatoryRequest(nonTripRequest())).toEqual({
+      anonymousPassengerSpecifications: [{ externalRef: 'P1', type: 'PERSON' }],
+      nonTripSearchCriteria: { zones: [zone] },
+    });
+    expect(o.mandatoryRequest(nonTripRequest({ places: [place('0000046'), place('0000040')] })).nonTripSearchCriteria)
+      .toEqual({ places: [place('0000046'), place('0000040')] });
+    expect(o.mandatoryRequest(nonTripRequest({ nutsCodes: ['XS111'] })).nonTripSearchCriteria).toEqual({ nutsCodes: ['XS111'] });
+  });
+
+  test.each(VERSIONS)('phase 1, each option alone and all at once are valid OSDM %s requests', (version) => {
+    const mandatory = o.mandatoryRequest(nonTripRequest());
+    expect(requestIssues(mandatory, 'OfferCollectionRequest', version)).toEqual([]);
+    const rows = nonTripRows(version).filter((r) => !r.skipped);
+    for (const r of rows) {
+      expect([r.option.key, requestIssues(o.withOptions(mandatory, [r]), 'OfferCollectionRequest', version)]).toEqual([r.option.key, []]);
+    }
+    expect(requestIssues(o.withOptions(mandatory, o.allSupported(rows)), 'OfferCollectionRequest', version)).toEqual([]);
+  });
+
+  test('validFrom is an option, the scenario\'s own else the travel day; never one of a trip\'s', () => {
+    const rows = nonTripRows();
+    expect(row(rows, 'nonTripSearchCriteria.validFrom')).toMatchObject({ value: '2026-11-10T00:00:00+01:00', source: 'scenario' });
+    const without = nonTripRequest();
+    delete without.nonTripSearchCriteria.validFrom;
+    expect(row(nonTripRows('3.8.0', without), 'nonTripSearchCriteria.validFrom')).toMatchObject({ value: '2026-11-10T00:00:00Z', source: 'default' });
+    const req = o.withOptions(o.mandatoryRequest(nonTripRequest()), [row(rows, 'nonTripSearchCriteria.validFrom')]);
+    expect(req.nonTripSearchCriteria).toEqual({ zones: [zone], validFrom: '2026-11-10T00:00:00+01:00' });
+    expect(optionsOf().map((r) => r.option.key)).not.toContain('nonTripSearchCriteria.validFrom');
+  });
+
+  test('the options of a trip are not tested: a return, the trip search, sections, the trip\'s shape', () => {
+    const skipped = nonTripRows().filter((r) => r.skipped);
+    expect(skipped.map((r) => r.option.key)).toEqual(['offerSearchCriteria.inboundDate', 'tripSearchCriteria.arrivalTime', 'tripSearchCriteria.vias',
+      'tripSearchCriteria.notVias', 'tripSearchCriteria.parameters', 'tripSearchCriteria.returnSearchParameters', 'requestedSections', 'tripResponseParameters']);
+    for (const r of skipped) expect(r.skipped).toBe('only for a trip (the scenario asks offers without a trip)');
+    // Every other option is tested, the passengers' included.
+    expect(nonTripRows().filter((r) => !r.skipped).map((r) => r.option.key)).toEqual(expect.arrayContaining([
+      'passenger.dateOfBirth', 'passenger.cards', 'offerSearchCriteria.productTags', 'offerSearchCriteria.travelClasses', 'promotionCodes', 'embed',
+    ]));
+  });
+
+  test('validFrom is kept when the admissions are valid from that time or later', () => {
+    const request = { nonTripSearchCriteria: { validFrom: '2026-11-10T00:00:00+01:00' } };
+    const offers = (...starts) => ({ offers: [{ admissionOfferParts: starts.map((validFrom) => ({ validFrom })) }] });
+    const check = o.OPTIONS.find((x) => x.key === 'nonTripSearchCriteria.validFrom').check;
+    expect(check(request, offers('2026-11-10T00:00:00+01:00', '2026-11-09T23:30:00Z'))).toBe('honoured');
+    expect(check(request, offers('2026-11-09T22:59:00Z'))).toBe('not-kept');
+    expect(check(request, offers())).toBeNull();
+    expect(check({ nonTripSearchCriteria: {} }, offers('2026-11-10T00:00:00Z'))).toBeNull();
+  });
+
+  test('the report says the request is without a trip, and how it names where; the server reads it back', async () => {
+    const report = await o.discover({
+      request: nonTripRequest(), version: '3.8.0', values: {}, invalidValues: 'random', seed: 4, travelDay: '2026-11-10',
+      budget: 6, mandatory: { ok: true, message: '1 offer(s)' }, ignoredOf: () => [], send: async () => ({ status: 200, body: { offers: [{ offerId: 'O' }] } }),
+    });
+    expect(report.withoutTrip).toBe('zones');
+    const lines = o.reportLines(report);
+    expect(lines[0]).toMatch(/^\[INFO\] 🧭 Offer request options \(#227\) — OSDM 3\.8\.0, offers without a trip \(zones\), budget 6 request\(s\)/);
+    const { reportOf } = require('../../src/utils/offerOptionReport');
+    expect(reportOf(lines)).toMatchObject({ version: '3.8.0', budget: 6, seed: 4, withoutTrip: 'zones' });
+    // A trip's report says nothing of it, as before.
+    const trip = await o.discover({
+      request: searchRequest(), version: '3.8.0', values: {}, seed: 4, travelDay: '2026-11-10', budget: 3,
+      mandatory: { ok: true, message: '' }, ignoredOf: () => [], send: async () => ({ status: 200, body: { offers: [] } }),
+    });
+    expect(trip.withoutTrip).toBeUndefined();
+    expect(o.reportLines(trip)[0]).toMatch(/— OSDM 3\.8\.0, budget 3 request\(s\)/);
+    expect(reportOf(o.reportLines(trip)).withoutTrip).toBeUndefined();
+  });
+
+  test('the Bruno glue: phase 1 says where, and its failure names what OSDM requires without a trip', async () => {
+    const env = { offerOptionDiscovery: 'true', OfferCollectionRequest: JSON.stringify(nonTripRequest()), osdmVersion: '3.8.0', scenarioCode: 'S', offerOptionMaxRequests: '3', __travelDay: '2026-11-10' };
+    const logs = [];
+    const checks = [];
+    global.bru = {
+      getEnvVar: (k) => env[k], setEnvVar: (k, v) => { env[k] = v; },
+      sendRequest: (req, cb) => cb(null, { status: 200, data: { offers: [{ offerId: 'O' }] } }),
+    };
+    global.test = (name, fn) => { try { fn(); checks.push([name, 'pass']); } catch (e) { checks.push([name, `fail: ${e.message}`]); } };
+    global.validationLogger = (line) => logs.push(line);
+    try {
+      o.prepareOptionDiscovery();
+      expect(JSON.parse(env.OfferCollectionRequest)).toEqual(o.mandatoryRequest(nonTripRequest()));
+      expect(logs[0]).toMatch(/and where the offers are valid, nonTripSearchCriteria without validFrom\)\.$/);
+      await o.runOptionDiscovery(400, { code: 'MISSING_VALID_FROM' });
+      expect(checks[0][1]).toMatch(/OSDM requires only the passengers, and where offers without a trip are valid: a provider must answer such a request\.$/);
+      expect(JSON.parse(env.__offerOptionReport).withoutTrip).toBe('zones');
+    } finally {
+      delete global.bru; delete global.test; delete global.validationLogger;
+    }
+  });
+});

@@ -908,11 +908,15 @@ function buildNonTripOffer({ asked, validity, passengers, item, travelClass, ful
  * in zones, a multi-ride card), kept to the product tags or codes asked. The
  * wrong variants (nonTrip.applyVariants) are chosen by the first stop place.
  */
-function buildNonTripCollection(body, providerAsIs, nowMs) {
+function buildNonTripCollection(request, providerAsIs, nowMs) {
   if (!providerAsIs.nonTrip) throw bad('nonTripSearchCriteria: this provider sells offers for trips only');
+  const asked = nonTrip.nonTripAsked(request.nonTripSearchCriteria, providerAsIs);
+  // #1437: optional parameters this provider ignores, refuses or answers
+  // without offers, from its own stop place or zone.
+  const options = applyRequestOptions(request, [], providerAsIs, asked);
+  const { body } = options;
   const criteria = body.offerSearchCriteria;
   const provider = inCurrency(providerAsIs, criteria);
-  const asked = nonTrip.nonTripAsked(body.nonTripSearchCriteria, provider);
   const from = body.nonTripSearchCriteria.validFrom;
   const validity = from === undefined || from === null
     ? { ms: nowMs, offset: provider.utcOffset }
@@ -932,12 +936,14 @@ function buildNonTripCollection(body, providerAsIs, nowMs) {
       offerOf(replacements.itemOf(kind, provider), travelClass), kind, provider, `${provider.idPrefix}-FEE-${randomId()}`)))
     : classesAsked(criteria).flatMap((travelClass) => items.map((item) => offerOf(item, travelClass)));
   nonTrip.applyVariants(asked, built, provider);
-  const { offers, problems: productProblems } = selectProducts(criteria, built, { nonTrip: true });
+  const selected = selectProducts(criteria, built, { nonTrip: true });
+  const offers = options.noOffer ? [] : selected.offers;
+  const productProblems = selected.problems;
   const replacementOf = (offer) => replacements.KINDS.find((kind) => offer.products?.[0]?.productTags?.includes(kind)) || null;
   const remembered = offers.map((offer) => ({
     offer, trips: [], passengers, oneFulfillment: false, shortLivedMs: null, replacement: lost.length > 0 ? replacementOf(offer) : null,
   }));
-  const problems = [...problemsOf(passengers, built, false, new Set()), ...productProblems];
+  const problems = [...problemsOf(passengers, built, false, new Set()), ...productProblems, ...options.problems];
   const response = { anonymousPassengerSpecifications: passengers, offers };
   if (problems.length > 0) response.problems = problems;
   return { response, remembered, trips: [] };
