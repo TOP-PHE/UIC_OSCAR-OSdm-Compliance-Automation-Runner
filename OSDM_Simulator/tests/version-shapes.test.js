@@ -14,7 +14,7 @@
 const { test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { shapeAnswer } = require('../src/osdm/versionShapes');
-const { responseIssues } = require('./osdm-conformance');
+const { responseIssues, KNOWN_SPEC_DEFECTS } = require('./osdm-conformance');
 const { SECRETS, startSimulator, tokenFor, call, offerRequest, bookingRequest } = require('./helpers');
 
 const confirmed38 = () => ({
@@ -130,6 +130,24 @@ test('the checker itself: an answer of another version is refused, naming the me
   assert.deepEqual(responseIssues('3.8.0', 'POST', '/gamma/offers', 200, offers38), []);
   assert.deepEqual(responseIssues('3.6.0', 'POST', '/alpha/offers', 200, offers38), ['offers[0].inboundTripCoverage: not a member of Offer']);
   assert.equal(responseIssues('3.8.0', 'POST', '/gamma/oauth/token', 200, {}), null, 'not an OSDM operation: nothing to check');
+});
+
+test('the checker excuses OSDM 3.6.0\'s product tags defect, by its exact issue only (#1436)', () => {
+  const SCHEMAS = require('./fixtures/osdm-response-schemas.json');
+  // Still a defect of 3.6.0: the members it requires are not among its own.
+  const response36 = SCHEMAS.versions['3.6.0'].schemas.ProductTagsResponse;
+  assert.deepEqual(response36.required.filter((m) => !Object.hasOwn(response36.properties, m)), ['productTagGroupNames', 'productTagGroupings']);
+  assert.equal(response36.additionalProperties, false);
+  assert.deepEqual(KNOWN_SPEC_DEFECTS.map((d) => `${d.version} ${d.method} ${d.path}`), ['3.6.0 GET /product-tags']);
+  const text = { id: 'T', text: 'Pass' };
+  const answer = { productTagNames: [{ tag: 'ADMISSION_PASS', description: text }], productTagGroups: [{ code: 'G', description: text, productTags: ['ADMISSION_PASS'] }] };
+  assert.deepEqual(responseIssues('3.6.0', 'GET', '/alpha/product-tags', 200, answer), []);
+  assert.deepEqual(responseIssues('3.7.0', 'GET', '/beta/product-tags', 200, answer), []);
+  // Any other issue of that answer is still reported, in 3.6 too.
+  assert.deepEqual(responseIssues('3.6.0', 'GET', '/alpha/product-tags', 200, { productTagGroups: answer.productTagGroups }),
+    ['(body): missing productTagNames, productTagGroupNames, productTagGroupings']);
+  assert.deepEqual(responseIssues('3.6.0', 'GET', '/alpha/product-tags', 200, { ...answer, extra: 1 }), ['extra: not a member of ProductTagsResponse']);
+  assert.deepEqual(responseIssues('3.7.0', 'GET', '/beta/product-tags', 200, { productTagGroups: answer.productTagGroups }), ['(body): missing productTagNames']);
 });
 
 test('alpha (3.6) and beta (3.7) give the refund receipt in Booking.documents, scoped to the booking (#914)', async (t) => {

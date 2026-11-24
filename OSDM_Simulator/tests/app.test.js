@@ -228,6 +228,52 @@ test('products: gamma lists its named products in both classes and gives one by 
   assert.equal((await call(sim.base, token, 'GET', '/gamma/products/a/b')).status, 501, 'deeper product paths are not provided');
 });
 
+test('product tags: every product of GET /products names its search tag (#1436)', async () => {
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  const list = await call(sim.base, token, 'GET', '/gamma/products');
+  const tagOf = (id) => list.body.products.find((p) => p.id === id).productTags;
+  assert.deepEqual(tagOf('GAMMA-PRD-SIM_FLEXI_BASIC-SECOND'), ['ADMISSION_POINT2POINT']);
+  assert.deepEqual(tagOf('GAMMA-PRD-UPG-SIM_FLEXI_BASIC'), ['UPGRADE_POINT2POINT']);
+  assert.deepEqual(tagOf('GAMMA-PRD-RES-FULL_FLEXIBLE'), ['RESERVATION']);
+  assert.deepEqual(tagOf('GAMMA-PRD-SIM_SINGLE_RIDE-SECOND'), ['ADMISSION_POINT2POINT']);
+  assert.deepEqual(tagOf('GAMMA-PRD-SIM_DAY_PASS-FIRST'), ['ADMISSION_PASS']);
+  assert.deepEqual(tagOf('GAMMA-PRD-SIM_TEN_RIDES-SECOND'), ['ADMISSION_MULTI_RIDE']);
+  assert.deepEqual(tagOf('GAMMA-PRD-SIM_LOST_TICKET-SECOND'), ['TICKET_LOST']);
+  assert.deepEqual(tagOf('GAMMA-PRD-SIM_LOST_CARD-SECOND'), ['CARD_LOST']);
+  for (const p of list.body.products) assert.equal(p.productTags.length, 1, p.id);
+  const one = await call(sim.base, token, 'GET', '/gamma/products/GAMMA-PRD-SIM_DAY_PASS-SECOND');
+  assert.deepEqual(one.body.product.productTags, ['ADMISSION_PASS']);
+});
+
+test('product tags: every provider lists what it sells in three groups, plain its admissions with a trip (#1436)', async () => {
+  const all = Object.entries(SECRETS).filter(([key]) => key !== 'plain').map(([key, clients]) => [key, clients[0]]);
+  assert.equal(all.length, 6);
+  for (const [key, client] of all) {
+    const token = await tokenFor(sim.base, key, client);
+    const res = await call(sim.base, token, 'GET', `/${key}/product-tags`);
+    assert.equal(res.status, 200, key);
+    assert.deepEqual(res.body.productTagGroups.map((g) => [g.code, g.productTags]), [
+      ['WITHOUT_TRIP', ['ADMISSION_POINT2POINT', 'ADMISSION_PASS', 'ADMISSION_MULTI_RIDE']],
+      ['REPLACEMENT', ['TICKET_LOST', 'CARD_LOST']],
+      ['WITH_TRIP', ['ADMISSION_POINT2POINT', 'UPGRADE_POINT2POINT', 'RESERVATION']],
+    ], key);
+    // Each tag once, even when two groups hold it.
+    assert.deepEqual(res.body.productTagNames.map((n) => n.tag), ['ADMISSION_POINT2POINT', 'ADMISSION_PASS', 'ADMISSION_MULTI_RIDE',
+      'TICKET_LOST', 'CARD_LOST', 'UPGRADE_POINT2POINT', 'RESERVATION'], key);
+    for (const item of [...res.body.productTagNames, ...res.body.productTagGroups]) {
+      assert.ok(item.description.id && item.description.text && item.description.shortText, JSON.stringify(item));
+    }
+    assert.equal(new Set(res.body.productTagNames.map((n) => n.description.id)).size, 7, 'Text ids are unique');
+  }
+  const plain = await call(sim.base, await tokenFor(sim.base, 'plain', plainOne), 'GET', '/plain/product-tags');
+  assert.equal(plain.status, 200);
+  assert.deepEqual(plain.body.productTagGroups.map((g) => [g.code, g.productTags]), [['WITH_TRIP', ['ADMISSION_POINT2POINT']]]);
+  assert.deepEqual(plain.body.productTagNames.map((n) => n.tag), ['ADMISSION_POINT2POINT']);
+  const token = await tokenFor(sim.base, 'gamma', gammaOne);
+  assert.equal((await call(sim.base, token, 'POST', '/gamma/product-tags', {})).status, 405);
+  assert.equal((await call(sim.base, token, 'GET', '/gamma/product-tags/x')).status, 501, 'no deeper path');
+});
+
 test('reduction cards: the booking keeps the card on the passenger and on the admission (#597)', async () => {
   const token = await tokenFor(sim.base, 'gamma', gammaOne);
   const cards = [{ type: 'REDUCTION_CARD', code: 'SIM_STUDENT' }];

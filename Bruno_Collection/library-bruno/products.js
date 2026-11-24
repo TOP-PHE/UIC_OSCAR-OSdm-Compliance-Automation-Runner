@@ -16,6 +16,9 @@ http://www.apache.org/licenses/LICENSE-2.0
  * offered and stops. The booking, once fulfilled, must hold the product, and
  * each fulfillment must cover a part of it.
  *
+ * #1436: a sale asking product tags (product types) chooses an offer holding
+ * one when there is one, and the booking must hold a product of that tag.
+ *
  * Pure module: no Bruno globals. Unit-tested in
  * Oscar_Server/tests/unit/bruno-products.test.js.
  */
@@ -102,4 +105,61 @@ function checkBookingProduct(booking, wanted) {
   return checks;
 }
 
-module.exports = { matchingProducts, offersWithProduct, offeredProducts, checkBookingProduct };
+// ── #1436: a sale asking product tags ───────────────────────────────────────
+//
+// OSDM: "All product types can be used as Product Tags in the search"; the
+// other known tags only ask for something (CARD_LOST, TICKET_LOST: the
+// replacement of a lost item, checked by lostItems.js; SPLIT_RESERVATION: a
+// reservation that may be split). A product is of a tag by its `type` or its
+// `productTags` (which OSDM lets a provider leave out outside GET /products).
+
+const SEARCH_ONLY_TAGS = new Set(['CARD_LOST', 'TICKET_LOST', 'SPLIT_RESERVATION']);
+
+/**
+ * The product-type tags a request's offerSearchCriteria asks: its
+ * `productTags` and the tags of its `productSelections`, each once.
+ */
+function productTagsAsked(criteria) {
+  const tags = [
+    ...listOf(criteria?.productTags),
+    ...listOf(criteria?.productSelections).map((s) => s?.productTag),
+  ].map(text).filter((t) => t && !SEARCH_ONLY_TAGS.has(t));
+  return [...new Set(tags)];
+}
+
+const isOfTag = (product, tags) => tags.includes(text(product?.type))
+  || listOf(product?.productTags).some((t) => tags.includes(text(t)));
+
+/** The offers holding a product of one of the tags. */
+function offersWithTag(offers, tags) {
+  return listOf(offers).filter((offer) => productsOfOffer(offer).some((p) => isOfTag(p, tags)));
+}
+
+// "CODE (type, tags)" of a booked product, for a message.
+const productLabel = (p) => {
+  const said = [text(p?.type), ...listOf(p?.productTags).map(text)].filter(Boolean);
+  return `${text(p?.code) || text(p?.id) || '?'}${said.length > 0 ? ` (${[...new Set(said)].join(', ')})` : ''}`;
+};
+
+/**
+ * The check that a booking holds a product of the tags asked (maintainer,
+ * 2026-11-24: a booking of another product fails). A booking whose products
+ * name neither a type nor tags cannot be checked: `level: 'warn'`.
+ * @returns {{ name, ok, level?, message? } | null} null when no tag is asked.
+ */
+function checkBookingTag(booking, tags) {
+  if (listOf(tags).length === 0) return null;
+  const products = listOf(booking?.bookedOffers).flatMap((o) => listOf(o?.products)).filter((p) => p && typeof p === 'object');
+  const name = `Booking: a booked offer holds a product of the tag asked (${tags.join(', ')})`;
+  const named = products.filter((p) => text(p.type) || listOf(p.productTags).length > 0);
+  if (named.length === 0) {
+    return { name, ok: false, level: 'warn', message: `cannot be checked: the booked products [${products.map(productLabel).join(', ') || 'none'}] name no type and no product tag` };
+  }
+  const ok = named.some((p) => isOfTag(p, tags));
+  return { name, ok, message: ok ? undefined : `booked products: [${products.map(productLabel).join(', ')}]` };
+}
+
+module.exports = {
+  matchingProducts, offersWithProduct, offeredProducts, checkBookingProduct,
+  SEARCH_ONLY_TAGS, productTagsAsked, offersWithTag, checkBookingTag,
+};

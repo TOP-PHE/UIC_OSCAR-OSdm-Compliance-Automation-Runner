@@ -1409,6 +1409,46 @@
         "trip": "NON_TRIP",
         "passengers": 1
       }
+    },
+    {
+      "code": "OTST_NONTRIP_SALE_SINGLE_RIDE_BY_TAG_1ADT",
+      "source": "SIM_NONTRIP_SALE_TAG_SINGLE_RIDE_1ADT_38",
+      "checks": 245,
+      "purpose": "Sale without a trip of a product asked by its product tag (#1436): one adult, a single ride asked by offerSearchCriteria.productTags ADMISSION_POINT2POINT between two stop places. The offer chosen is one holding a product of that tag (by its type or productTags); fails when the booking holds no product of the tag. Booked, passenger details updated, fulfilled.",
+      "capability": "sale.products",
+      "needs": {
+        "trip": "NON_TRIP",
+        "tariff": "NON_FLEXIBLE",
+        "passengers": 1,
+        "providerValues": [
+          "nonTripPlaces"
+        ]
+      }
+    },
+    {
+      "code": "OTST_NONTRIP_SALE_PASS_BY_TAG_1ADT",
+      "source": "SIM_NONTRIP_SALE_TAG_PASS_1ADT_38",
+      "checks": 287,
+      "purpose": "Sale without a trip of a product asked by its product tag (#1436): one adult, a pass asked by offerSearchCriteria.productTags ADMISSION_PASS in the first zone of GET /zones. The offer chosen is one holding a product of that tag (by its type or productTags); fails when the booking holds no product of the tag. Booked, passenger details updated, fulfilled.",
+      "capability": "sale.products",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_NONTRIP_SALE_MULTI_RIDE_BY_TAG_1ADT",
+      "source": "SIM_NONTRIP_SALE_TAG_MULTI_RIDE_1ADT_38",
+      "checks": 245,
+      "purpose": "Sale without a trip of a product asked by its product tag (#1436): one adult, a multi-ride card asked by offerSearchCriteria.productTags ADMISSION_MULTI_RIDE between two stop places. The offer chosen is one holding a product of that tag (by its type or productTags); fails when the booking holds no product of the tag. Booked, passenger details updated, fulfilled.",
+      "capability": "sale.products",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1,
+        "providerValues": [
+          "nonTripPlaces"
+        ]
+      }
     }
   ]
 }

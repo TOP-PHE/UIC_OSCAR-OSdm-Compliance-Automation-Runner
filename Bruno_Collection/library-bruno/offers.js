@@ -562,6 +562,24 @@ function validateSelectedOfferAdmission(selOffer, scenarioTypeStr, overallFlexib
   if (scenarioTypeStr?.includes("REFUND")) validateField("refundable", "refundable");
 }
 
+/**
+ * #1436: the offers holding a product of the product-type tags the scenario's
+ * offer search criteria ask (products.js), or null when it asks none. Says in
+ * the log which offers the choice is made among.
+ */
+function offersOfTagAsked(offers) {
+  const { productTagsAsked, offersWithTag } = require('./products.js');
+  const tags = productTagsAsked(parseEnvJson("offerSearchCriteria", null));
+  if (tags.length === 0) return null;
+  const holding = offersWithTag(offers, tags);
+  if (holding.length > 0) {
+    validationLogger(`[INFO] 🏷️ Offer: chosen among the ${holding.length} offer(s) holding a product of the tag asked (${tags.join(", ")}).`);
+  } else {
+    validationLogger(`[INFO] 🏷️ Offer: no offer holds a product of the tag asked (${tags.join(", ")}); the offer is chosen as without it.`);
+  }
+  return holding;
+}
+
 function selectAndSetOffer(jsonData) {
   validationLogger("[DEBUG] ➤ selectAndSetOffer");
 
@@ -651,6 +669,12 @@ function selectAndSetOffer(jsonData) {
     }
   }
 
+  // #1436: a sale asking product tags (product types) takes an offer holding
+  // one when an offer does. When none does, the checks after 01 say so and the
+  // booking is held to the tag at 07 (checkBookingTag).
+  const tagHolding = offersOfTagAsked(filteredOffers);
+  if (tagHolding?.length > 0) filteredOffers = tagHolding;
+
   // #600: the class the scenario expects on each leg. #762: no offer giving
   // them is a warning, not a failure: a provider answers with what it has,
   // and selling that offer or not is the retailer's choice. The sale goes on
@@ -681,7 +705,8 @@ function selectAndSetOffer(jsonData) {
   }
 
   // Select the first matching offer or default to the first offer
-  const selectedOffer = filteredOffers[0] || onSearchTrip[0] || jsonData.offers[0];
+  // #1436: an offer of the tag asked before any other, when the flexibility left none.
+  const selectedOffer = filteredOffers[0] || tagHolding?.[0] || onSearchTrip[0] || jsonData.offers[0];
 
   validationLogger(`[DEBUG] Selected Offer ID: ${selectedOffer.offerId}`);
   // Per-part summary first, so a certifier reading the log can tell at a glance

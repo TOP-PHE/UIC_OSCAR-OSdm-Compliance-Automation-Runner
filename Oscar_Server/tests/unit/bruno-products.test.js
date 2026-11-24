@@ -151,7 +151,87 @@ describe('the fulfilled booking holds the product', () => {
   });
 });
 
+describe('#1436: a sale asking product tags', () => {
+  const pass = product('DAY_PASS', 'Day pass', { type: 'ADMISSION_PASS', flexibility: 'SEMI_FLEXIBLE' });
+  const ride = product('SINGLE', 'Single ride', { type: 'ADMISSION_POINT2POINT', flexibility: 'NON_FLEXIBLE' });
+  const tagged = product('TEN', 'Ten rides', { type: 'OTHER', productTags: ['ADMISSION_MULTI_RIDE'] });
+  const nonTrip = [offer('R1', ride, 'NON_FLEXIBLE'), offer('P1', pass, 'SEMI_FLEXIBLE'), offer('T1', tagged)];
+  const select = (list = nonTrip) => withBrunoExpect(() => offers.selectAndSetOffer({ offers: list, trips: [] }));
+
+  test('the tags asked: productTags and the tags of productSelections, product types only, each once', () => {
+    expect(products.productTagsAsked({ productTags: ['ADMISSION_PASS', ' ADMISSION_PASS '], productSelections: [{ productTag: 'ADMISSION_MULTI_RIDE' }, { productCode: 'X' }] }))
+      .toEqual(['ADMISSION_PASS', 'ADMISSION_MULTI_RIDE']);
+    expect(products.productTagsAsked({ productTags: ['TICKET_LOST', 'CARD_LOST', 'SPLIT_RESERVATION'] })).toEqual([]);
+    expect(products.productTagsAsked({ productTags: 'ADMISSION_PASS' })).toEqual([]);
+    expect(products.productTagsAsked(null)).toEqual([]);
+  });
+
+  test('an offer is of a tag by its product type or its productTags', () => {
+    expect(products.offersWithTag(nonTrip, ['ADMISSION_PASS']).map((o) => o.offerId)).toEqual(['P1']);
+    expect(products.offersWithTag(nonTrip, ['ADMISSION_MULTI_RIDE']).map((o) => o.offerId)).toEqual(['T1']);
+    expect(products.offersWithTag(nonTrip, ['UPGRADE_PASS'])).toEqual([]);
+  });
+
+  test('the offer chosen holds the tag asked, before the first offer', () => {
+    envStore.offerSearchCriteria = JSON.stringify({ productTags: ['ADMISSION_PASS'] });
+    select();
+    expect(envStore.offerId).toBe('P1');
+    envStore = { offerSearchCriteria: JSON.stringify({ productSelections: [{ productTag: 'ADMISSION_MULTI_RIDE', numberOfItems: 1 }] }) };
+    select();
+    expect(envStore.offerId).toBe('T1');
+  });
+
+  test('a flexibility that leaves no offer of the tag falls back to an offer of the tag', () => {
+    envStore.offerSearchCriteria = JSON.stringify({ productTags: ['ADMISSION_PASS'] });
+    envStore.desiredFlexibility = 'FULL_FLEXIBLE';
+    select();
+    expect(envStore.offerId).toBe('P1');
+  });
+
+  test('no offer of the tag, or no tag asked: chosen as before; a lost-item tag changes nothing', () => {
+    envStore.offerSearchCriteria = JSON.stringify({ productTags: ['UPGRADE_PASS'] });
+    select();
+    expect(envStore.offerId).toBe('R1');
+    envStore = { offerSearchCriteria: JSON.stringify({ productTags: ['TICKET_LOST'] }) };
+    select();
+    expect(envStore.offerId).toBe('R1');
+    envStore = {};
+    select();
+    expect(envStore.offerId).toBe('R1');
+  });
+
+  const booked = (...prds) => ({ bookedOffers: [{ products: prds }] });
+
+  test('the booking holds a product of the tag asked: passes; another product fails, naming what was booked', () => {
+    expect(products.checkBookingTag(booked(pass), ['ADMISSION_PASS'])).toEqual({ name: 'Booking: a booked offer holds a product of the tag asked (ADMISSION_PASS)', ok: true, message: undefined });
+    expect(products.checkBookingTag(booked(tagged), ['ADMISSION_MULTI_RIDE']).ok).toBe(true);
+    expect(products.checkBookingTag(booked(ride), ['ADMISSION_PASS'])).toEqual({
+      name: 'Booking: a booked offer holds a product of the tag asked (ADMISSION_PASS)', ok: false,
+      message: 'booked products: [SINGLE (ADMISSION_POINT2POINT)]',
+    });
+  });
+
+  test('booked products naming neither a type nor tags cannot be checked: a warning', () => {
+    const check = products.checkBookingTag(booked(basic), ['ADMISSION_PASS']);
+    expect(check).toMatchObject({ ok: false, level: 'warn' });
+    expect(check.message).toBe('cannot be checked: the booked products [FLEXI_BASIC] name no type and no product tag');
+    expect(products.checkBookingTag({}, ['ADMISSION_PASS'])).toMatchObject({ level: 'warn' });
+  });
+
+  test('no tag asked: no check', () => {
+    expect(products.checkBookingTag(booked(pass), [])).toBeNull();
+  });
+});
+
 describe('the steps and the parser', () => {
+  test('#1436: 07 holds the booking to the tags asked, from the criteria the parser kept', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const step = fs.readFileSync(path.join(__dirname, '..', '..', '..', 'Bruno_Collection', '02-Common Requests', '07. GET Booking after Fulfillments.yml'), 'utf8');
+    expect(step).toMatch(/checkBookingTag\(\(jsonData && jsonData\.booking\) \|\| jsonData, productTagsAsked\(_asked\)\)/);
+    expect(step).toMatch(/bru\.getEnvVar\("offerSearchCriteria"\)/);
+  });
+
   test('01 and 01b stop on __productNotOffered; 07 checks the booking; both reset lists name the variables', () => {
     const fs = require('node:fs');
     const path = require('node:path');
