@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 /**
  * backup-status.test.js — #572: the disaster-recovery status.
@@ -237,7 +238,7 @@ describe('the host scripts write it', () => {
 });
 
 describe('the Admin Dashboard panel', () => {
-  const html = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'admin-dashboard.html'), 'utf8');
+  const html = pageSource(path.join(__dirname, '..', '..', 'public', 'admin-dashboard.html'), 'utf8');
   // The page's inline script that draws the panel: the text between the
   // opening tag before the #572 marker and the closing tag after it.
   const marker = html.indexOf('// #572');

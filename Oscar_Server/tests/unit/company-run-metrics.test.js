@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 // #1017: runs and their requests by company or provider, for Prometheus, and
 // the OSCAR · Overview row that reads them. Never a user in a label.
@@ -97,7 +98,7 @@ describe('OSCAR · Overview', () => {
 });
 
 describe('Admin → Server Activity', () => {
-  const html = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'admin.html'), 'utf8');
+  const html = pageSource(path.join(__dirname, '..', '..', 'public', 'admin.html'), 'utf8');
   const lines = html.split('\n');
   const start = lines.findIndex((l) => l.startsWith('function runsInProgressRows('));
   const end = lines.findIndex((l, i) => i > start && l === '}');

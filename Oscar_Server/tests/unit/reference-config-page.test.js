@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 /**
  * reference-config-page.test.js — #838 PR 2: what Test Config's
@@ -22,7 +23,7 @@ const { esc } = require('../../public/js/esc');
 const PUBLIC_DIR = path.resolve(__dirname, '../../public');
 
 function lift(rel, name, context) {
-  const lines = fs.readFileSync(path.join(PUBLIC_DIR, rel), 'utf8').replaceAll('\r\n', '\n').split('\n');
+  const lines = pageSource(path.join(PUBLIC_DIR, rel), 'utf8').replaceAll('\r\n', '\n').split('\n');
   const start = lines.findIndex(l => l.startsWith(`function ${name}(`));
   if (start < 0) throw new Error(`${name} not found in ${rel}`);
   const end = lines.findIndex((l, i) => i > start && l === '}');

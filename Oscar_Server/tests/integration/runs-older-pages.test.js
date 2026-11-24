@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 // The dashboard's "Show older batches": GET /v1/runs reads on after the last
 // run of the page before (before_at + before_id, from next_before), so a large
@@ -124,7 +125,7 @@ describe('GET /v1/runs: the page after another', () => {
 });
 
 describe('the dashboard page', () => {
-  const page = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'dashboard.html'), 'utf8');
+  const page = pageSource(path.join(__dirname, '..', '..', 'public', 'dashboard.html'), 'utf8');
   function loadFunction(name) {
     const lines = page.split('\n');
     const start = lines.findIndex(l => l.startsWith(`function ${name}(`));

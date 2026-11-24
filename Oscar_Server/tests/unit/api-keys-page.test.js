@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 /**
  * api-keys-page.test.js — #503: what the API keys page draws. The pure
@@ -19,7 +20,7 @@ const vm = require('node:vm');
 const { esc } = require('../../public/js/esc');
 
 const PUBLIC_DIR = path.resolve(__dirname, '../../public');
-const read = rel => fs.readFileSync(path.join(PUBLIC_DIR, rel), 'utf8').replaceAll('\r\n', '\n');
+const read = rel => pageSource(path.join(PUBLIC_DIR, rel), 'utf8').replaceAll('\r\n', '\n');
 
 function lift(name, context) {
   const lines = read('js/api-keys.js').split('\n');
@@ -81,5 +82,5 @@ test('the menu offers the page to Test Managers only, and the page loads its scr
   expect(nav.match(/api-keys\.html/g)).toHaveLength(1);
   const page = read('api-keys.html');
   expect(page).toContain('<script src="/js/api-keys.js"></script>');
-  expect(page).toContain("renderOscarNav('oscar-nav', 'api-keys')");
+  expect(page).toContain('id="oscar-nav" data-page="api-keys"');   // drawn by nav.js (#1423)
 });

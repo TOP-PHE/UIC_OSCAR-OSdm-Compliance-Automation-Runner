@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 /**
  * waiting-runs-ceiling.test.js — #1369: a ceiling on the runs one person or
@@ -107,7 +108,7 @@ describe('the ceiling', () => {
     expect(admin).toMatch(/MAX_WAITING_RUNS_PER_ACCOUNT: \{[^}]*type: 'number', default: 5000, min: 100, max: 100000 \}/);
     const launch = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'api', 'helpers', 'runLaunch.js'), 'utf8');
     expect(launch).toContain("getConfig('MAX_WAITING_RUNS_PER_ACCOUNT', '5000')");
-    const page = fs.readFileSync(path.join(__dirname, '..', '..', 'public', 'admin.html'), 'utf8');
+    const page = pageSource(path.join(__dirname, '..', '..', 'public', 'admin.html'), 'utf8');
     expect(page).toContain("MAX_WAITING_RUNS_PER_ACCOUNT: 'Max Waiting Runs per Account'");
   });
 

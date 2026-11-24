@@ -107,9 +107,11 @@ describe('the limits a new function is held to', () => {
   // What was over the limits when they were set. **These numbers only go
   // down**: lower them with the record (`npm run lint:baseline`) when a
   // function is brought under a limit. Raising one says, in this diff, that a
-  // function over a limit was let in on purpose.
+  // function over a limit was let in on purpose. 101 and 16 became 116 and
+  // 18 with #1423: the pages' scripts moved into public/js/<page>.js, where
+  // ESLint reads them for the first time (15 and 2 functions that were there).
   test.each([
-    ['eslint-suppressions.json', 101, 16],
+    ['eslint-suppressions.json', 116, 18],
     ['eslint-library-suppressions.json', 78, 20],
   ])('%s records no more than what was there', (name, complexity, lines) => {
     const record = recorded(name);

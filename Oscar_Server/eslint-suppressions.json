@@ -1,4 +1,9 @@
 {
+  "public/js/admin.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
   "public/js/ai-analysis.js": {
     "complexity": {
       "count": 2
@@ -9,12 +14,43 @@
       "count": 2
     }
   },
+  "public/js/dashboard.js": {
+    "complexity": {
+      "count": 2
+    }
+  },
   "public/js/findings.js": {
     "complexity": {
       "count": 3
     }
   },
+  "public/js/providers.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
   "public/js/reference-config.js": {
+    "complexity": {
+      "count": 1
+    }
+  },
+  "public/js/report-builder.js": {
+    "complexity": {
+      "count": 5
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "public/js/run-detail.js": {
+    "complexity": {
+      "count": 5
+    },
+    "max-lines-per-function": {
+      "count": 1
+    }
+  },
+  "public/js/run.js": {
     "complexity": {
       "count": 1
     }

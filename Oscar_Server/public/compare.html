@@ -65,10 +65,9 @@ h2{color:#0090D4;font-size:20px;margin-bottom:18px}
 <body>
 <header class="uic-banner">
   <script src="/js/banner.js"></script>
-  <div class="uic-banner-nav" id="oscar-nav"></div>
+  <div class="uic-banner-nav" id="oscar-nav" data-page="compare"></div>
   <script src="/js/esc.js"></script>
   <script src="/nav.js"></script>
-  <script>renderOscarNav('oscar-nav', 'compare');</script>
 </header>
 
 <div class="container">
@@ -76,133 +75,7 @@ h2{color:#0090D4;font-size:20px;margin-bottom:18px}
   <div id="main"><div class="loading">⏳ Computing diff...</div></div>
 </div>
 
-<script>
-const token = localStorage.getItem('oscar_token') || '';
-if (!localStorage.getItem('oscar_user')) window.location.href = '/';
-const company = JSON.parse(localStorage.getItem('oscar_company') || '{}');
-const user = JSON.parse(localStorage.getItem('oscar_user') || '{}');
-// logout() provided by nav.js
-
-const params = new URLSearchParams(location.search);
-const runAId = params.get('a');
-const runBId = params.get('b');
-if (!runAId || !runBId) window.location.href = '/dashboard.html';
-
-let allItems  = [];
-let activeFilter = 'ALL';
-
-const LABELS = {
-  PASSED_TO_FAILED: '❌ Passed → Failed',
-  FAILED_TO_PASSED: '✅ Failed → Passed',
-  ADDED:            '➕ Added',
-  REMOVED:          '➖ Removed',
-  UNCHANGED_FAIL:   '⬜ Unchanged (Fail)',
-  UNCHANGED_PASS:   '✔ Unchanged (Pass)'
-};
-
-// v1.11.7 — parseServerTs (nav.js) handles SQLite's TZ-less UTC strings.
-function fmtDate(d) { return d ? parseServerTs(d).toLocaleString() : '-'; }
-
-function renderDiff(data) {
-  const s = data.summary;
-  document.getElementById('main').innerHTML = `
-    <div class="run-cards">
-      <div class="run-card">
-        <h4>Run A (baseline)</h4>
-        <div class="url">${esc(data.run_a.api_base || '-')}</div>
-        <div style="color:#90a4ae;font-size:12px;margin-top:4px">${fmtDate(data.run_a.queued_at)}</div>
-      </div>
-      <div style="display:flex;align-items:center;font-size:22px;color:#90a4ae;padding-top:8px">→</div>
-      <div class="run-card">
-        <h4>Run B (latest)</h4>
-        <div class="url">${esc(data.run_b.api_base || '-')}</div>
-        <div style="color:#90a4ae;font-size:12px;margin-top:4px">${fmtDate(data.run_b.queued_at)}</div>
-      </div>
-    </div>
-
-    <div class="summary">
-      <div class="tile tile-p2f"><div class="n">${s.passed_to_failed}</div><div class="l">Passed → Failed</div></div>
-      <div class="tile tile-f2p"><div class="n">${s.failed_to_passed}</div><div class="l">Failed → Passed</div></div>
-      <div class="tile tile-add"><div class="n">${s.added}</div><div class="l">Added</div></div>
-      <div class="tile tile-rem"><div class="n">${s.removed}</div><div class="l">Removed</div></div>
-      <div class="tile tile-uf" ><div class="n">${s.unchanged_fail}</div><div class="l">Unchanged Fail</div></div>
-      <div class="tile tile-up" ><div class="n">${s.unchanged_pass}</div><div class="l">Unchanged Pass</div></div>
-    </div>
-
-    <div class="filter-bar">
-      <span style="font-size:12px;color:#546e7a;font-weight:700">Filter:</span>
-      ${['ALL','PASSED_TO_FAILED','FAILED_TO_PASSED','ADDED','REMOVED','UNCHANGED_FAIL','UNCHANGED_PASS'].map(f =>
-        `<button class="filter-btn fb-${f} ${f==='ALL'?'active':''}" data-filter="${f}" id="fb-${f}">
-          ${f === 'ALL' ? `All (${s.total})` : LABELS[f]}
-        </button>`
-      ).join('')}
-    </div>
-
-    <div id="diff-list"></div>
-  `;
-
-  allItems = data.items || [];
-  renderItems();
-}
-
-function setFilter(f) {
-  activeFilter = f;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById(`fb-${f}`).classList.add('active');
-  renderItems();
-}
-
-// The error line of a comparison item: run B's error, or run A's when the
-// item was removed.
-function diffErrorHtml(item) {
-  if (item.run_b?.error) return `<div class="diff-error">${esc(item.run_b.error)}</div>`;
-  if (item.run_a?.error && item.category === 'REMOVED') return `<div class="diff-error">${esc(item.run_a.error)}</div>`;
-  return '';
-}
-
-function renderItems() {
-  const filtered = activeFilter === 'ALL' ? allItems : allItems.filter(i => i.category === activeFilter);
-  const el = document.getElementById('diff-list');
-  if (!filtered.length) { el.innerHTML = '<div class="empty">No items match this filter.</div>'; return; }
-  el.innerHTML = filtered.map(item => {
-    const error = diffErrorHtml(item);
-    return `<div class="diff-item">
-      <div class="diff-header">
-        <span class="cat-badge cat-${item.category}">${LABELS[item.category] || item.category}</span>
-        <div class="diff-path">
-          <div class="suite">${esc(item.suite)} › ${esc(item.request)}</div>
-          <div style="margin-top:2px">${esc(item.assertion)}</div>
-        </div>
-      </div>
-      ${error}
-    </div>`;
-  }).join('');
-}
-
-// S11: the one shared escaper (js/esc.js). Was {&,<,>}-only; now also " and '.
-const esc = window.esc;
-
-async function loadComparison() {
-  const res = await fetch('/v1/reports/compare', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ run_a_id: runAId, run_b_id: runBId })
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    document.getElementById('main').innerHTML = `<div class="empty">⚠️ ${esc(data.detail || data.title || 'Failed to compute comparison.')}</div>`;
-    return;
-  }
-  renderDiff(data);
-}
-
-document.getElementById('main').addEventListener('click', function(e) {
-  const btn = e.target.closest('[data-filter]');
-  if (btn) setFilter(btn.dataset.filter);
-});
-
-loadComparison();
-</script>
+<script src="/js/compare.js"></script>
 <footer class="site-footer">
   <div style="margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap">
     <img src="/trackonpath-logo.png" alt="TrackOnPath" style="height:36px;background:#fff;border-radius:6px;padding:4px 10px;vertical-align:middle;opacity:.95">

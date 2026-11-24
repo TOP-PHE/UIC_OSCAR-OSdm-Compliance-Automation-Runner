@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 /**
  * ui-scripts.test.js — the scripts under Oscar_Server/public, without a browser.
@@ -30,7 +31,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const PUBLIC_DIR = path.resolve(__dirname, '..', '..', 'public');
-const read = (rel) => fs.readFileSync(path.join(PUBLIC_DIR, rel), 'utf8').replaceAll('\r\n', '\n');
+const read = (rel) => pageSource(path.join(PUBLIC_DIR, rel), 'utf8').replaceAll('\r\n', '\n');
 
 // Walks the page the way the HTML parser does, as dashboard-pages.test.js does:
 // a script element ends at the first "</script" followed by whitespace, "/" or ">".

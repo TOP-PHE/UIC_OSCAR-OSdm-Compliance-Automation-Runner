@@ -1,4 +1,5 @@
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 // #901 PR 2: the page helpers that share runs with the company operating a
 // provider, and show the runs shared with one's own company. No DOM harness
@@ -10,7 +11,7 @@ const path = require('path');
 const vm = require('vm');
 
 const PUBLIC_DIR = path.join(__dirname, '..', '..', 'public');
-const read = (rel) => fs.readFileSync(path.join(PUBLIC_DIR, rel), 'utf8');
+const read = (rel) => pageSource(path.join(PUBLIC_DIR, rel), 'utf8');
 
 function loadFunction(rel, name, context = {}) {
   const lines = read(rel).split('\n');

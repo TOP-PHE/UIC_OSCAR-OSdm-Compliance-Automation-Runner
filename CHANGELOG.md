@@ -654,6 +654,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.582] — 2026-11-24
+
+**The pages carry no script of their own** (#1423, PR 1 of 2; maintainer's choice, 2026-11-24: scripts in files rather than hashes or nonces). Not released on its own: listed in `compatibility.json` (2026.623) without moving `current_release`. Collection unchanged at OTST_V2.0.270. Nothing changes for a user.
+
+- **Before:** the content security policy's `script-src` allowed `'unsafe-inline'` because every page carried its scripts inline: 21 pages, 32 blocks, about 8,200 lines.
+- **The code of 14 pages moved, unchanged,** into `public/js/<page>.js`: admin, admin-dashboard, compare, dashboard, forgot-password, index, profile, providers, report-builder, reset-password, run, run-detail, verify-email, welcome. Each file is loaded by a `<script src>` where the inline block stood, so it runs at the same moment as before; the Admin Dashboard's two blocks, next to each other, are one file.
+- **The other line was the menu:** `renderOscarNav('oscar-nav', '<page>')` after `nav.js`, in 17 pages. The menu's element now names the page (`data-page`), and `nav.js` draws it at its end, where the call stood. The administration page names its tab (`data-page="admin-" data-page-tab="users"`).
+- **Proved byte for byte** against `main`: each file is a header plus the page's former blocks (blank lines before and spaces after a block aside), and each page is the same but for its inline scripts, the one tag and the menu's attributes. The check was shown to see a change of one character in a file and in a page. The script was not committed: the PR says how it was run.
+- **Checked in a browser** on a server of this branch **with the policy of PR 2** (`script-src 'self'`): the 21 pages, as a Test Manager and as an administrator, each drawing its menu with the right entry and its content, no script refused or failing. An injected inline script and a `javascript:` link did not run.
+- **ESLint now reads that code**: the names each file uses from `nav.js`, `esc.js` or `run-exit.js` are declared in a `/* global */` line (all defined by a script the page loads first: no undefined name was found). The 15 functions over the complexity limit and 2 over the length limit were there before: recorded in `eslint-suppressions.json`, and `lint-config.test.js`'s totals go from 101 and 16 to 116 and 18.
+- **Tests:** `tests/helpers/page-source.js` `pageSource()` reads a page with its own script put back where its tag stands, so the 21 tests that lift functions out of a page's text read the same code as before. New `page-scripts.test.js`: no page holds an inline script, an inline event handler or a `javascript:` address; every script a page loads exists; every page that loads `nav.js` names its entry before it; `nav.js` draws the entry and the admin tab.
+- `style-src` keeps `'unsafe-inline'`: the pages hold 442 `style` attributes, and a style runs no code.
+
+---
+
 ## [server-1.11.581] — 2026-11-24
 
 **The sign-in is locked per e-mail address after ten wrong passwords** (#1421; maintainer's rules, 2026-11-24). Not released on its own: listed in `compatibility.json` (2026.622) without moving `current_release`. Collection unchanged at OTST_V2.0.270.

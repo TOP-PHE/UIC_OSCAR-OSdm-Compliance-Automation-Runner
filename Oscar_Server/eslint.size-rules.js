@@ -10,7 +10,8 @@
  *   comments not counted.
  *
  * The code had 189 functions over the first and 45 over the second when the
- * limits were set (November 2026). Those are recorded, file by file, in
+ * limits were set (November 2026), and the pages' scripts brought 15 and 2
+ * more when they moved out of the HTML pages into files ESLint reads (#1423). Those are recorded, file by file, in
  * eslint-suppressions.json (the server and the pages) and
  * eslint-library-suppressions.json (the library): ESLint's own baseline. A
  * file may hold as many functions over a limit as its record says, and no

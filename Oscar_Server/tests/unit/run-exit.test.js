@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 // #1287: a run Bruno ends with a code other than 0 or 1 is not a test result.
 
@@ -20,7 +21,7 @@ const BRUNO_CONSTANTS = path.join(__dirname, '..', '..', 'bruno-cli', 'node_modu
 
 // A top-level function of the page, as ui-scripts.test.js lifts one.
 function pageFunction(name, context) {
-  const lines = fs.readFileSync(PAGE, 'utf8').split('\n');
+  const lines = pageSource(PAGE, 'utf8').split('\n');
   const start = lines.findIndex((l) => l.startsWith(`function ${name}(`));
   const end = lines.findIndex((l, i) => i > start && l === '}');
   if (start === -1 || end === -1) throw new Error(`run-detail.html: no top-level function ${name}`);

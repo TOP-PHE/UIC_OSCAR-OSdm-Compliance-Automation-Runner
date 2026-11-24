@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 /**
  * The pages say an intrusion attempt was met, as text: the run page's red
@@ -17,7 +18,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const PUBLIC_DIR = path.join(__dirname, '../../public');
-const read = rel => fs.readFileSync(path.join(PUBLIC_DIR, rel), 'utf8');
+const read = rel => pageSource(path.join(PUBLIC_DIR, rel), 'utf8');
 
 function loadFunction(rel, name, context = {}) {
   const lines = read(rel).split('\n');

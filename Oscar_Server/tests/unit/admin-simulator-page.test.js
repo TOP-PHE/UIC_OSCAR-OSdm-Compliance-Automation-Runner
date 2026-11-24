@@ -6,6 +6,7 @@
 //        http://www.apache.org/licenses/LICENSE-2.0
 
 'use strict';
+const { pageSource } = require('../helpers/page-source');
 
 /**
  * admin-simulator-page.test.js — #930 PR 2: what the OSDM Simulator page
@@ -18,7 +19,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const PUBLIC_DIR = path.resolve(__dirname, '../../public');
-const read = rel => fs.readFileSync(path.join(PUBLIC_DIR, rel), 'utf8').replaceAll('\r\n', '\n');
+const read = rel => pageSource(path.join(PUBLIC_DIR, rel), 'utf8').replaceAll('\r\n', '\n');
 const SOURCE = read('js/admin-simulator.js');
 
 function lift(name, context) {
@@ -188,7 +189,7 @@ test('the menu offers the page to administrators, and the page loads its script 
   expect(adminBlock).toContain("{ href: '/admin-simulator.html',     label: 'OSDM Simulator',   page: 'admin-simulator' }");
   const html = read('admin-simulator.html');
   expect(html.indexOf('/nav.js')).toBeLessThan(html.indexOf('/js/admin-simulator.js'));
-  expect(html).toContain("renderOscarNav('oscar-nav', 'admin-simulator')");
+  expect(html).toContain('id="oscar-nav" data-page="admin-simulator"');   // drawn by nav.js (#1423)
 });
 
 test('the page never keeps the key: the key field is cleared after a save and never filled from an answer', () => {

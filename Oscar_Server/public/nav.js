@@ -531,3 +531,18 @@ function oscarToastAfterNav(message, kind) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showPending);
   else showPending();
 })();
+
+// ── The page's own menu entry (#1423) ─────────────────────────────────────────
+// A page names its entry on the menu's element (data-page) instead of calling
+// renderOscarNav() from a script of its own: the content security policy
+// refuses inline scripts. Drawn here, at the end of nav.js, which is where the
+// page's call stood. The administration page's entry is its tab:
+// data-page-tab gives the tab when the address names none.
+(function () {
+  var host = document.getElementById('oscar-nav');
+  if (!host || !host.dataset.page) return;
+  var tab = host.dataset.pageTab
+    ? (new URLSearchParams(location.search).get('tab') || host.dataset.pageTab)
+    : '';
+  window.renderOscarNav('oscar-nav', host.dataset.page + tab);
+})();
