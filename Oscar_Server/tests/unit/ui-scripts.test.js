@@ -889,7 +889,7 @@ describe('pages — helpers taken out of nested conditionals (#527)', () => {
     test('a read-only setting is drawn as a field that cannot be typed in', () => {
       const row = page.slice(page.indexOf('if (cfg.read_only) {'), page.indexOf('} else if (isEnum) {'));
       expect(row).toContain('readonly');
-      expect(row).toContain('id="${esc(fieldId)}"');
+      expect(row).toContain('id="$' + '{esc(fieldId)}"');   // the page's template text
       expect(row).toContain('esc(cfg.value');
     });
 

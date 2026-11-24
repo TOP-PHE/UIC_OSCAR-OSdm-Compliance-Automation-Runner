@@ -122,10 +122,11 @@ describe('values traced to innerHTML (#1423)', () => {
   test('admin: user and company ids reach the page through esc()', () => {
     const src = read('admin.html');
     expect(src).not.toMatch(/\$\{(u|c)\.id\}/);
-    expect(src).toContain('data-user-id="${esc(u.id)}"');
+    // '$' + '{…}': the page's own template text, not one of this file's.
+    expect(src).toContain('data-user-id="$' + '{esc(u.id)}"');
   });
 
   test('welcome: the name taken from the stored e-mail goes through esc()', () => {
-    expect(read('welcome.html')).toContain('heading.innerHTML = `Welcome, ${esc(displayName)}! ${pill}`;');
+    expect(read('welcome.html')).toContain('heading.innerHTML = `Welcome, $' + '{esc(displayName)}! $' + '{pill}`;');
   });
 });
