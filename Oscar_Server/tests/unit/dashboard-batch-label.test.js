@@ -14,7 +14,6 @@ const { pageSource } = require('../helpers/page-source');
  * dashboard.html, draws the server's own words.
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { esc } = require('../../public/js/esc');

@@ -14,7 +14,6 @@ const { pageSource } = require('../helpers/page-source');
  * text, as api-keys-page.test.js does, and the menu entry is checked in nav.js.
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { esc } = require('../../public/js/esc');

@@ -1298,11 +1298,16 @@ function renderJsonNode(value, key, root) {
     + '</div>';
 }
 
+// The four tabs renderHttpDetail() draws: switchHttpTab() takes no other.
+var HTTP_TAB_KINDS = ['response', 'request', 'resHeaders', 'reqHeaders'];
+
 function switchHttpTab(tabEl) {
-  // Kept as getAttribute on purpose: this value is the source of the open
-  // code-scanning alert on the innerHTML below, and rewriting the read could
-  // make the alert disappear without the flow being fixed.
+  // The tab's name comes from the page and reaches the innerHTML below
+  // through renderHttpTabBody(): it is one of the four tabs, or nothing is
+  // drawn (#1423: the code-scanning alert dismissed while this code was in
+  // report-builder.html came back at the new path; fixed, not dismissed).
   var kind = tabEl.getAttribute('data-http-tab');
+  if (HTTP_TAB_KINDS.indexOf(kind) < 0) return;
   var detailId = tabEl.dataset.detailId;
   if (tabEl.classList.contains('empty')) return;
   // toggle active on siblings

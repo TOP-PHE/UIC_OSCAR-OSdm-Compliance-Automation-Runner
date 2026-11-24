@@ -13,7 +13,6 @@ const { pageSource } = require('../helpers/page-source');
  * confirmed yet, greyed, with when its link runs out, and offers only Refuse.
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 

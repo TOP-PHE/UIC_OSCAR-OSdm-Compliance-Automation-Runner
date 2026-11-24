@@ -28,7 +28,6 @@ const { pageSource } = require('../helpers/page-source');
  * scenarios-load-guard.test.js does for scenarios.js.
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 

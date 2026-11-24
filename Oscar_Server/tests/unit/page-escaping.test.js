@@ -14,7 +14,6 @@ const { pageSource } = require('../helpers/page-source');
  * hands a spreadsheet a formula.
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 

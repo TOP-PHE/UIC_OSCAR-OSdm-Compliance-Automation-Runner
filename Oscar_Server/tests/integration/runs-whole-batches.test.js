@@ -15,7 +15,6 @@ const { pageSource } = require('../helpers/page-source');
 process.env.JWT_SECRET = 'test-jwt-secret-for-whole-batches';
 
 const jwt     = require('jsonwebtoken');
-const fs      = require('fs');
 const path    = require('path');
 const { randomUUID: uuidv4 } = require('node:crypto');
 const request = require('supertest');

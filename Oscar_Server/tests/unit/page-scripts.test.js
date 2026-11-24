@@ -21,7 +21,9 @@ const vm = require('node:vm');
 const PUBLIC_DIR = path.resolve(__dirname, '../../public');
 const PAGES = fs.readdirSync(PUBLIC_DIR).filter(f => f.endsWith('.html')).sort();
 const read = rel => fs.readFileSync(path.join(PUBLIC_DIR, rel), 'utf8');
-const SCRIPT_RE = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
+// An end tag may carry attributes or white space ("</script foo>"): the
+// parser closes the script there all the same.
+const SCRIPT_RE = /<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi;
 
 describe('every page', () => {
   test.each(PAGES)('%s holds no inline script and no inline event handler', (page) => {

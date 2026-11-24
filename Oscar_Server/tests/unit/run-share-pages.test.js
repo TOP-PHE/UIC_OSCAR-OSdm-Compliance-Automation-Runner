@@ -6,7 +6,6 @@ const { pageSource } = require('../helpers/page-source');
 // exists for public/: the top-level functions are lifted out by text and run
 // in a bare vm context, as ui-scripts.test.js does.
 
-const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 

@@ -1137,15 +1137,34 @@ describe('pages — written this way on purpose (#527)', () => {
     expect(encoderChain.test(src)).toBe(false);
   });
 
-  // The tab kind is the source of an open code-scanning alert on the innerHTML
-  // a few lines below. Reading it through dataset could hide that flow from
-  // CodeQL without fixing it.
-  test('report-builder.html switchHttpTab reads the tab kind with getAttribute', () => {
+  // The tab kind comes from the page and reaches an innerHTML a few lines
+  // below. Its code-scanning alert was dismissed while the code was inline;
+  // since #1423 the flow is closed instead: only the four tabs the page draws
+  // are taken, and any other name draws nothing.
+  test('report-builder.html switchHttpTab takes only the four tabs the page draws', () => {
     const src = read('report-builder.html');
     const start = src.indexOf('function switchHttpTab(');
     const body = src.slice(start, src.indexOf('\n}\n', start));
-    expect(body).toContain("var kind = tabEl.getAttribute('data-http-tab');");
-    expect(body).not.toContain('dataset.httpTab');
+    expect(body).toContain("var kind = tabEl.getAttribute('data-http-tab');\n  if (HTTP_TAB_KINDS.indexOf(kind) < 0) return;");
+    const drawn = [...src.matchAll(/data-http-tab="([A-Za-z]+)"/g)].map(m => m[1]);
+    const kinds = vm.runInNewContext(src.match(/^var HTTP_TAB_KINDS = \[[^\]]*\];$/m)[0] + '; HTTP_TAB_KINDS');
+    expect([...kinds].sort()).toEqual([...new Set(drawn)].sort());
+
+    const written = [];
+    const tab = kind => ({
+      getAttribute: () => kind, dataset: { detailId: 'd1' }, classList: { contains: () => false, add() {} },
+      parentElement: { querySelectorAll: () => [] },
+    });
+    const ctx = {
+      HTTP_TAB_KINDS: kinds, _httpDetailCache: { d1: { request: {} } },
+      renderHttpTabBody: (r, kind) => `<b>${kind}</b>`,
+      document: { getElementById: () => ({ set innerHTML(v) { written.push(v); } }) },
+    };
+    const switchHttpTab = vm.runInNewContext(`(${body}\n})`, ctx);
+    switchHttpTab(tab('<img src=x>'));
+    expect(written).toEqual([]);
+    switchHttpTab(tab('response'));
+    expect(written).toEqual(['<b>response</b>']);
   });
 
   // Inside an inline script the closing tag has to be written with a backslash,

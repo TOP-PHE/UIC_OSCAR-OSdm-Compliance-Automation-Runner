@@ -14,7 +14,6 @@ const { pageSource } = require('../helpers/page-source');
  * run.html, draw the server's own preview and read it back.
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { esc } = require('../../public/js/esc');

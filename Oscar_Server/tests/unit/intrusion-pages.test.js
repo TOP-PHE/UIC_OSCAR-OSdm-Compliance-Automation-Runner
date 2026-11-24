@@ -13,7 +13,6 @@ const { pageSource } = require('../helpers/page-source');
  * banner and the administrators' list never read a value as markup.
  */
 
-const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
