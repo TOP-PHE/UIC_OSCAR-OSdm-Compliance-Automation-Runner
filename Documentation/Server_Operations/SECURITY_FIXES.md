@@ -18,7 +18,7 @@ A security review of the OSCAR server identified 13 vulnerabilities across Criti
 
 **Fix:** Added `helmet()` middleware with a strict Content Security Policy:
 - `default-src 'self'` — blocks all external resource loading
-- `script-src 'self' 'unsafe-inline'` — inline scripts required by the vanilla JS frontend
+- `script-src 'self' 'unsafe-inline'` — inline scripts required by the vanilla JS frontend (since server 1.11.583, #1423: `script-src 'self'`; the pages' scripts are files)
 - `frame-ancestors 'none'` — prevents clickjacking
 - HSTS enabled with 1-year max-age
 - X-Content-Type-Options, X-DNS-Prefetch-Control, X-XSS-Protection all set by helmet defaults
@@ -202,7 +202,9 @@ All events record the acting user's ID, email, company context, and timestamp.
 
 ---
 
-## Future Improvement: Remove inline event handlers (CSP hardening)
+## Done: no inline script or handler (CSP hardening)
+
+**Done** in two steps: the inline event handlers went to `addEventListener()` and `data-action` delegation (`script-src-attr 'none'`, helmet's default), then the pages' inline `<script>` blocks became files under `public/js/` and `script-src` lost `'unsafe-inline'` (server 1.11.582 and 1.11.583, #1423). The notes below are the original plan, kept as written.
 
 **Current state:** The CSP directive `script-src-attr 'unsafe-inline'` is required because all HTML pages use inline event handlers (`onclick="..."`, `onchange="..."`, `oninput="..."`, etc.). This is a pragmatic compromise — the UI would break without it.
 

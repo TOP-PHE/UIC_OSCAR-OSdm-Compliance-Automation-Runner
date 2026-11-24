@@ -4662,7 +4662,12 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   place; a moved file's header says "moved out of the page unchanged
   (#1423)", which is how the helper knows it. A moved file declares the
   names it takes from `nav.js` / `esc.js` / `run-exit.js` in a
-  `/* global */` line. PR 2 removes `'unsafe-inline'` from `script-src`.
+  `/* global */` line. **PR 2 (1.11.583): `script-src 'self'`** (no
+  `'unsafe-inline'`), pinned by `server.test.js`; `style-src` keeps it (style
+  attributes). **Moving inline code into `.js` files wakes SonarCloud's typed
+  and taint rules** (it skipped them inside HTML): 109 findings in #1424, all
+  fixed there. A page's `const esc = window.esc` must come before any code
+  run at load that uses it (TDZ; only a browser shows it).
 - **Every image a page shows is served by OSCAR** (#805, 1.11.319). The
   banner's UIC and OSDM logos were loaded from uic.org and broke on every page
   when uic.org stopped serving them. They are `public/uic-logo.png` and

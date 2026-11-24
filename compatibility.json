@@ -4,6 +4,17 @@
   "current_release": "2026.621",
   "releases": [
     {
+      "release": "2026.624",
+      "date": "2026-11-24",
+      "server": "1.11.583",
+      "collection": "OTST_V2.0.270",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.583 (#1423, PR 2 of 2): the content security policy's script-src is 'self' alone; 'unsafe-inline' is gone, so a browser runs no inline script, injected or not. The pages hold none since 1.11.582. style-src keeps 'unsafe-inline' for the pages' style attributes. Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.623",
       "date": "2026-11-24",
       "server": "1.11.582",
