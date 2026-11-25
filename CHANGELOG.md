@@ -683,6 +683,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.586] / [collection-OTST_V2.0.272] — 2026-11-25
+
+Issue #1437, part of #1266. Simulator 0.75.0. The offer request options test (#227) on a request without a trip. Listed as release 2026.627; `current_release` is not moved.
+
+OSDM: `OfferCollectionRequest` requires only `anonymousPassengerSpecifications`; without a trip, `nonTripSearchCriteria` names where the offers are valid, by `places`, `zones` or `nutsCodes`, and requires no member, `validFrom` included (3.4 to 3.12). Until now the test knew the trip forms only: on a request without a trip, its mandatory request kept the passengers alone.
+
+Decided with the maintainer:
+- the mandatory request keeps the passengers and where, and `validFrom` becomes an option;
+- every option is tested but those of a trip, which are reported "not tested: only for a trip";
+- the simulator applies its behaviours at a stop place and a zone of their own;
+- two scenarios and two catalogue entries, one by stop places and one by zone, and the report says the request is without a trip.
+
+### Added
+- **The form without a trip** (`library-bruno/offerOptions.js`): `tripFormOf()` is `NON_TRIP` for a request with `nonTripSearchCriteria`; `mandatoryRequest()` keeps its `places`, `zones` or `nutsCodes` (`nonTripWhere()`).
+- **`nonTripSearchCriteria.validFrom`** as an option, for a request without a trip only: the scenario's own, else the travel day. It is honoured when the admissions are valid from then or later.
+- **Not tested without a trip**: `offerSearchCriteria.inboundDate`, the trip search options, `requestedSections`, `tripResponseParameters`.
+- **The report says it**: its first line reads "…, offers without a trip (stop places | zones | NUTS codes), …"; phase 1's line and its failure name what OSDM requires without a trip. The server reads it back (`offerOptionReport.js`, `withoutTrip`). The coverage entry (`offerOptionCoverage.js`) and the Report Builder's two views show it.
+- **Catalogue**: `OTST_NONTRIP_OFFER_OPTION_DISCOVERY_PLACES` and `_ZONES` (89 checks each).
+- **Simulator scenarios** (gamma, with their version copies, in the run list): `SIM_NONTRIP_OFFER_OPTION_DISCOVERY_PLACES_38` (trip 54, 0000046 → 0000040) and `_ZONES_38` (trip 55, zone `SIM-OPTIONS`).
+- **Docs and page**: *What is tested* (the simulator table, two catalogue rows, the summary), *OSCAR - OSDM Simulator scenarios* (two rows), the simulator's README, a welcome-page news entry.
+
+### Simulator 0.75.0
+- **Request options without a trip**: `requestOptions.nonTripFrom` (the first stop place asked) and `nonTripZone` (a zone asked), each optional, apply the behaviours of trips from `from` to a request without a trip (`appliesTo()`). In every provider: 0000046, a new stop place named Optionville (0000045 is the other-carrier variant), and the new zone `SIM-OPTIONS` (zone id 103), listed last by `GET /places` and `GET /zones`.
+- `tripResponseParameters` (no offer, nothing said) is not sent without a trip, so that class of answer is shown for a trip only.
+
+### Changed
+- *OSCAR - Checks by scenario* regenerated, and the simulator hints of the finding drafts (`src/utils/simulator-checks.json`).
+- Every simulator reference changes (the run list).
+
+### Checked
+- **Replay** with the real Bruno CLI 4.2.1 against simulator 0.75.0, of the 226 scenarios of *Checks by scenario* (after #1436), in chunks: the same recording as #1436's, with the stop place and zone added. The two new scenarios pass with no failed check (89 each), one WARNING naming `offerSearchCriteria.flexibilities` and `corporateCodes` (taken without a word); their ten copies pass on their providers. `replay.js catalogue` agrees with all 115 entries.
+- **Simulator**: `request-options.test.js` covers each behaviour by stop place and by zone on the six providers, where every answer is checked against the OSDM response schema of that version, nothing elsewhere, and the profile check; `non-trip.test.js` the new stop place and zone.
+- **Collection**: `bruno-offer-options.test.js` covers the form, phase 1, every option alone and all at once as valid requests of OSDM 3.4 to 3.12, `validFrom`, the options not tested, the report and the glue.
+- **Server**: `offer-option-coverage.test.js` and `ui-scripts.test.js` cover `withoutTrip`.
+- **Mutation checks**: each new rule (20), removed one by one, fails a test.
+
+---
+
 ## [server-1.11.585] / [collection-OTST_V2.0.271] — 2026-11-24
 
 Issue #1436, part of #1266, asked by the maintainer: the system request for product tags did not work on the simulator, and no scenario sold a product without a trip asked by its product tag. Simulator 0.74.0. Listed as release 2026.626; `current_release` is not moved (a release PR follows the run of #1266 PRs).

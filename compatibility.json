@@ -4,6 +4,17 @@
   "current_release": "2026.625",
   "releases": [
     {
+      "release": "2026.627",
+      "date": "2026-11-25",
+      "server": "1.11.586",
+      "collection": "OTST_V2.0.272",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.586 / collection OTST_V2.0.272 / simulator 0.75.0 (#1437, part of #1266): the offer request options test (#227) on a request without a trip. Its request with the mandatory parameters only keeps the passengers and where the offers are valid (stop places, zones or NUTS codes); nonTripSearchCriteria.validFrom is an option of its own; the options of a trip (inboundDate, the trip search options, requestedSections, tripResponseParameters) are reported as not tested. The report says the request is without a trip (the coverage and the Report Builder show it). The simulator applies its request option behaviours to a request without a trip from stop place 0000046 or in zone SIM-OPTIONS, in every provider. Two simulator scenarios with their copies, two reference scenarios (OTST_NONTRIP_OFFER_OPTION_DISCOVERY_PLACES, _ZONES), the references regenerated. No other scenario's checks change. Not released on its own: current_release is not moved."
+      ]
+    },
+    {
       "release": "2026.626",
       "date": "2026-11-24",
       "server": "1.11.585",
