@@ -3,7 +3,9 @@
 /**
  * requestOptions.js — what the provider does with optional parameters of the
  * offer request (#227), for trips from one stop place (`requestOptions.from`
- * in the profile).
+ * in the profile), and (#1437) for a request without a trip whose first stop
+ * place is `requestOptions.nonTripFrom` or whose zones hold
+ * `requestOptions.nonTripZone`.
  *
  * OSCAR's offer request options scenario sends each optional parameter alone and
  * classifies the answer; each behaviour here gives one of its classes:
@@ -69,14 +71,23 @@ function refusalOf(member, behaviour, body, options) {
 const NO_OFFER = new Set(['no-offer-said', 'no-offer-silent']);
 const IGNORED = new Set(['ignore-silent', 'ignore-said']);
 
+// Whether the behaviours apply: a trip from `from`, or a request without a
+// trip (`nonTrip`, nonTrip.nonTripAsked()) from `nonTripFrom` or in `nonTripZone`.
+function appliesTo(options, trips, nonTrip) {
+  if (trips.some((t) => t.origin?.stopPlaceRef === options.from)) return true;
+  if (!nonTrip) return false;
+  if (nonTrip.kind === 'places') return nonTrip.places[0]?.stopPlaceRef === options.nonTripFrom;
+  return nonTrip.zones.some((z) => z.id === options.nonTripZone);
+}
+
 /**
  * The request as the provider reads it, and what it adds to the answer:
  * { body, problems, noOffer }. Throws an HttpError for the behaviours that
  * refuse the request.
  */
-function applyRequestOptions(body, trips, provider) {
+function applyRequestOptions(body, trips, provider, nonTrip = null) {
   const options = provider.requestOptions;
-  if (!options || !trips.some((t) => t.origin?.stopPlaceRef === options.from)) return { body, problems: [], noOffer: false };
+  if (!options || !appliesTo(options, trips, nonTrip)) return { body, problems: [], noOffer: false };
   const asked = Object.entries(options.members).filter(([member]) => presentIn(body, member));
   for (const [member, behaviour] of asked) {
     const refusal = refusalOf(member, behaviour, body, options);

@@ -31,7 +31,9 @@ const NORTH = 'urn:uic:stn:0000042';
 const EAST = 'urn:uic:stn:0000043';
 const WEST = 'urn:uic:stn:0000044';
 const SOUTH = 'urn:uic:stn:0000045';
-const ALL_PLACES = [CENTRAL, AIRPORT, NORTH, EAST, WEST, SOUTH];
+// #1437: where the offer request options apply without a trip.
+const OPTIONVILLE = 'urn:uic:stn:0000046';
+const ALL_PLACES = [CENTRAL, AIRPORT, NORTH, EAST, WEST, SOUTH, OPTIONVILLE];
 const PAX = [{ externalRef: '00001', type: 'PERSON', dateOfBirth: '1990-01-15' }];
 
 const stop = (stopPlaceRef) => ({ objectType: 'StopPlaceRef', stopPlaceRef });
@@ -349,7 +351,7 @@ const byNuts = (codes, extra = {}) => ({
 });
 
 test('NUTS: the zones name made-up NUTS codes, each in one zone; a wrong one stops the start', () => {
-  assert.deepEqual(gamma.nonTrip.zones.map((z) => [z.id, z.nutsCodes]), [['SIM-CITY', ['XS111']], ['SIM-NORTH', ['XS112']], ['SIM-SOUTH', undefined]]);
+  assert.deepEqual(gamma.nonTrip.zones.map((z) => [z.id, z.nutsCodes]), [['SIM-CITY', ['XS111']], ['SIM-NORTH', ['XS112']], ['SIM-SOUTH', undefined], ['SIM-OPTIONS', undefined]]);
   const base = { ...JSON.parse(JSON.stringify(gamma)), key: undefined };
   const withZones = (zones) => ({ ...base, carrier: gamma.carrier, nonTrip: { ...base.nonTrip, zones } });
   const [city, north] = gamma.nonTrip.zones;
@@ -386,7 +388,7 @@ test("over HTTP, in each provider's version: GET /zones names the NUTS codes; a 
   for (const key of REAL) {
     const token = await tokenFor(sim.base, key, SECRETS[key][0]);
     const zones = await call(sim.base, token, 'GET', `/${key}/zones`);
-    assert.deepEqual(zones.body.zones.map((z) => z.nutsCodes), [['XS111'], ['XS112'], undefined], key);
+    assert.deepEqual(zones.body.zones.map((z) => z.nutsCodes), [['XS111'], ['XS112'], undefined, undefined], key);
     const offers = await call(sim.base, token, 'POST', `/${key}/offers`, byNuts(['XS111']));
     assert.equal(offers.status, 200, `${key} ${JSON.stringify(offers.body).slice(0, 300)}`);
     const offer = offers.body.offers[0];

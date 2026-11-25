@@ -73,6 +73,14 @@ describe('the offer request options in the coverage (#995)', () => {
       + ' · 3 combination(s): 1 answered, 1 without offer, 1 refused · every supported parameter at once: answered');
   });
 
+  test('#1437: a report of a request without a trip says how it named where; a trip\'s says nothing', () => {
+    const nonTrip = reportOf(reportLines({ ...written, withoutTrip: 'stop places' }));
+    const [e] = C.offerOptionCoverageOf([{ code: 'OTST_NONTRIP_OFFER_OPTION_DISCOVERY_PLACES', run: run('r2', '2026-11-24 10:00:00'), report: nonTrip }]);
+    expect(e).toMatchObject({ version: '3.8.0', withoutTrip: 'stop places', budget: 30 });
+    const [t] = C.offerOptionCoverageOf([{ code: 'OTST_OFFER_OPTION_DISCOVERY', run: run('r1', '2026-10-26 20:22:07'), report }]);
+    expect(Object.hasOwn(t, 'withoutTrip')).toBe(false);
+  });
+
   test('the latest run first; a run without report, or nothing at all, gives nothing', () => {
     const list = C.offerOptionCoverageOf([
       { code: 'B', run: run('r1', '2026-10-20 10:00:00'), report },

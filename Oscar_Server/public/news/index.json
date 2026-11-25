@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-25-offer-request-options-without-a-trip",
+    "date": "November 25, 2026",
+    "tag": "New",
+    "title": "Without a trip: which optional parameters of the offer request a provider takes",
+    "summary": "The offer request options test now runs on requests without a trip, between stop places or in a zone.",
+    "content": "OSCAR's offer request options test sends the offer request with its mandatory parameters only, then each optional parameter alone, combinations of those found supported and all of them at once, and says what the provider did with each.\n\nIt now runs on requests without a trip too. There, the mandatory request names the passengers and where the offers are valid (stop places, zones or NUTS codes). The date the offers are valid from (validFrom) is tested as an option of its own: OSDM does not require it. The options that only a trip has (a return date, the trip search options, requested sections, how the trip is shown) are reported as not tested. The report says the request was without a trip.\n\nTwo reference scenarios can be copied: OTST_NONTRIP_OFFER_OPTION_DISCOVERY_PLACES (between stop places) and OTST_NONTRIP_OFFER_OPTION_DISCOVERY_ZONES (in a zone). Your Test Framework must declare offers without a trip in that form (Offer requests).\n\nIf your company follows a simulator reference configuration, update it from Test Config. Otherwise no action is required."
+  },
+  {
     "id": "2026-11-24-sale-by-product-tag",
     "date": "November 24, 2026",
     "tag": "New",

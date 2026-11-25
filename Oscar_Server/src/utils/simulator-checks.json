@@ -1,9 +1,9 @@
 {
  "about": {
-  "collection": "OTST_V2.0.271",
-  "simulator": "0.74.0",
+  "collection": "OTST_V2.0.272",
+  "simulator": "0.75.0",
   "day": "2026-11-24",
-  "scenarios": 174
+  "scenarios": 176
  },
  "checks": {
   "del exchange offer|Status code is N, offer is deleted": [
@@ -2007,7 +2007,7 @@
    0
   ],
   "get coach|[OSDM] Content-Type is JSON": [
-   174,
+   176,
    0
   ],
   "get exchange offer|'…' exists in response": [
@@ -2107,7 +2107,7 @@
    0
   ],
   "get passenger categories|[OSDM] Content-Type is JSON": [
-   174,
+   176,
    0
   ],
   "get passenger|HTTP response status — expected N, actual: N": [
@@ -2595,187 +2595,187 @@
    0
   ],
   "get product by productid|GET /products/{productId} response body is present": [
-   174,
+   176,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is array": [
-   174,
+   176,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is boolean": [
-   348,
+   352,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is object": [
-   174,
+   176,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is string": [
-   870,
+   880,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" is a Product object": [
-   174,
+   176,
    0
   ],
   "get product by productid|GET /products/{productId} → N OK": [
-   174,
+   176,
    0
   ],
   "get product by productid|GET /products/{productId} → Product has required \"…\" (string)": [
-   696,
+   704,
    0
   ],
   "get product by productid|GET /products/{productId} → conforms to OSDM N.N Product schema (deep)": [
-   174,
+   176,
    0
   ],
   "get product by productid|GET /products/{productId} → response is a resource object": [
-   174,
+   176,
    0
   ],
   "get product by productid|[OSDM] Content-Type is JSON": [
-   174,
+   176,
    0
   ],
   "get product tags|GET /product-tags response body is present and not empty": [
-   174,
+   176,
    0
   ],
   "get product tags|GET /product-tags → N OK": [
-   174,
+   176,
    0
   ],
   "get product tags|GET /product-tags → conforms to OSDM N.N ProductTagGroup schema (deep)": [
-   174,
+   176,
    0
   ],
   "get product tags|GET /product-tags → conforms to OSDM N.N ProductTagName schema (deep)": [
-   174,
+   176,
    0
   ],
   "get product tags|GET /product-tags → every productTagGroup has required \"…\" (Text object)": [
-   174,
+   176,
    0
   ],
   "get product tags|GET /product-tags → every productTagGroup has required \"…\" (string)": [
-   174,
+   176,
    0
   ],
   "get product tags|GET /product-tags → every productTagName has required \"…\" (Text object)": [
-   174,
+   176,
    0
   ],
   "get product tags|GET /product-tags → every productTagName has required \"…\" (string)": [
-   174,
+   176,
    0
   ],
   "get product tags|GET /product-tags → required \"…\" is an array<ProductTagGroup>": [
-   174,
+   176,
    0
   ],
   "get product tags|GET /product-tags → required \"…\" is an array<ProductTagName>": [
-   174,
+   176,
    0
   ],
   "get product tags|GET /product-tags → response is a ProductTagsResponse object": [
-   174,
+   176,
    0
   ],
   "get product tags|[OSDM] Content-Type is JSON": [
-   174,
+   176,
    0
   ],
   "get products|GET /products response body is present and not empty": [
-   174,
+   176,
    0
   ],
   "get products|GET /products response contains at least one product id": [
-   174,
+   176,
    0
   ],
   "get products|GET /products → \"…\" (when present) is array": [
-   174,
+   176,
    0
   ],
   "get products|GET /products → \"…\" (when present) is boolean": [
-   348,
+   352,
    0
   ],
   "get products|GET /products → \"…\" (when present) is object": [
-   174,
+   176,
    0
   ],
   "get products|GET /products → \"…\" (when present) is string": [
-   870,
+   880,
    0
   ],
   "get products|GET /products → \"…\" is an array<Product>": [
-   174,
+   176,
    0
   ],
   "get products|GET /products → N OK": [
-   174,
+   176,
    0
   ],
   "get products|GET /products → conforms to OSDM N.N Product schema (deep)": [
-   174,
+   176,
    0
   ],
   "get products|GET /products → every Product has required \"…\" (string)": [
-   696,
+   704,
    0
   ],
   "get products|GET /products → response is a collection object": [
-   174,
+   176,
    0
   ],
   "get products|[OSDM] Content-Type is JSON": [
-   174,
+   176,
    0
   ],
   "get promotion codes|[OSDM] Content-Type is JSON": [
-   174,
+   176,
    0
   ],
   "get reduction cards|GET /reduction-cards response body is present and not empty": [
-   174,
+   176,
    0
   ],
   "get reduction cards|GET /reduction-cards → \"…\" (when present) is boolean": [
-   174,
+   176,
    0
   ],
   "get reduction cards|GET /reduction-cards → \"…\" (when present) is string": [
-   174,
+   176,
    0
   ],
   "get reduction cards|GET /reduction-cards → \"…\" is an array<ReductionCardType>": [
-   174,
+   176,
    0
   ],
   "get reduction cards|GET /reduction-cards → N OK": [
-   174,
+   176,
    0
   ],
   "get reduction cards|GET /reduction-cards → conforms to OSDM N.N ReductionCardType schema (deep)": [
-   174,
+   176,
    0
   ],
   "get reduction cards|GET /reduction-cards → every ReductionCardType has required \"…\" (object)": [
-   174,
+   176,
    0
   ],
   "get reduction cards|GET /reduction-cards → every ReductionCardType has required \"…\" (string)": [
-   348,
+   352,
    0
   ],
   "get reduction cards|GET /reduction-cards → response is a collection object": [
-   174,
+   176,
    0
   ],
   "get reduction cards|[OSDM] Content-Type is JSON": [
-   174,
+   176,
    0
   ],
   "get refund offer|'…' array exists with N refund offer(s)": [
@@ -2899,35 +2899,35 @@
    0
   ],
   "get system version check|GET /versions → \"…\" (when present) is an ISO-N date-time": [
-   174,
+   176,
    0
   ],
   "get system version check|GET /versions → \"…\" (when present) is an object": [
-   174,
+   176,
    0
   ],
   "get system version check|GET /versions → N OK": [
-   174,
+   176,
    0
   ],
   "get system version check|GET /versions → at least one ApiVersion entry": [
-   174,
+   176,
    0
   ],
   "get system version check|GET /versions → conforms to OSDM N.N ApiVersion schema (deep)": [
-   174,
+   176,
    0
   ],
   "get system version check|GET /versions → every entry has required \"…\" (non-empty string)": [
-   174,
+   176,
    0
   ],
   "get system version check|GET /versions → response is an array<ApiVersion>": [
-   174,
+   176,
    0
   ],
   "get system version check|OSDM version check (soft): data file \"…\" vs API [N.N] — match": [
-   174,
+   176,
    0
   ],
   "get system version check|Trip Search Criteria has at least one leg": [
@@ -2939,43 +2939,43 @@
    0
   ],
   "get system version check|[OSDM] Content-Type is JSON": [
-   174,
+   176,
    0
   ],
   "get zones|GET /zones response body is present and not empty": [
-   174,
+   176,
    0
   ],
   "get zones|GET /zones → \"…\" (when present) is array": [
-   174,
+   176,
    0
   ],
   "get zones|GET /zones → \"…\" (when present) is string": [
-   174,
+   176,
    0
   ],
   "get zones|GET /zones → \"…\" is an array<ZoneDefinition>": [
-   174,
+   176,
    0
   ],
   "get zones|GET /zones → N OK": [
-   174,
+   176,
    0
   ],
   "get zones|GET /zones → conforms to OSDM N.N ZoneDefinition schema (deep)": [
-   174,
+   176,
    0
   ],
   "get zones|GET /zones → every ZoneDefinition has required \"…\" (string)": [
-   348,
+   352,
    0
   ],
   "get zones|GET /zones → response is a collection object": [
-   174,
+   176,
    0
   ],
   "get zones|[OSDM] Content-Type is JSON": [
-   174,
+   176,
    0
   ],
   "patch multi passenger|HTTP response status — expected N, actual: N": [
@@ -4819,7 +4819,7 @@
    0
   ],
   "post get offer|[OSCAR request] POST /offers conforms to OSDM N.N OfferCollectionRequest": [
-   174,
+   176,
    0
   ],
   "post get offer|[OSCAR request] POST /offers does not conform to OSDM N.N OfferCollectionRequest, on purpose (negative test: empty passenger list)": [
@@ -4827,7 +4827,7 @@
    0
   ],
   "post get offer|[OSDM] Content-Type is JSON": [
-   175,
+   177,
    0
   ],
   "post get offer|[fares N] No fare in the answer, as the scenario expects (expectFares: false)": [
@@ -5019,7 +5019,7 @@
    0
   ],
   "post get offer|🧭 Offer request with the mandatory parameters only — answered with offers (HTTP N)": [
-   1,
+   3,
    0
   ],
   "post get return offer|'…' array exists with N offer(s)": [
@@ -5631,11 +5631,11 @@
    0
   ],
   "simulator access token|Authentication: access token acquired for Simulator": [
-   174,
+   176,
    0
   ],
   "simulator access token|[OSDM] Content-Type is JSON": [
-   174,
+   176,
    0
   ]
  }

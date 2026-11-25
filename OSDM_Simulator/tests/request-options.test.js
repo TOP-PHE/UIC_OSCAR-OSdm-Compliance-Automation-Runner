@@ -95,3 +95,63 @@ test('the profile check', () => {
     assert.throws(() => check(wrong), /requestOptions/);
   }
 });
+
+// ── #1437: the same behaviours without a trip, from 0000046 or in SIM-OPTIONS ──
+
+const OPTIONVILLE = 'urn:uic:stn:0000046';
+const nonTripRequest = (where, change = () => {}) => {
+  const body = offerRequest();
+  delete body.tripSearchCriteria;
+  body.nonTripSearchCriteria = { ...where, validFrom: '2026-11-20T00:00:00+01:00' };
+  change(body);
+  return body;
+};
+const BY_PLACES = { places: [{ objectType: 'StopPlaceRef', stopPlaceRef: OPTIONVILLE }, { objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:0000040' }] };
+const byZone = (carrier) => ({ zones: [{ id: 'SIM-OPTIONS', carrier }] });
+
+test('without a trip: every provider, by its stop place and by its zone, answers each behaviour, in its own version', async () => {
+  for (const key of ['alpha', 'beta', 'gamma', 'delta', 'epsilon', 'zeta']) {
+    const t = await tokenFor(sim.base, key, SECRETS[key][0]);
+    const carrier = `urn:x_osdm_simulator:carrier:${key}`;
+    for (const where of [BY_PLACES, byZone(carrier)]) {
+      const nt = (change) => call(sim.base, t, 'POST', `/${key}/offers`, nonTripRequest(where, change));
+      const label = `${key} ${Object.keys(where)[0]}`;
+      const plain = await nt((b) => { delete b.nonTripSearchCriteria.validFrom; });
+      assert.equal(plain.status, 200, label);
+      assert.ok(plain.body.offers.length > 0, label);
+      assert.equal((await nt(each('prmNeeds'))).status, 501, label);
+      assert.equal((await nt((b) => { b.embed = ['ALL']; })).status, 500, label);
+      assert.equal((await nt((b) => { b.promotionCodes = [{ code: 'NOPE' }]; })).status, 400, label);
+      assert.equal((await nt((b) => { b.promotionCodes = [{ code: 'SIM-PROMO-10' }]; })).status, 200, label);
+      const said = await nt(each('residency'));
+      assert.ok(said.body.offers.length > 0, label);
+      assert.equal(said.body.problems.find((p) => p.code === 'PARAMETER_NOT_SUPPORTED').pointers[0].requestPointer, '/anonymousPassengerSpecifications/0/residency', label);
+      const silent = await nt((b) => { b.offerSearchCriteria = { flexibilities: ['FULL_FLEXIBLE'] }; });
+      assert.ok(new Set(silent.body.offers.map((o) => o.offerSummary.overallFlexibility)).size > 1, `${label}: every product, as if not asked`);
+      const none = await nt((b) => { b.anonymousPassengerSpecifications[0].transportable = { type: 'BICYCLE' }; });
+      assert.deepEqual(none.body.offers, [], label);
+      assert.equal(none.body.problems.find((p) => p.code === 'NO_OFFER_FOUND').code, 'NO_OFFER_FOUND', label);
+    }
+  }
+});
+
+test('without a trip elsewhere the same members change nothing', async () => {
+  const elsewhere = { places: [{ objectType: 'StopPlaceRef', stopPlaceRef: 'urn:uic:stn:0000040' }, { objectType: 'StopPlaceRef', stopPlaceRef: OPTIONVILLE }] };
+  const res = await call(sim.base, token, 'POST', '/gamma/offers', nonTripRequest(elsewhere, (b) => { each('prmNeeds')(b); b.embed = ['ALL']; b.promotionCodes = [{ code: 'NOPE' }]; }));
+  assert.equal(res.status, 200, 'the first stop place chooses, not any of them');
+  const zone = await call(sim.base, token, 'POST', '/gamma/offers', nonTripRequest(byZone('urn:x_osdm_simulator:carrier:gamma'), (b) => { b.nonTripSearchCriteria.zones[0].id = 'SIM-CITY'; b.embed = ['ALL']; }));
+  assert.equal(zone.status, 200);
+});
+
+test('the profile check: the stop place and zone without a trip are optional text', () => {
+  const { checkProvider } = require('../src/config');
+  const base = JSON.parse(JSON.stringify(require('../providers/gamma.json')));
+  assert.equal(base.requestOptions.nonTripFrom, OPTIONVILLE);
+  assert.equal(base.requestOptions.nonTripZone, 'SIM-OPTIONS');
+  const check = (requestOptions) => checkProvider('gamma', { ...base, requestOptions });
+  const one = { from: 'urn:uic:stn:1', members: { embed: 'error' }, promotionCodes: [], nonTripFrom: 'urn:uic:stn:2', nonTripZone: 'Z' };
+  assert.deepEqual(check(one).requestOptions, one);
+  for (const wrong of [{ nonTripFrom: '' }, { nonTripZone: 3 }, { nonTripZone: 'x'.repeat(61) }]) {
+    assert.throws(() => check({ ...one, ...wrong }), /requestOptions/);
+  }
+});

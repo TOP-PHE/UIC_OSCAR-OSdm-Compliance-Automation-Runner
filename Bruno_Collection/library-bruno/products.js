@@ -137,8 +137,9 @@ function offersWithTag(offers, tags) {
 
 // "CODE (type, tags)" of a booked product, for a message.
 const productLabel = (p) => {
-  const said = [text(p?.type), ...listOf(p?.productTags).map(text)].filter(Boolean);
-  return `${text(p?.code) || text(p?.id) || '?'}${said.length > 0 ? ` (${[...new Set(said)].join(', ')})` : ''}`;
+  const said = [...new Set([text(p?.type), ...listOf(p?.productTags).map(text)].filter(Boolean))];
+  const name = text(p?.code) || text(p?.id) || '?';
+  return said.length > 0 ? `${name} (${said.join(', ')})` : name;
 };
 
 /**

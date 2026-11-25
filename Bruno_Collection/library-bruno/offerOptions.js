@@ -34,6 +34,12 @@ http://www.apache.org/licenses/LICENSE-2.0
  * only when its parameter is in that version's request schema
  * (osdmRequestSchemas.js, generated).
  *
+ * #1437: a request without a trip (nonTripSearchCriteria) keeps in phase 1
+ * only where its offers are valid (stop places, zones or NUTS codes): OSDM
+ * requires no member of NonTripSearchCriteria, so its validFrom is an option
+ * of its own. The options of a trip (a return's inboundDate, the trip search
+ * options, requestedSections, tripResponseParameters) are not tested there.
+ *
  * The pure part has no Bruno globals; the glue at the bottom has.
  */
 
@@ -100,8 +106,9 @@ function laterTime(dateTime, hours) {
 
 // ── The trip of a request ────────────────────────────────────────────────────
 
-/** 'TRIP_IDS', 'SPECIFICATION' or 'SEARCH', from the members a request holds. */
+/** 'NON_TRIP', 'TRIP_IDS', 'SPECIFICATION' or 'SEARCH', from the members a request holds. */
 function tripFormOf(request) {
+  if (isObj(request?.nonTripSearchCriteria)) return 'NON_TRIP';
   if (Array.isArray(request?.tripIds) && request.tripIds.length > 0) return 'TRIP_IDS';
   if (Array.isArray(request?.tripSpecifications) && request.tripSpecifications.length > 0) return 'SPECIFICATION';
   return 'SEARCH';
@@ -119,6 +126,25 @@ function tripEnds(request) {
   return first && last ? { start: first, end: last } : null;
 }
 
+// #1437: where the offers of a request without a trip are valid, in the
+// members it names (validFrom left out), and those members in words.
+const NON_TRIP_WHERE = Object.freeze({ places: 'stop places', zones: 'zones', nutsCodes: 'NUTS codes' });
+
+function nonTripWhere(criteria) {
+  const out = {};
+  for (const member of Object.keys(NON_TRIP_WHERE)) {
+    if (criteria?.[member] !== undefined) out[member] = copy(criteria[member]);
+  }
+  return out;
+}
+
+/** "stop places", "zones" or "NUTS codes": how a request without a trip names where; null for a trip. */
+function nonTripWhereOf(request) {
+  if (!isObj(request?.nonTripSearchCriteria)) return null;
+  const member = Object.keys(NON_TRIP_WHERE).find((m) => request.nonTripSearchCriteria[m] !== undefined);
+  return member ? NON_TRIP_WHERE[member] : 'nothing named';
+}
+
 function departureOf(request) {
   if (isObj(request?.tripSearchCriteria)) return request.tripSearchCriteria.departureTime || null;
   return request?.tripSpecifications?.[0]?.legs?.[0]?.timedLeg?.start?.serviceDeparture?.timetabledTime || null;
@@ -128,7 +154,8 @@ function departureOf(request) {
  * The request with the mandatory parameters only: each passenger's externalRef
  * and type, and the trip. A search keeps its origin, destination and time
  * (a search with no time is not a trip); a specification or trip ids are kept
- * as they are.
+ * as they are. A request without a trip keeps where its offers are valid,
+ * not from when (#1437).
  */
 function mandatoryRequest(request) {
   const passengers = (Array.isArray(request?.anonymousPassengerSpecifications) ? request.anonymousPassengerSpecifications : [])
@@ -136,7 +163,8 @@ function mandatoryRequest(request) {
     .map((p) => ({ externalRef: p.externalRef, type: p.type || 'PERSON' }));
   const out = { anonymousPassengerSpecifications: passengers };
   const form = tripFormOf(request);
-  if (form === 'TRIP_IDS') out.tripIds = copy(request.tripIds);
+  if (form === 'NON_TRIP') out.nonTripSearchCriteria = nonTripWhere(request.nonTripSearchCriteria);
+  else if (form === 'TRIP_IDS') out.tripIds = copy(request.tripIds);
   else if (form === 'SPECIFICATION') out.tripSpecifications = copy(request.tripSpecifications);
   else if (isObj(request?.tripSearchCriteria)) {
     const t = request.tripSearchCriteria;
@@ -160,6 +188,8 @@ const IN = {
     }) }),
   search: (member) => ({ schema: 'TripSearchCriteria', member, searchOnly: true,
     set: (req, v) => { req.tripSearchCriteria = { ...req.tripSearchCriteria, [member]: v }; } }),
+  nonTrip: (member) => ({ schema: 'NonTripSearchCriteria', member, nonTripOnly: true,
+    set: (req, v) => { req.nonTripSearchCriteria = { ...req.nonTripSearchCriteria, [member]: v }; } }),
   root: (member) => ({ schema: 'OfferCollectionRequest', member,
     set: (req, v) => { req[member] = v; } }),
 };
@@ -179,6 +209,16 @@ const perPassenger = (list) => Object.assign(list, { perPassenger: true });
  * Framework), 'scenario' (the scenario's own request), 'default' (an OSDM
  * value valid for any provider), 'invalid' (made up on purpose).
  */
+// #1437: the admissions are valid from the time asked or later.
+function validFromCheck(request, body) {
+  const asked = Date.parse(request.nonTripSearchCriteria?.validFrom);
+  const offers = Array.isArray(body?.offers) ? body.offers : [];
+  const starts = offers.flatMap((o) => (Array.isArray(o?.admissionOfferParts) ? o.admissionOfferParts : []))
+    .map((part) => Date.parse(part?.validFrom)).filter(Number.isFinite);
+  if (!Number.isFinite(asked) || starts.length === 0) return null;
+  return starts.every((t) => t >= asked) ? 'honoured' : 'not-kept';
+}
+
 function criteriaCheck(member) {
   return (request, body) => {
     const checks = checkOfferCriteria({ [member]: request.offerSearchCriteria?.[member] }, body, []);
@@ -254,10 +294,18 @@ const OPTIONS = [
       return currencies.every((c) => c === asked) ? 'honoured' : 'not-kept';
     },
     value: (ctx) => ({ value: given(ctx, 'offerSearchCriteria.currency') || 'EUR', source: given(ctx, 'offerSearchCriteria.currency') ? 'declared' : 'default' }) },
-  { key: 'offerSearchCriteria.inboundDate', group: 'offer', where: IN.criteria('inboundDate'),
+  { key: 'offerSearchCriteria.inboundDate', group: 'offer', where: IN.criteria('inboundDate'), tripOnly: true,
     value: (ctx) => {
       const back = ctx.travelDay ? addDays(ctx.travelDay, 2) : null;
       return back ? { value: `${back}T16:00:00`, source: 'default' } : null;
+    } },
+
+  // Without a trip (#1437): from when the offers are valid; without it, "now".
+  { key: 'nonTripSearchCriteria.validFrom', group: 'nonTrip', where: IN.nonTrip('validFrom'), check: validFromCheck,
+    value: (ctx) => {
+      const own = ctx.request?.nonTripSearchCriteria?.validFrom;
+      if (typeof own === 'string' && own) return { value: own, source: 'scenario' };
+      return ctx.travelDay ? { value: `${ctx.travelDay}T00:00:00Z`, source: 'default' } : null;
     } },
 
   // Trip search (search criteria only)
@@ -285,7 +333,7 @@ const OPTIONS = [
     } },
 
   // Other members of the request
-  { key: 'requestedSections', group: 'other', where: IN.root('requestedSections'),
+  { key: 'requestedSections', group: 'other', where: IN.root('requestedSections'), tripOnly: true,
     value: (ctx) => {
       const ends = tripEnds(ctx.request);
       return ends ? { value: [{ startPlace: ends.start, endPlace: ends.end }], source: 'default' } : null;
@@ -309,7 +357,7 @@ const OPTIONS = [
       if (Array.isArray(declared) && declared.length > 0) return { value: declared, source: 'declared' };
       return invalid(ctx, () => [{ code: `OSCAR-UNKNOWN-${token(ctx.rand)}` }]);
     } },
-  { key: 'tripResponseParameters', group: 'other', where: IN.root('tripResponseParameters'),
+  { key: 'tripResponseParameters', group: 'other', where: IN.root('tripResponseParameters'), tripOnly: true,
     value: () => ({ value: { stopBehavior: 'REAL_BOARDING_ALIGHTING' }, source: 'default' }) },
   { key: 'embed', group: 'other', where: IN.root('embed'),
     value: () => ({ value: ['ALL'], source: 'default' }) },
@@ -337,7 +385,10 @@ function optionsFor({ request, version, values = {}, invalidValues = 'random', s
   const passengers = (request?.anonymousPassengerSpecifications || []).filter(isObj);
   const ctx = { request, values, invalidValues, rand, travelDay, passengers };
   const form = tripFormOf(request);
-  return OPTIONS.filter((o) => memberIn(version, o.where.schema, o.where.member)).map((option) => {
+  // #1437: an option of a request without a trip is no option of a trip's.
+  const fits = (o) => form === 'NON_TRIP' || !o.where.nonTripOnly;
+  return OPTIONS.filter((o) => memberIn(version, o.where.schema, o.where.member) && fits(o)).map((option) => {
+    if (form === 'NON_TRIP' && (option.tripOnly || option.where.searchOnly)) return { option, skipped: 'only for a trip (the scenario asks offers without a trip)' };
     if (option.where.searchOnly && form !== 'SEARCH') return { option, skipped: `only for a trip given by search criteria (the scenario's is ${form.toLowerCase().replace('_', ' ')})` };
     const v = option.value(ctx);
     if (!v) return { option, skipped: option.invalidAllowed ? 'no value declared, and invalid values are not sent' : 'no value declared or known' };
@@ -546,10 +597,13 @@ function phase4Line(all) {
 }
 
 /** The lines of the report, for the run log. */
+// #1437: ", offers without a trip (<where>)" in the report's first line, '' for a trip.
+const withoutTripText = (report) => (report.withoutTrip ? `, offers without a trip (${report.withoutTrip})` : '');
+
 function reportLines(report) {
   const answered = report.mandatory.ok ? 'answered' : 'NOT answered';
   const lines = [
-    `[INFO] 🧭 Offer request options (#227) — OSDM ${report.version}, budget ${report.budget} request(s), ${report.used} used, seed ${report.seed}.`,
+    `[INFO] 🧭 Offer request options (#227) — OSDM ${report.version}${withoutTripText(report)}, budget ${report.budget} request(s), ${report.used} used, seed ${report.seed}.`,
     `[INFO] 🧭 Phase 1, mandatory parameters only: ${answered} — ${report.mandatory.message}`,
   ];
   const counts = {};
@@ -678,6 +732,8 @@ async function discover({ request, version, values, invalidValues, seed, travelD
   const share = plan(budget, testable.length);
   const base = mandatoryRequest(request);
   const report = { version, budget, used: 1, seed, mandatory, options: [], combinations: [], all: null };
+  const where = nonTripWhereOf(request);
+  if (where) report.withoutTrip = where;
   const ask = async (picks) => {
     const body = withOptions(base, picks);
     const answer = await send(body);
@@ -720,12 +776,19 @@ function envJson(name, fallback) {
  * Step 01, before the request: keeps the scenario's whole request and sends
  * the one with the mandatory parameters only (phase 1).
  */
+// What phase 1 keeps besides the passengers, in words.
+const MANDATORY_WORDS = Object.freeze({
+  trip: 'the trip',
+  nonTrip: 'where the offers are valid, nonTripSearchCriteria without validFrom',
+});
+const mandatoryWords = (request) => (tripFormOf(request) === 'NON_TRIP' ? MANDATORY_WORDS.nonTrip : MANDATORY_WORDS.trip);
+
 function prepareOptionDiscovery() {
   if (!armed()) return;
   const full = envJson('OfferCollectionRequest', {});
   bru.setEnvVar('__offerOptionFull', JSON.stringify(full));
   bru.setEnvVar('OfferCollectionRequest', JSON.stringify(mandatoryRequest(full)));
-  validationLogger('[INFO] 🧭 Offer request options (#227) — phase 1: POST /offers with the mandatory parameters only (passengers\' externalRef and type, and the trip).');
+  validationLogger(`[INFO] 🧭 Offer request options (#227) — phase 1: POST /offers with the mandatory parameters only (passengers' externalRef and type, and ${mandatoryWords(full)}).`);
 }
 
 async function sendOffers(body) {
@@ -746,12 +809,14 @@ async function sendOffers(body) {
 async function runOptionDiscovery(status, body) {
   if (!armed()) return false;
   const mandatory = mandatoryOutcome(status, body);
+  const full = envJson('__offerOptionFull', {});
+  const required = tripFormOf(full) === 'NON_TRIP' ? 'the passengers, and where offers without a trip are valid' : 'the passengers and the trip';
   test(`🧭 Offer request with the mandatory parameters only — answered with offers (HTTP ${status})`, () => {
-    if (!mandatory.ok) throw new Error(`${mandatory.message}. OSDM requires only the passengers and the trip: a provider must answer such a request.`);
+    if (!mandatory.ok) throw new Error(`${mandatory.message}. OSDM requires only ${required}: a provider must answer such a request.`);
   });
   const { ignoredParameters } = require('./ignoredParameters.js');
   const report = await discover({
-    request: envJson('__offerOptionFull', {}),
+    request: full,
     version: bru.getEnvVar('osdmVersion'),
     values: envJson('offerOptionValues', {}) || {},
     invalidValues: bru.getEnvVar('offerOptionInvalidValues') === 'skip' ? 'skip' : 'random',
@@ -801,6 +866,7 @@ module.exports = {
   mulberry32,
   seedOf,
   tripFormOf,
+  nonTripWhereOf,
   mandatoryRequest,
   memberIn,
   optionsFor,

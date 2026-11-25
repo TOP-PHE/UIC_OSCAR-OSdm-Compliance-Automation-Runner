@@ -306,6 +306,8 @@ function checkAgeTariffs(value, bad) {
 // for trips from one stop place (`from`): `members` maps a member (as the
 // collection names it) to a behaviour of REQUEST_OPTION_BEHAVIOURS;
 // `promotionCodes` lists the codes it knows. Absent: no such behaviour.
+// #1437: the same behaviours for a request without a trip from a stop place
+// (`nonTripFrom`) or in a zone (`nonTripZone`) of its `nonTrip`, each optional.
 const REQUEST_OPTION_BEHAVIOURS = new Set(['ignore-silent', 'ignore-said', 'not-implemented', 'error', 'no-offer-said', 'no-offer-silent', 'refuse-unknown']);
 const REQUEST_OPTION_MEMBER = /^[a-zA-Z]+(\.[a-zA-Z]+)?$/;
 function checkRequestOptions(value, bad) {
@@ -319,7 +321,16 @@ function checkRequestOptions(value, bad) {
     if (!REQUEST_OPTION_MEMBER.test(member) || !REQUEST_OPTION_BEHAVIOURS.has(behaviour)) throw bad('requestOptions');
   }
   if (!Array.isArray(promotionCodes) || promotionCodes.length > 20 || !promotionCodes.every((c) => isText(c, 1, 60))) throw bad('requestOptions');
-  return { requestOptions: { from: value.from, members: { ...members }, promotionCodes: [...promotionCodes] } };
+  const { nonTripFrom, nonTripZone } = value;
+  if (nonTripFrom !== undefined && !isText(nonTripFrom, 1, 120)) throw bad('requestOptions.nonTripFrom');
+  if (nonTripZone !== undefined && !isText(nonTripZone, 1, 60)) throw bad('requestOptions.nonTripZone');
+  return {
+    requestOptions: {
+      from: value.from, members: { ...members }, promotionCodes: [...promotionCodes],
+      ...(nonTripFrom === undefined ? {} : { nonTripFrom }),
+      ...(nonTripZone === undefined ? {} : { nonTripZone }),
+    },
+  };
 }
 
 // #1258: what the provider sells without a trip: its stop places (by id and

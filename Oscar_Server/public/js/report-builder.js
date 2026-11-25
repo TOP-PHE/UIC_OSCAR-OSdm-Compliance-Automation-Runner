@@ -643,7 +643,8 @@ function offerOptionRunHtml(entry) {
   if (r.all) requests.push('<li>Every supported option (' + escHtml(r.all.count) + '): HTTP ' + escHtml(r.all.status) + ', ' + escHtml(offerOptionResultLabel(r.all.result)) + (r.all.message ? ' — ' + escHtml(r.all.message) : '') + '</li>');
   return '<div style="margin-bottom:18px">'
     + '<div style="font-size:13px;color:#37474f;line-height:1.6;margin-bottom:8px"><strong>' + escHtml(entry.scenario_code || entry.run_id) + '</strong>'
-    + ' &middot; OSDM ' + escHtml(r.version || '?') + ' &middot; ' + escHtml(r.used) + ' of ' + escHtml(r.budget) + ' request(s) &middot; seed ' + escHtml(r.seed)
+    + ' &middot; OSDM ' + escHtml(r.version || '?') + (r.withoutTrip ? ' &middot; offers without a trip (' + escHtml(r.withoutTrip) + ')' : '')
+    + ' &middot; ' + escHtml(r.used) + ' of ' + escHtml(r.budget) + ' request(s) &middot; seed ' + escHtml(r.seed)
     + '<br>Mandatory parameters only: ' + escHtml(mandatory) + '</div>'
     + '<table class="cap-table"><thead><tr><th>Option</th><th>Value sent</th><th>HTTP</th><th>Result</th><th>Test Framework</th><th>Detail</th></tr></thead>'
     + '<tbody>' + rows + '</tbody></table>'
@@ -1776,8 +1777,10 @@ function capabilityCombinationLines(e) {
 }
 
 function capabilityMandatoryText(e) {
-  if (!e.mandatory) return 'Mandatory parameters only: not in the report';
-  return 'Mandatory parameters only: ' + (e.mandatory.ok ? 'answered' : 'NOT answered') + (e.mandatory.message ? ' — ' + e.mandatory.message : '');
+  // #1437: a request without a trip says how it named where.
+  var form = e.withoutTrip ? 'Offers without a trip (' + e.withoutTrip + '). ' : '';
+  if (!e.mandatory) return form + 'Mandatory parameters only: not in the report';
+  return form + 'Mandatory parameters only: ' + (e.mandatory.ok ? 'answered' : 'NOT answered') + (e.mandatory.message ? ' — ' + e.mandatory.message : '');
 }
 
 function capabilityParameterCells(p) {
