@@ -372,6 +372,11 @@
             "type": ["string", "boolean", "null"],
             "enum": ["on", "off", true, false, "", null]
           },
+          "nonTripFaresExpectRejection": {
+            "description": "Negative test (#1444). When on, the scenario asks fares (requestedOfferParts FARE_*) for a trip requirement without a trip: POST /offers must refuse it with a 4xx RFC-9457 Problem, or give no fare; fares given are a WARNING (OSDM describes online fares for a trip only). The scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
+            "type": ["string", "boolean", "null"],
+            "enum": ["on", "off", true, false, "", null]
+          },
           "lostCardExpectRejection": {
             "description": "Negative test (#1266). When on, the lost card (lostCard) is one the provider does not know: POST /bookings of the replacement must be refused with a 4xx RFC-9457 Problem, and the scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],

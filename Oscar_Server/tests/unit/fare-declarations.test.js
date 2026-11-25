@@ -95,17 +95,20 @@ describe('#937 what a framework declares in fares', () => {
 });
 
 describe('#937 the fare entries of the catalogue', () => {
-  test('a framework declaring everything is offered all twenty-three', () => {
+  test('a framework declaring everything is offered all twenty-four', () => {
     const entries = fareEntries(FARE_FW);
-    expect(entries).toHaveLength(23);
-    const refused = entries.filter((e) => e.missing.length && e.code !== 'NHF_FARE_PRODUCT_ONLY');
+    expect(entries).toHaveLength(24);
+    const refused = entries.filter((e) => e.missing.length && !['NHF_FARE_PRODUCT_ONLY', 'NHF_NONTRIP_FARES_1ADT'].includes(e.code));
     expect(refused.map((e) => [e.code, e.missing])).toEqual([]);
     expect(entries.find((e) => e.code === 'NHF_FARE_PRODUCT_ONLY').missing).toEqual(['product-based distribution (Distribution)']);
+    // #1444: the probe of fares without a trip also needs offers without a trip declared.
+    expect(entries.find((e) => e.code === 'NHF_NONTRIP_FARES_1ADT').missing).toEqual(['offer requests without a trip, in zones']);
+    expect(fareEntries({ ...FARE_FW, offerRequestForms: ['SEARCH', 'NON_TRIP_ZONES'] }).find((e) => e.code === 'NHF_NONTRIP_FARES_1ADT').missing).toEqual([]);
   });
 
   test('a fare entry keeps its form: no _SPEC or _TRIPID twin', () => {
     const entries = fareEntries({ ...FARE_FW, offerRequestForms: ['SEARCH', 'SPECIFICATION', 'TRIP_IDS'] });
-    expect(entries).toHaveLength(23);
+    expect(entries).toHaveLength(24);
     expect(entries.some((e) => e.variantOf)).toBe(false);
   });
 

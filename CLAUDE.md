@@ -204,7 +204,20 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     product of it (`checkBookingTag()`; a WARNING when the booked products
     name neither a type nor a tag). Capability `sale.products`. The system
     requests run in every scenario: every catalogue `checks` moved (+11).
-    Left in #1266: #227 without a trip, fares.
+    **Fares without a trip** (#1444, 1.11.588 / OTST_V2.0.273, simulator
+    0.76.0): osdm.io says online fares are "always part of an offer for a
+    specified trip"; the maintainer asked the OSDM architect. Until he
+    answers: a probe, `nonTripFaresExpectRejection` (`checkNonTripFaresRefused()`,
+    `nonTrip.js`, after the unknown NUTS probe at 01): a refusal is graded
+    as a Problem, no fare passes, fares given are a WARNING (`holdsFares()`:
+    `fares` or a FARE_MODE reservation). The simulator refuses any FARE_*
+    part without a trip (400 `FARE_WITHOUT_TRIP_NOT_SUPPORTED`). Capability
+    `fares.offers`, an expected refusal. The simulator scenario follows the
+    fare naming rule (`SIM_NHF_FARE_NONTRIP_1ADT_38`, which
+    `distribution-modes.test.js` reads as FARE), the catalogue entry the
+    non-trip one (`NHF_NONTRIP_FARES_1ADT`, which the forms tests read).
+    #1266 is done but for what the maintainer left for later (a lost
+    electronic or anonymous ticket refused; other Place kinds).
     **To regenerate *Checks by scenario* from a partial change**, record the
     scenarios it names in chunks and merge the recordings (the
     simulator's `replay.js record` keeps only its last call).

@@ -406,3 +406,23 @@ test("over HTTP, in each provider's version: GET /zones names the NUTS codes; a 
     assert.deepEqual(unknown.body.pointers, [{ requestPointer: '/nonTripSearchCriteria/nutsCodes/0' }], key);
   }
 });
+
+// ── #1444: fares are not sold without a trip ─────────────────────────────────
+
+test('without a trip, a request asking fare parts is refused: 400 pointing at the offer parts; without them, as before', async () => {
+  for (const key of REAL) {
+    const token = await tokenFor(sim.base, key, SECRETS[key][0]);
+    const carrier = providers.get(key).carrier.ref;
+    for (const parts of [['FARE_ADMISSION'], ['ADMISSION', 'FARE_ADMISSION'], ['FARE_RESERVATION']]) {
+      for (const body of [byPlaces([CENTRAL, AIRPORT]), byZones([{ id: 'SIM-CITY', carrier }])]) {
+        const res = await call(sim.base, token, 'POST', `/${key}/offers`, { ...body, offerSearchCriteria: { requestedOfferParts: parts } });
+        assert.equal(res.status, 400, `${key} ${parts}`);
+        assert.equal(res.body.code, 'FARE_WITHOUT_TRIP_NOT_SUPPORTED', key);
+        assert.deepEqual(res.body.pointers, [{ requestPointer: '/offerSearchCriteria/requestedOfferParts' }], key);
+      }
+    }
+    const products = await call(sim.base, token, 'POST', `/${key}/offers`, { ...byZones([{ id: 'SIM-CITY', carrier }]), offerSearchCriteria: { requestedOfferParts: ['ADMISSION'] } });
+    assert.equal(products.status, 200, key);
+    assert.ok(products.body.offers.length > 0, key);
+  }
+});

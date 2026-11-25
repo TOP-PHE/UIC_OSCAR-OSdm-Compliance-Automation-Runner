@@ -815,6 +815,8 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     SIM_WRONG_FARE_COVERED_LEG_38: [v.coveredLegUnknown, 'SPECIFICATION', true, true, undefined],
     // #1045: a search answered with one more trip, from a stop by the station asked.
     SIM_FARE_NEARBY_STOP_SRCH_1ADT_38: [v.nearbyStopTrip, 'SEARCH', undefined, true, undefined],
+    // #1444: fares asked without a trip, a probe (nonTripFaresExpectRejection): no section.
+    SIM_NHF_FARE_NONTRIP_1ADT_38: [undefined, 'NON_TRIP', undefined, true, undefined],
   };
   const found = Object.fromEntries(fareScenarios.map((s) => [s.code, [
     startOf(s), tripOf(s).tripType, s.isPartOfInternationalTrip, s.offerSearchCriteria.requestedOfferParts.includes('FARE_ADMISSION'), s.expectFares,
