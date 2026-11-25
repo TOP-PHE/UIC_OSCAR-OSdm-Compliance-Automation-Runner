@@ -4835,7 +4835,9 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   Dockerfile FROMs, the kube-prometheus-stack chart rendered with helm),
   with no credential, and on a PR changing the scan or a pinned image (not
   `compatibility.json`: a release PR names images not yet published): **a new pinned image is scanned by itself, and must
-  name its digest** (`image-scans.test.js`). **The promotion builds without
+  name its digest** (`image-scans.test.js`). The weekly rule (maintainer,
+  2026-11-25): OSCAR's images fail on HIGH and CRITICAL, a third-party image
+  on CRITICAL only, its HIGH listed (upstream fixes them, we only move pins). **The promotion builds without
   the cache**: from it, the `apt-get upgrade` layer was weeks old.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image**. **The VPS checkout follows the

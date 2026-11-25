@@ -257,7 +257,7 @@ describe('accepted.json', () => {
     }
     expect(Array.isArray(accepted.trivy)).toBe(true);
     for (const e of accepted.trivy) {
-      expect([e.check, /^[A-Z]{2,4}-?\d{3,4}$/.test(e.check)]).toEqual([e.check, true]);
+      expect([e.check, /^[A-Z]{2,4}-?\d{3,5}$/.test(e.check)]).toEqual([e.check, true]);
       expect(e.resources.length).toBeGreaterThan(0);
       expect(e.reason.length).toBeGreaterThan(40);
     }

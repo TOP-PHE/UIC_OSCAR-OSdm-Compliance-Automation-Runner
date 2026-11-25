@@ -210,14 +210,21 @@ describe('the weekly job', () => {
     expect(steps).toMatch(/helm template [^\n]*\\\n[^\n]*--skip-tests/);
   });
 
-  test('one job per image, every one run, the build\'s rule', () => {
+  test('one job per image, every one run; HIGH and CRITICAL listed, ours fail on both, a third-party image on CRITICAL', () => {
     const job = weekly.jobs.scan;
     expect(job.strategy['fail-fast']).toBe(false);
     expect(job.strategy.matrix.image).toBe('${{ fromJSON(needs.images.outputs.images) }}');
-    const [scan] = trivySteps(job);
-    expect(scan.uses).toBe(TRIVY_ACTION);
-    expect(scan.with).toEqual(expect.objectContaining({
-      'image-ref': '${{ matrix.image }}', scanners: 'vuln', 'exit-code': '1', 'ignore-unfixed': true, severity: 'CRITICAL,HIGH',
-    }));
+    const [list, rule] = trivySteps(job);
+    for (const s of [list, rule]) {
+      expect(s.uses).toBe(TRIVY_ACTION);
+      expect(s.with).toEqual(expect.objectContaining({ 'image-ref': '${{ matrix.image }}', scanners: 'vuln', 'ignore-unfixed': true }));
+    }
+    expect(list.with).toEqual(expect.objectContaining({ 'exit-code': '0', severity: 'CRITICAL,HIGH', output: 'trivy.txt' }));
+    expect(rule.with['exit-code']).toBe('1');
+    expect(rule.with.severity).toBe("${{ startsWith(matrix.image, 'ghcr.io/top-phe/') && 'CRITICAL,HIGH' || 'CRITICAL' }}");
+    expect(rule.if).toBe('${{ !cancelled() }}');
+    // The release's images are the ones the rule calls ours.
+    for (const ref of I.releaseImages()) expect(ref.startsWith('ghcr.io/top-phe/')).toBe(true);
+    for (const ref of I.pinnedImages()) expect(ref.startsWith('ghcr.io/top-phe/')).toBe(false);
   });
 });

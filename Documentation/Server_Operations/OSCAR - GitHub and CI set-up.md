@@ -122,7 +122,7 @@ secrets and still report green.
 | `publish-cluster-images.yml` | Publish · cluster images to GHCR | tag `release-*` | The bundle and run images for Kubernetes |
 | `simulator-release.yml` | Simulator · tag and release | push to `main` | A new simulator version gets its tag and GitHub release |
 | `simulator-deploy.yml` | Simulator · update the installed simulator | push to `main` | On a version change, updates the simulator's host over SSH |
-| `scan-images.yml` | Scan · published and pinned images (weekly) | Monday 05:47 UTC, manual, PR on its paths (the scan, a pinned image) | Trivy on the current release's images on GHCR and on every third-party image a deployment pins, kube-prometheus-stack's included; one job per image, red on a CRITICAL or HIGH finding with a fix (#1453) |
+| `scan-images.yml` | Scan · published and pinned images (weekly) | Monday 05:47 UTC, manual, PR on its paths (the scan, a pinned image) | Trivy on the current release's images on GHCR and on every third-party image a deployment pins, kube-prometheus-stack's included; one job per image; red on a HIGH or CRITICAL finding with a fix for OSCAR's images, on a CRITICAL one for a third-party image, whose HIGH findings are listed (#1453) |
 | `production-smoke.yml` | Production smoke · OSCAR API | after a promotion, daily 06:17 UTC, manual | Three GAMMA scenarios through the test automation API, as a company's CI would |
 
 **Actions settings:** every action allowed, but by convention each is pinned

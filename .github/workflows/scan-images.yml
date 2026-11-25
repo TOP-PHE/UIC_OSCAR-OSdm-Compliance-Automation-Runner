@@ -9,8 +9,9 @@ name: Scan · published and pinned images (weekly)
 
 # #1453: an image is scanned when it is built (ci-server.yml, Trivy), never
 # again after, and the third-party images the deployments pin were never
-# scanned at all. Every week this scans, with the build's rule (CRITICAL and
-# HIGH with a fix fail):
+# scanned at all. Every week this scans (HIGH and CRITICAL with a fix are
+# listed; OSCAR's images fail on both, as their build does, a third-party
+# image on CRITICAL: maintainer, 2026-11-25):
 #   - the current release's images on GHCR (compatibility.json):
 #     oscar-server, oscar and oscar-run, :release-<current_release>;
 #   - every third-party image a deployment file pins (Docker Compose,
@@ -109,14 +110,14 @@ jobs:
       matrix:
         image: ${{ fromJSON(needs.images.outputs.images) }}
     steps:
-      - name: Trivy, vulnerabilities with a fix
+      - name: Trivy, HIGH and CRITICAL with a fix, listed
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ matrix.image }}
           scanners: vuln
           format: table
           output: trivy.txt
-          exit-code: '1'
+          exit-code: '0'
           ignore-unfixed: true
           vuln-type: os,library
           severity: CRITICAL,HIGH
@@ -135,3 +136,19 @@ jobs:
             cat trivy.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # The rule (maintainer, 2026-11-25): OSCAR's own images fail on HIGH and
+      # CRITICAL, as their build does; a third-party image fails on CRITICAL,
+      # its HIGH findings listed above. A third-party image is fixed upstream:
+      # all we can do is move its pin when a fixed version is published.
+      - name: The rule (ours HIGH and CRITICAL, third-party CRITICAL)
+        if: ${{ !cancelled() }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ matrix.image }}
+          scanners: vuln
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: ${{ startsWith(matrix.image, 'ghcr.io/top-phe/') && 'CRITICAL,HIGH' || 'CRITICAL' }}
