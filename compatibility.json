@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.625",
+  "current_release": "2026.629",
   "releases": [
     {
       "release": "2026.629",
@@ -11,7 +11,8 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.588 / collection OTST_V2.0.273 / simulator 0.76.0 (#1444, part of #1266): fares asked without a trip, a negative probe. OSDM describes online fares as part of an offer for a trip (osdm.io, Constructing products from fares) and names no fare for a sale without a trip. A scenario with nonTripFaresExpectRejection asks FARE_ADMISSION without a trip: a refusal (4xx Problem) or an answer without fare passes, fares given are a warning. The simulator refuses any fare part without a trip (400 FARE_WITHOUT_TRIP_NOT_SUPPORTED). Coverage: an expected refusal under Fare offers. One simulator scenario with its copies, the reference scenario NHF_NONTRIP_FARES_1ADT, Test Config's switch. No other scenario's checks change. Not released on its own: current_release is not moved."
+        "Release 2026.629 (current_release): everything merged since 2026.625. Server 1.11.585 (2026.626, #1438): the run dispatcher names RUN_POD_USER in each run pod and removes lost Secrets by label, with the Kubernetes scans in CI (Kubescape, kube-bench). 1.11.586 (2026.627, #1436), 1.11.587 (2026.628, #1437) and 1.11.588 (#1444), this entry, with simulator 0.74.0 to 0.76.0 (#1266): a sale without a trip by product tag, the offer request options test on a request without a trip, and fares asked without a trip as a negative probe. Without version: no container mounts the Docker socket (#1434: restarts from a host timer, Promtail from the log files), and the server's and the runner's root file systems are read-only on Kubernetes (#1441) and on the VPS (#1446). No migration. Before the promotion, the installed simulator moves to 0.76.0 (Simulator · update the installed simulator). The promotion makes oscar and oscar-runner again from the new compose file, read-only, and its deploy step ends with oscar is healthy. After it, once: Server Admin Guide 13.8 (the host's restart timer, the other containers made again, Promtail last), then 13.9's checks. Collection OTST_V2.0.273.",
+        "Server 1.11.588 / collection OTST_V2.0.273 / simulator 0.76.0 (#1444, part of #1266): fares asked without a trip, a negative probe. OSDM describes online fares as part of an offer for a trip (osdm.io, Constructing products from fares) and names no fare for a sale without a trip. A scenario with nonTripFaresExpectRejection asks FARE_ADMISSION without a trip: a refusal (4xx Problem) or an answer without fare passes, fares given are a warning. The simulator refuses any fare part without a trip (400 FARE_WITHOUT_TRIP_NOT_SUPPORTED). Coverage: an expected refusal under Fare offers. One simulator scenario with its copies, the reference scenario NHF_NONTRIP_FARES_1ADT, Test Config's switch. No other scenario's checks change."
       ]
     },
     {

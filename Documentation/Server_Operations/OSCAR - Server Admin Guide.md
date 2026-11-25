@@ -969,7 +969,7 @@ In Grafana, *OSCAR · Logs* shows the `oscar` container's new lines. A promotion
 
 The `oscar` and `oscar-runner` containers run with a read-only root file system (`read_only: true` in `docker-compose.yml`). What they write is on `./data` (database, data files, reports), the `run-workspaces` volume (the runs' folders), Alertmanager's volume (metrics overlay) and a `tmpfs` on `/tmp` of 1 GB, which is also HOME. A write anywhere else fails with `EROFS` in the container's log.
 
-An installed server takes it when its containers are made again from the new compose file: a promotion makes `oscar` again; `oscar-runner` with a full `up -d`, from the running server's compose files:
+An installed server takes it when its containers are made again from the new compose file. The promotion that brings it does: `refresh-collection.sh` makes `oscar` again, and `oscar-runner` when the isolated profile runs one; moving to 13.8 does too. To make them again by hand, from the running server's compose files, and check:
 
 ```bash
 cd /opt/OSCAR/OSCAR_Deploy

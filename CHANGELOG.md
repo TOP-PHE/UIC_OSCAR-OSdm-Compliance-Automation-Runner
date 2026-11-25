@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **On the VPS too, the server's and the runner's root file systems are read-only** (#1446; maintainer's request, 2026-11-25, after #1441 did it on Kubernetes). Deployment files, CI and guides, no version.
   - `docker-compose.yml`: `read_only: true` on `oscar` and `oscar-runner`, a `tmpfs` on `/tmp` (1 GB) and `HOME=/tmp` for both. What they write was on volumes already: `./data`, `run-workspaces`, Alertmanager's volume (metrics overlay).
   - **Proved in CI** (`ci-kubernetes.yml`, job *kind*): the real compose file, in isolated mode as production, with the image the job built and the simulator: `smoke.sh` passes its scenario, both containers read `ReadonlyRootfs`, neither can write its root, no log holds a refused write. `smoke.sh` reads the Test Manager's activation link with `docker exec` when `OSCAR_CONTAINER` names a container.
-  - **On the VPS, once:** a promotion makes `oscar` again; `oscar-runner` takes it with `up -d oscar oscar-runner` from the running server's compose files (*Server Admin Guide*, 13.9).
+  - **On the VPS:** the promotion that brings it makes `oscar` and, when the isolated profile runs one, `oscar-runner` again from the new compose file (`refresh-collection.sh`), so both take it then; *Server Admin Guide* 13.9 checks it.
   - *Server Hardening* 4.2: closed. `docker-socket.test.js` pins both services.
 
 - **On Kubernetes, the server's and the runner's root file systems are read-only** (#1441; maintainer's choice, 2026-11-25: the exception #1438 accepted is removed). Deployment files, CI and guides, no version.
@@ -696,7 +696,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-1.11.588] / [collection-OTST_V2.0.273] — 2026-11-25
 
-Issue #1444, the last case of #1266. Simulator 0.76.0. Fares asked without a trip: a negative probe. Listed as release 2026.629; `current_release` is not moved.
+Issue #1444, the last case of #1266. Simulator 0.76.0. Fares asked without a trip: a negative probe.
+
+**Release 2026.629 (`current_release`)**, with everything merged since 2026.625: the run dispatcher's `RUN_POD_USER` and the Kubernetes scans (1.11.585, #1438); a sale without a trip by product tag (1.11.586, #1436), the offer request options test on a request without a trip (1.11.587, #1437) and fares asked without a trip (1.11.588, this section), the last cases of #1266, with simulator 0.74.0 to 0.76.0; and three changes without version, under *Unreleased*: no container mounts the Docker socket (#1434), and the server's and the runner's root file systems are read-only on Kubernetes (#1441) and on the VPS (#1446).
+
+**What to do with this release.**
+- **Before approving the promotion:** the installed simulator is still 0.73.0, and this release's simulator scenarios and references need 0.76.0. In *Simulator · update the installed simulator*, reject run #64 (it expects 0.74.0, but the host's update takes `main`, so its check would fail) and approve #66: it ends with `Updated the simulator to 0.76.0`. Nothing to do on the VPS before.
+- **The promotion** moves the checkout to the release and makes `oscar` and `oscar-runner` again from the new compose file: read-only, each with its `logging` block. Its step *Refresh host repo and start the image on VPS* ends with `deployed ghcr.io/top-phe/oscar-server@sha256:…: oscar is healthy`. The `autoheal` container and Promtail keep running as they were (compose calls the first an orphan) until the step after. The production smoke test then runs by itself.
+- **At the start:** no migration.
+- **After it, once, when no run is in progress** (about a minute): *Server Admin Guide* 13.8 (install the host's restart timer, make the other containers again, Promtail last; the `autoheal` container goes), then 13.9's checks (`read-only=true` for both, no `EROFS` after a scenario).
+- **On oscartest (k3s), when it moves to this release:** the k3s guide, section 9, *The CIS benchmark and Kubescape* (the certificates' drop-in and the default ServiceAccounts). The overlay brings `RUN_POD_USER`.
 
 OSDM:
 - osdm.io, *Constructing products from fares*: "Online Fares are always part of an offer for a specified trip and a specified list of passengers".
