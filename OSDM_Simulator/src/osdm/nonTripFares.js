@@ -28,7 +28,7 @@
  * section and no trip, sold as a separate ticket (SEPARATE_TICKET).
  */
 
-const crypto = require('crypto');
+const crypto = require('node:crypto');
 const nonTrip = require('./nonTrip');
 
 const randomId = () => crypto.randomBytes(8).toString('hex');
