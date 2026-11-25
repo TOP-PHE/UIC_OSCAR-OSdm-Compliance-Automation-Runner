@@ -136,6 +136,11 @@ describe('images.js: what the weekly job scans', () => {
       values: `${helmChart.spec.valuesContent.trimEnd()}\n`,
     });
     expect(yaml.load(chart.values).grafana.image.sha).toMatch(/^[0-9a-f]{64}$/);
+    // Grafana's sidecar, moved past the chart's own for the weekly scan's
+    // CRITICAL findings: a version and its digest.
+    expect(yaml.load(chart.values).grafana.sidecar.image).toEqual({
+      tag: expect.stringMatching(/^\d+\.\d+\.\d+$/), sha: expect.stringMatching(/^[0-9a-f]{64}$/),
+    });
   });
 
   test('the images of a rendered chart: its image lines and the config reloader', () => {

@@ -711,6 +711,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - the promotion built the server image from the Actions cache, so the Dockerfile's `apt-get upgrade` layer could be weeks old: 2026.629 went out with `apt` 2.6.1, whose HIGH finding (CVE-2026-109518) 2.6.2 fixes. `promote-release.yml` builds with `no-cache: true` now; the next promotion carries the fix;
   - the configuration scan's Dockerfile findings: Bruno is installed with `npm ci --prefix /opt/bruno-cli` (no `cd` in a `RUN`, both images alike, as `kubernetes-manifests.test.js` asks), and the cluster image names its user (`USER 1000`);
   - the chart is rendered with `--skip-tests`: its test pods run only under `helm test`, which k3s never runs.
+  - Grafana's sidecar on k3s, k8s-sidecar 2.14.1 in the chart, had two CRITICAL findings (certifi's compromised emSign root certificates among them): its pin moves to 2.14.3, by digest, in the chart's values (maintainer, 2026-11-25). Nothing moves that pin by itself; it goes when the chart names a fixed version. oscartest takes it with the k3s guide's monitoring block (section 9).
 
 ---
 
