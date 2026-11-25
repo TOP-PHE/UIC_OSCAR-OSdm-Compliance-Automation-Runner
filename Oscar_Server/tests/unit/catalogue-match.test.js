@@ -490,6 +490,20 @@ describe('#1266 the replacement in the coverage', () => {
   });
 });
 
+describe('#1444 fares asked without a trip in the coverage', () => {
+  const { derivedCapability, isRefusalTest } = require('../../src/utils/capabilities');
+  const sim = (code) => simulator.scenarios.find((s) => s.code === code);
+
+  test('a probe of fare offers, an expected refusal, in every version', () => {
+    for (const code of ['SIM_NHF_FARE_NONTRIP_1ADT_38', 'SIM_NHF_FARE_NONTRIP_1ADT_36', 'SIM_NHF_FARE_NONTRIP_1ADT_312']) {
+      expect([code, derivedCapability(sim(code), simulator), isRefusalTest(sim(code))]).toEqual([code, 'fares.offers', true]);
+    }
+    // Without the flag, the same request is a fare sale, and no refusal.
+    const plain = { ...sim('SIM_NHF_FARE_NONTRIP_1ADT_38'), nonTripFaresExpectRejection: 'off' };
+    expect([derivedCapability(plain, simulator), isRefusalTest(plain)]).toEqual(['fares.sale', false]);
+  });
+});
+
 describe('#1436 a sale by product tag in the coverage', () => {
   const { derivedCapability, SEARCH_ONLY_TAGS } = require('../../src/utils/capabilities');
   const sim = (code) => simulator.scenarios.find((s) => s.code === code);

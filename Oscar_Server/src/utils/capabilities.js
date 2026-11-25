@@ -181,7 +181,7 @@ const NO_OVERRULE = new Set(['', 'null', 'CODE_DOES_NOT_EXIST']);
 const REFUSAL_FLAGS = Object.freeze([
   'passengerLimitExpectRejection', 'departureExpectRejection', 'emptyPassengersExpectRejection', 'overruleCodeExpectRejection',
   'tripIdsExpectRejection', 'currencyExpectRejection', 'offerOptionExpectRejection', 'expectedProductAbsent',
-  'refundAgainProbe', 'exchangeRefundedProbe', 'confirmAgainProbe', 'lostCardExpectRejection', 'nutsCodeExpectRejection',
+  'refundAgainProbe', 'exchangeRefundedProbe', 'confirmAgainProbe', 'lostCardExpectRejection', 'nutsCodeExpectRejection', 'nonTripFaresExpectRejection',
   'expiredOfferTest', 'expiredBookingTest', 'expiredRefundOfferTest', 'expiredExchangeOfferTest',
 ]);
 
@@ -285,6 +285,8 @@ function saleCapability(scenario, datafile) {
 function fareCapability(scenario, datafile) {
   if (typeOf(scenario) === 'REFUND') return 'fares.refund';
   if (scenario.expectFares === false) return 'fares.offers';
+  // #1444: fares asked without a trip, expected refused or given none.
+  if (armed(scenario.nonTripFaresExpectRejection)) return 'fares.offers';
   if (partsOf(scenario, datafile).includes('FARE_RESERVATION')) return 'fares.reservation';
   return 'fares.sale';
 }

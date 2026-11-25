@@ -1477,6 +1477,17 @@
           "nonTripZones"
         ]
       }
+    },
+    {
+      "code": "NHF_NONTRIP_FARES_1ADT",
+      "source": "SIM_NHF_FARE_NONTRIP_1ADT_38",
+      "checks": 92,
+      "purpose": "Negative test (#1444): fares asked without a trip (nonTripSearchCriteria in the first zone of GET /zones, requestedOfferParts FARE_ADMISSION only, nonTripFaresExpectRejection). OSDM describes online fares as part of an offer for a trip (osdm.io, Constructing products from fares) and names no fare on its page on sales without a trip. POST /offers must refuse it with a 4xx Problem, or give no fare; fares given are a WARNING, not a failure. The scenario ends there.",
+      "capability": "fares.offers",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1
+      }
     }
   ]
 }

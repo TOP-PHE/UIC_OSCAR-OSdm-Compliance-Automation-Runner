@@ -22,6 +22,11 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   of the region"; a validity naming no code asked (Zone.nutsCode) is a
  *   WARNING, as for places and zones. `nutsCodeExpectRejection` expects an
  *   unknown code refused or answered without an offer.
+ * - Fares (#1444): OSDM's page on fares says online fares are "always part
+ *   of an offer for a specified trip", and its page on sales without a trip
+ *   names none. `nonTripFaresExpectRejection` asks fares without a trip:
+ *   refused, or answered without a fare, passes; fares given are a WARNING
+ *   (OSDM says it in prose, not in the schema).
  * - The answer has no trip and no trip coverage; each admission says where it
  *   is valid: `regionalValidities` from OSDM 3.7 (the single
  *   `regionalValidity`, which 3.7 deprecated, is then a WARNING), the single
@@ -502,6 +507,39 @@ function checkUnknownNutsRefused(status, body) {
   return true;
 }
 
+// #1444: an offer holding fares (FARE_ADMISSION), or fare reservations.
+const holdsFares = (offer) => list(offer?.fares).length > 0
+  || list(offer?.reservationOfferParts).some((part) => part?.mode === 'FARE_MODE');
+
+/**
+ * #1444: fares asked without a trip must be refused, or answered without a
+ * fare; fares given are a WARNING. True when armed (the scenario ends at 01).
+ */
+function checkNonTripFaresRefused(status, body) {
+  if (String(bruEnv('nonTripFaresExpectRejection')) !== 'true') return false;
+  log('[INFO] 🧪 Fares without a trip probe — fares asked (requestedOfferParts) by a request without a trip; OSDM describes online fares for a trip only (osdm.io, Constructing products from fares).');
+  if (typeof status === 'number' && status >= 300) {
+    const { validateProblemResponse } = require('./requestedInformation.js');
+    validateProblemResponse({
+      status,
+      body,
+      targets: [],
+      prefix: '🧪 Fares without a trip probe',
+      label: 'POST /offers',
+      assert: (name, ok, msg) => test(name, () => { if (!ok) throw new Error(msg); }),
+      log: (level, msg) => log(`[${level}] ${msg}`),
+    });
+    return true;
+  }
+  const withFares = list(body?.offers).filter(holdsFares);
+  if (withFares.length > 0) {
+    log(`[WARNING] 🧪 Fares without a trip probe: ${withFares.length} offer(s) hold fares for a request without a trip (${withFares.map((o) => o?.offerId).filter(Boolean).slice(0, 5).join(', ') || 'no id'}). OSDM describes online fares as part of an offer for a trip; a fare valid without a trip is not described.`);
+    return true;
+  }
+  test('🧪 Fares without a trip probe [POST /offers]: no fare is given', () => {});
+  return true;
+}
+
 function record(checks, test) {
   for (const c of checks) {
     if (c.level === 'warn') {
@@ -572,7 +610,7 @@ function recordNonTripBookingChecks(booking, step, test) {
 module.exports = {
   stopPlaceRefOf, sameStopPlace, isAuto, nonTripRequirementOf, nonTripCriteria, nonTripOfferRequest, placeRequest,
   checkPlaceAnswer, checkZonesAnswer, validityListExpected, validitiesOf, stopPlacesNamedIn, admissionValidityChecks,
-  checkNonTripOffers, checkNonTripBooking, exchangeNonTripCriteria, askedOfCriteria, namesWhere, checkUnknownNutsRefused,
+  checkNonTripOffers, checkNonTripBooking, exchangeNonTripCriteria, askedOfCriteria, namesWhere, checkUnknownNutsRefused, checkNonTripFaresRefused, holdsFares,
   isNonTripSale, prepareNonTripRequest, checkNonTripLookup, recordNonTripOfferChecks, recordNonTripBookingChecks,
   recordNonTripExchangeOfferChecks, recordNonTripExchangedPartsChecks,
 };

@@ -75,6 +75,7 @@ const ENUMS = {
   lostCardExpectRejection:           ['off', 'on'],
   // #1266: negative test, a NUTS code the provider does not know.
   nutsCodeExpectRejection:           ['off', 'on'],
+  nonTripFaresExpectRejection:       ['off', 'on'],
   // #703: negative test, an offer request with no passenger must be refused.
   emptyPassengersExpectRejection:    ['off', 'on'],
   // #704: negative test, a departure in the past or beyond the sales horizon must be refused.
@@ -2420,6 +2421,8 @@ function buildDetailHTML(idx) {
         ${buildLostCardFields(idx)}
         ${buildSelect(idx, 'nutsCodeExpectRejection', 'Unknown NUTS code refused', ENUMS.nutsCodeExpectRejection,
           'Negative test (#1266), for a trip without a trip by NUTS codes. On: the NUTS codes of the trip are ones the provider does not know; POST /offers must refuse them (4xx + RFC-9457 Problem) or give no offer; offers given fail. The scenario ends there.')}
+        ${buildSelect(idx, 'nonTripFaresExpectRejection', 'Fares without a trip refused', ENUMS.nonTripFaresExpectRejection,
+          'Negative test (#1444), for a trip without a trip that asks fare parts (Offer search → Offer parts, FARE_ADMISSION). OSDM describes online fares for a trip only. On: POST /offers must refuse it (4xx + RFC-9457 Problem) or give no fare; fares given are a warning. The scenario ends there.')}
         ${(() => {
           // Hide the Overrule Code selector when the framework does not enable
           // IROPS for this scenario type. Shown only for REFUND / EXCHANGE

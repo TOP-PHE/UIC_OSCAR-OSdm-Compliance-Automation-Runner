@@ -480,6 +480,43 @@ describe('NUTS codes (#1266)', () => {
     expect(recorded.filter((r) => !r.ok).map((r) => r.message)).toEqual(['POST /offers gave 1 offer(s) for NUTS code(s) XS999']);
   });
 
+  test('#1444, fares without a trip: off does nothing; a refusal or no fare passes; fares given are a warning, never a failure', () => {
+    envStore.nonTripFaresExpectRejection = 'false';
+    expect(NT.checkNonTripFaresRefused(400, {})).toBe(false);
+    expect(recorded).toEqual([]);
+
+    envStore.nonTripFaresExpectRejection = 'true';
+    expect(NT.checkNonTripFaresRefused(400, { code: 'FARE_WITHOUT_TRIP_NOT_SUPPORTED', title: 'Fares need a trip', status: 400, detail: 'd' })).toBe(true);
+    expect(recorded.length).toBeGreaterThan(0);
+    expect(recorded.filter((r) => !r.ok)).toEqual([]);
+    expect(recorded.every((r) => r.name.startsWith('🧪 Fares without a trip probe'))).toBe(true);
+    expect(recorded.some((r) => r.name.includes('no fare is given'))).toBe(false);
+
+    recorded.length = 0;
+    expect(NT.checkNonTripFaresRefused(200, { offers: [{ offerId: 'P', products: [{}] }] })).toBe(true);
+    expect(recorded).toEqual([{ name: '🧪 Fares without a trip probe [POST /offers]: no fare is given', ok: true }]);
+
+    recorded.length = 0;
+    mockLogs.length = 0;
+    expect(NT.checkNonTripFaresRefused(200, { offers: [{ offerId: 'F1', fares: [{ id: 'x' }] }, { offerId: 'R1', reservationOfferParts: [{ mode: 'FARE_MODE' }] }] })).toBe(true);
+    expect(recorded).toEqual([]);
+    expect(mockLogs.filter((l) => l.startsWith('[WARNING] 🧪 Fares without a trip probe: 2 offer(s) hold fares'))).toHaveLength(1);
+    expect(mockLogs.some((l) => l.includes('(F1, R1)'))).toBe(true);
+    expect(NT.holdsFares({ reservationOfferParts: [{ mode: 'PRODUCT_MODE' }] })).toBe(false);
+  });
+
+  test('#1444: step 01 grades the probe before the status check, and both reset lists name it', () => {
+    const fs = require('node:fs');
+    const path = require('node:path');
+    const root = path.join(__dirname, '..', '..', '..', 'Bruno_Collection');
+    const step = fs.readFileSync(path.join(root, '02-Common Requests', '01. POST Get Offer.yml'), 'utf8');
+    expect(step.indexOf('checkNonTripFaresRefused(')).toBeGreaterThan(step.indexOf('checkUnknownNutsRefused('));
+    expect(step.indexOf('checkNonTripFaresRefused(')).toBeLessThan(step.indexOf('checkDepartureRefused') === -1 ? Infinity : step.indexOf('checkDepartureRefused'));
+    for (const file of [path.join(root, 'library-bruno', 'scenarioParser.js'), path.join(root, 'opencollection.yml')]) {
+      expect(fs.readFileSync(file, 'utf8')).toMatch(/"nutsCodeExpectRejection", "nonTripFaresExpectRejection"/);
+    }
+  });
+
   test('the parser: the requirement by NUTS, and an exchange naming other codes', () => {
     const { nonTripRequest, prepareExchangeTrip } = require('../../../Bruno_Collection/library-bruno/scenarioParser.js');
     nonTripRequest({ tripType: 'NON_TRIP', nonTrip: { by: 'NUTS', nutsCodes: ['XS111'] } }, '2026-11-20');

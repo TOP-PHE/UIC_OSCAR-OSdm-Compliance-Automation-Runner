@@ -908,9 +908,18 @@ function buildNonTripOffer({ asked, validity, passengers, item, travelClass, ful
  * in zones, a multi-ride card), kept to the product tags or codes asked. The
  * wrong variants (nonTrip.applyVariants) are chosen by the first stop place.
  */
+// #1444: a request asking fare parts (FARE_ADMISSION, FARE_RESERVATION, FARE_ANCILLARY).
+const asksFares = (criteria) => Array.isArray(criteria?.requestedOfferParts)
+  && criteria.requestedOfferParts.some((part) => typeof part === 'string' && part.startsWith('FARE_'));
+const faresNeedATrip = () => new HttpError(400, 'FARE_WITHOUT_TRIP_NOT_SUPPORTED', 'Fares need a trip',
+  'This provider gives fares for a trip only; ask products, or name a trip.', {}, { pointers: [{ requestPointer: '/offerSearchCriteria/requestedOfferParts' }] });
+
 function buildNonTripCollection(request, providerAsIs, nowMs) {
   if (!providerAsIs.nonTrip) throw bad('nonTripSearchCriteria: this provider sells offers for trips only');
   const asked = nonTrip.nonTripAsked(request.nonTripSearchCriteria, providerAsIs);
+  // #1444: fares without a trip are not sold (OSDM: online fares are part of
+  // an offer for a specified trip).
+  if (asksFares(request.offerSearchCriteria)) throw faresNeedATrip();
   // #1437: optional parameters this provider ignores, refuses or answers
   // without offers, from its own stop place or zone.
   const options = applyRequestOptions(request, [], providerAsIs, asked);

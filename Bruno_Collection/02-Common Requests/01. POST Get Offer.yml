@@ -132,6 +132,14 @@ runtime:
           return;
         }
 
+        // #1444: fares asked without a trip must be refused or given no
+        // fare (fares given: a warning); the scenario ends here either way.
+        if (require(bru.getEnvVar("library_base") + "nonTrip.js").checkNonTripFaresRefused(res.getStatus(), _tripIdsBody)) {
+          const { loopbackOrStop } = require(bru.getEnvVar("library_base") + "loopback.js");
+          loopbackOrStop("POST Get Offer (fares without a trip probe)");
+          return;
+        }
+
         // #704: a departure in the past or beyond the sales horizon must not
         // be sold; the scenario ends here either way.
         if (require(bru.getEnvVar("library_base") + "departureLimit.js").checkDepartureRefused(res.getStatus(), _tripIdsBody)) {

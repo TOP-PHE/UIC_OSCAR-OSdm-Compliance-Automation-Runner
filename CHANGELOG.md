@@ -694,6 +694,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.588] / [collection-OTST_V2.0.273] — 2026-11-25
+
+Issue #1444, the last case of #1266. Simulator 0.76.0. Fares asked without a trip: a negative probe. Listed as release 2026.629; `current_release` is not moved.
+
+OSDM:
+- osdm.io, *Constructing products from fares*: "Online Fares are always part of an offer for a specified trip and a specified list of passengers".
+- osdm.io, *Non trip based sale* speaks of offers and products, and names no fare.
+- The schema allows `nonTripSearchCriteria` and `FARE_ADMISSION` in one request.
+
+Decided with the maintainer, who asks the OSDM architect whether such fares are in OSDM's scope:
+- a negative probe: a refusal or no fare passes;
+- fares given are a WARNING;
+- the simulator refuses with a 400.
+
+### Added
+- **The probe** (`nonTripFaresExpectRejection`, `checkNonTripFaresRefused()` in `library-bruno/nonTrip.js`, at 01 after the unknown NUTS code probe, before the status check):
+  - a refusal is graded as a Problem (a 501 is "not supported");
+  - an answer without fare passes;
+  - offers holding fares, or fare-mode reservations (`holdsFares()`), are a WARNING naming them.
+  - The scenario ends there. The flag is in both reset lists and in the data file schema.
+- **Server**:
+  - the probe is an expected refusal (`REFUSAL_FLAGS`), under *Fare offers* (`fares.offers`);
+  - Test Config's switch *Fares without a trip refused*.
+- **Catalogue**: `NHF_NONTRIP_FARES_1ADT` (92 checks). It needs fare-based distribution and offers without a trip in zones declared.
+- **Simulator scenario** (gamma, with its version copies, in the run list): `SIM_NHF_FARE_NONTRIP_1ADT_38` (trip 47).
+- **Docs and page**:
+  - *What is tested* (step 01, the simulator table, the summary, one catalogue row);
+  - *OSCAR - OSDM Simulator scenarios* (one row);
+  - the simulator's README;
+  - a welcome-page news entry.
+
+### Simulator 0.76.0
+- **Fares without a trip are refused**: a request with `nonTripSearchCriteria` whose `requestedOfferParts` holds a `FARE_*` part gets 400 `FARE_WITHOUT_TRIP_NOT_SUPPORTED`, pointing at `/offerSearchCriteria/requestedOfferParts`, whatever else it asks.
+- A request without a trip that asks no fare part is answered as before (it ignored `requestedOfferParts`).
+
+### Changed
+- *OSCAR - Checks by scenario* regenerated, and the simulator hints of the finding drafts.
+- Every simulator reference changes (the run list).
+
+### Checked
+- **Replay** with the real Bruno CLI 4.2.1 against simulator 0.76.0, in chunks, of the 228 scenarios of *Checks by scenario* after #1437: the same checks, results and warnings, but for five check texts that carry a date (it ran a day later).
+  - The new scenario passes, 92 checks, the refusal graded.
+  - Its five copies pass on their providers.
+  - `replay.js catalogue` agrees with all 116 entries.
+- **Simulator**: `non-trip.test.js` covers the refusal on the six providers, by stop places and by zone, a fare part with others, and a request without fare parts; every answer is checked against the OSDM response schema of its version. `datafile.test.js` pins the scenario among the fare ones.
+- **Collection**: `bruno-non-trip.test.js` covers the probe off, a refusal, no fare, fares given (a warning, no failed check), and its place in step 01 and the reset lists.
+- **Server**: `catalogue-match.test.js` (the capability, the expected refusal); `fare-declarations.test.js` (the entry needs the form without a trip); the pinned lists of entries.
+- **Mutation checks**: each new rule (11), removed one by one, fails a test.
+
+---
+
 ## [server-1.11.587] / [collection-OTST_V2.0.272] — 2026-11-25
 
 Issue #1437, part of #1266. Simulator 0.75.0. The offer request options test (#227) on a request without a trip. Listed as release 2026.628; `current_release` is not moved.

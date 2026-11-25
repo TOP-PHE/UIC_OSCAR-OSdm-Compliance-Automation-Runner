@@ -4,6 +4,17 @@
   "current_release": "2026.625",
   "releases": [
     {
+      "release": "2026.629",
+      "date": "2026-11-25",
+      "server": "1.11.588",
+      "collection": "OTST_V2.0.273",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.588 / collection OTST_V2.0.273 / simulator 0.76.0 (#1444, part of #1266): fares asked without a trip, a negative probe. OSDM describes online fares as part of an offer for a trip (osdm.io, Constructing products from fares) and names no fare for a sale without a trip. A scenario with nonTripFaresExpectRejection asks FARE_ADMISSION without a trip: a refusal (4xx Problem) or an answer without fare passes, fares given are a warning. The simulator refuses any fare part without a trip (400 FARE_WITHOUT_TRIP_NOT_SUPPORTED). Coverage: an expected refusal under Fare offers. One simulator scenario with its copies, the reference scenario NHF_NONTRIP_FARES_1ADT, Test Config's switch. No other scenario's checks change. Not released on its own: current_release is not moved."
+      ]
+    },
+    {
       "release": "2026.628",
       "date": "2026-11-25",
       "server": "1.11.587",

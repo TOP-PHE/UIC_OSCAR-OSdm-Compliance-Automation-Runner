@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-25-fares-without-a-trip-refused",
+    "date": "November 25, 2026",
+    "tag": "New",
+    "title": "Without a trip: fares asked are expected to be refused",
+    "summary": "A new negative scenario asks fares without a trip, which OSDM does not describe: the provider should refuse it, or give no fare.",
+    "content": "OSDM describes online fares as always part of an offer for a trip. Its page on sales without a trip speaks of products only.\n\nA new negative scenario asks offers without a trip with FARE_ADMISSION only. A refusal (a 4xx with an RFC 9457 Problem) or an answer without any fare passes. Fares given are a warning, not a failure: OSDM says it in its pages, not in its schema. The scenario ends after the offer request.\n\nThe reference scenario NHF_NONTRIP_FARES_1ADT can be copied when your Test Framework declares fare-based distribution and offers without a trip in zones. In Test Config the switch is Fares without a trip refused.\n\nThe question is with the OSDM working group. If OSDM comes to describe such fares, this scenario will change. If your company follows a simulator reference configuration, update it from Test Config. Otherwise no action is required."
+  },
+  {
     "id": "2026-11-25-offer-request-options-without-a-trip",
     "date": "November 25, 2026",
     "tag": "New",
