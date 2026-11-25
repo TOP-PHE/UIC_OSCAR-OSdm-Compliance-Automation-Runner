@@ -489,3 +489,25 @@ describe('#1266 the replacement in the coverage', () => {
     expect(derivedCapability(sim('SIM_NONTRIP_ZONES_1ADT_38'), simulator)).toBe('offers.nonTripZones');
   });
 });
+
+describe('#1436 a sale by product tag in the coverage', () => {
+  const { derivedCapability, SEARCH_ONLY_TAGS } = require('../../src/utils/capabilities');
+  const sim = (code) => simulator.scenarios.find((s) => s.code === code);
+
+  test('a choice of product (sale.products), whatever the form; a probe of the tag stays an offer option', () => {
+    for (const code of ['SIM_NONTRIP_SALE_TAG_SINGLE_RIDE_1ADT_38', 'SIM_NONTRIP_SALE_TAG_PASS_1ADT_38', 'SIM_NONTRIP_SALE_TAG_MULTI_RIDE_1ADT_38', 'SIM_NONTRIP_SALE_TAG_PASS_1ADT_36']) {
+      expect([code, derivedCapability(sim(code), simulator)]).toEqual([code, 'sale.products']);
+    }
+    expect(derivedCapability(sim('SIM_NONTRIP_PROBE_TAG_PASS_38'), simulator)).toBe('offers.options');
+    // A tag by its selection counts too; SPLIT_RESERVATION asks nothing sold.
+    const bySelection = { ...sim('SIM_NONTRIP_ZONES_1ADT_38'), offerSearchCriteria: { productSelections: [{ productTag: 'ADMISSION_PASS', numberOfItems: 1 }] } };
+    expect(derivedCapability(bySelection, simulator)).toBe('sale.products');
+    const split = { ...sim('SIM_NONTRIP_ZONES_1ADT_38'), offerSearchCriteria: { productTags: ['SPLIT_RESERVATION'] } };
+    expect(derivedCapability(split, simulator)).toBe('offers.nonTripZones');
+  });
+
+  test('the tags that ask for something are the collection\'s', () => {
+    const { SEARCH_ONLY_TAGS: collection } = require('../../../Bruno_Collection/library-bruno/products.js');
+    expect([...SEARCH_ONLY_TAGS].sort()).toEqual([...collection].sort());
+  });
+});

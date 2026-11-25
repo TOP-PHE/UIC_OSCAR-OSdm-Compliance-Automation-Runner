@@ -103,4 +103,4 @@ function selectProducts(criteria, offers, { nonTrip = false } = {}) {
   return { offers: tagged.filter((o) => holds(o, wantedTags, codes)), problems };
 }
 
-module.exports = { TAG_OF_TYPE, productsAsked, selectProducts };
+module.exports = { TAG_OF_TYPE, tagOf, productsAsked, selectProducts };

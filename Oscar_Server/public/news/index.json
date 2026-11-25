@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-24-sale-by-product-tag",
+    "date": "November 24, 2026",
+    "tag": "New",
+    "title": "Without a trip: a sale by product tag, and the product tags read",
+    "summary": "OSCAR now tests a sale without a trip of a single ride, a day pass or a multi-ride card asked by its product tag, from the offer to the ticket. The simulator answers GET /product-tags.",
+    "content": "OSDM lets a distributor ask offers by product tag: every product type is a tag (ADMISSION_POINT2POINT for a single ride, ADMISSION_PASS for a pass, ADMISSION_MULTI_RIDE for a multi-ride card), and GET /product-tags lists the tags a provider uses.\n\nA scenario that asks a product type by its tag now books an offer holding a product of that tag, when an offer does. After the confirmation, the booking must hold a product of the tag asked: a booking of another product fails. A booking whose products name neither a type nor a tag gives a warning. The tags TICKET_LOST and CARD_LOST (the replacement of a lost ticket or card) are checked as before.\n\nThree reference scenarios can be copied: OTST_NONTRIP_SALE_SINGLE_RIDE_BY_TAG_1ADT, OTST_NONTRIP_SALE_PASS_BY_TAG_1ADT and OTST_NONTRIP_SALE_MULTI_RIDE_BY_TAG_1ADT. In the coverage report they count under Named products and tariff choice.\n\nThe OSDM simulator now answers GET /product-tags on every provider, so the system information step checks a product tags answer on each. Every scenario run on the simulator gains those checks.\n\nIf your company follows a simulator reference configuration, update it from Test Config. Otherwise no action is required."
+  },
+  {
     "id": "2026-11-24-sign-in-paused-after-wrong-passwords",
     "date": "November 24, 2026",
     "tag": "Security",

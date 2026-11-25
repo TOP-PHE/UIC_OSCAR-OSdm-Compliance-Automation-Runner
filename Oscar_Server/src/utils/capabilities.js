@@ -238,6 +238,16 @@ function asksLostItem(scenario, datafile) {
     .some((tag) => LOST_TAGS.includes(text(tag)));
 }
 
+// #1436: a sale asking a product type by its tag (OSDM: "All product types can
+// be used as Product Tags"); the lost-item tags and SPLIT_RESERVATION only ask
+// for something. Pinned to the collection's SEARCH_ONLY_TAGS (products.js).
+const SEARCH_ONLY_TAGS = Object.freeze([...LOST_TAGS, 'SPLIT_RESERVATION']);
+function asksProductTag(scenario, datafile) {
+  const criteria = scenarioOfferCriteria(scenario, datafile);
+  return [...arr(criteria?.productTags), ...arr(criteria?.productSelections).map((s) => s?.productTag)]
+    .some((tag) => text(tag) && !SEARCH_ONLY_TAGS.includes(text(tag)));
+}
+
 const SALE_RULES = [
   [(s) => armed(s.idempotencyCheck), 'sale.idempotency'],
   [(s) => armed(s.confirmAgainProbe) || armed(s.emptyPassengersExpectRejection), 'sale'],
@@ -253,6 +263,8 @@ const SALE_RULES = [
   [(s, df) => armed(s.currencyExpectRejection) || text(s.expectedCurrency) || text(scenarioOfferCriteria(s, df)?.currency), 'sale.currencies'],
   // #1266: the replacement of a lost ticket or card (TICKET_LOST / CARD_LOST asked).
   [(s, df) => asksLostItem(s, df), 'sale.replacement'],
+  // #1436: a sale asking a product by its tag is a choice of product.
+  [(s, df) => asksProductTag(s, df), 'sale.products'],
   // #1258: a sale without a trip is for its offer request form.
   [(s, df) => NON_TRIP_REQUEST_FORMS.includes(offerRequestFormOf(s, df)), (s, df) => OFFER_FORM_CAPABILITY[offerRequestFormOf(s, df)]],
   [(s) => armed(s.offersByTripIds) || armed(s.tripIdsExpectRejection), 'offers.tripIds'],
@@ -360,6 +372,7 @@ const isOptionalRead = (stepName) => OPTIONAL_READS.has(stepName);
 const ALWAYS_REQUIRED = Object.freeze(['sale', 'offers.search']);
 
 module.exports = {
+  SEARCH_ONLY_TAGS,
   CAPABILITIES, CAPABILITY, GROUPS, STEP_ROLES, STAGE_ROLES, STAGE_GOAL, SYSTEM_INFO_STEPS, OPTIONAL_READS, SALE_GOAL, OFFER_GOAL, ALWAYS_REQUIRED, armed,
   derivedCapability, traitsOf, stepCapabilities, isRefusalTest, isFareScenario, roleOf, isOptionalRead, refundCapability,
 };

@@ -28,6 +28,8 @@ const { placeCollection, findPlaces, placeById, zoneCollection } = require('./os
 const { createBooking, confirmBooking, releaseIfExpired, addOfferParts, addReservations, findPassenger, patchPassenger, setPurchaser, exchangedBookedOffer } = require('./osdm/bookings');
 const { createRefundOffers, findRefundOffer, confirmRefundOffer, deleteRefundOffer } = require('./osdm/refunds');
 const { reductionCardCollection } = require('./osdm/reductionCards');
+const { productTagsOf } = require('./osdm/productTags');
+const { tagOf } = require('./osdm/productSelection');
 const { preferenceAvailability } = require('./osdm/reservations');
 const { vehiclePlaceMap, nearbyAvailability } = require('./osdm/placeMap');
 const { buildTripCollection } = require('./osdm/trips');
@@ -94,10 +96,14 @@ function requireMethod(req, ...allowed) {
 }
 
 // An error answer of the token endpoint (RFC 6749 section 5.2).
+// A product of the master data names its search tag (#1436; OSDM: the tags
+// "can be omitted outside of the product master data service").
+const withTag = (p) => (p.productTags || !tagOf(p) ? p : { ...p, productTags: [tagOf(p)] });
+
 // GET /products, GET /products/{id} (#598)
 function productRoute(req, provider, productId) {
   requireMethod(req, 'GET');
-  const products = productsOf(provider);
+  const products = productsOf(provider).map(withTag);
   if (productId === undefined) return { products };
   const product = products.find((p) => p.id === productId);
   if (!product) throw new HttpError(404, 'PRODUCT_NOT_FOUND', 'Product not found');
@@ -521,6 +527,11 @@ function createApp({ providers, clients, accounts = null, admin = null, stats = 
     }
     // #598: a provider with named products lists them; the others answer 501.
     if (resource === 'products' && rest.length <= 1 && provider.products) return productRoute(req, provider, rest[0]);
+    // #1436: every provider lists the tags of what it sells.
+    if (resource === 'product-tags' && rest.length === 0) {
+      requireMethod(req, 'GET');
+      return productTagsOf(provider);
+    }
     // #597: a provider with reduction cards lists them; the others answer 501.
     if (resource === 'reduction-cards' && rest.length === 0 && provider.reductionCards) {
       requireMethod(req, 'GET');
