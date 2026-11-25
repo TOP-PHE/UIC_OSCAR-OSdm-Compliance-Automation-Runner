@@ -491,6 +491,15 @@ describe('pod mode (option 4)', () => {
     expect(dContainer.env).toEqual([{ name: 'RUN_AGENT_TOKEN', valueFrom: { secretKeyRef: { name: 'oscar-runner', key: 'RUN_AGENT_TOKEN' } } }]);
     expect(JSON.stringify(dispatcher)).not.toMatch(/oscar-secrets|oscar-data|\/app\/data/);
     expect(dContainer.securityContext).toMatchObject({ allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ['ALL'] } });
+    // #1441: the server's and the runner's roots are read-only too, and what
+    // they write has a volume.
+    const server = loadAll('base/deployment.yaml').find((d) => d.kind === 'Deployment').spec.template.spec;
+    for (const c of server.containers) {
+      expect([c.name, c.securityContext.readOnlyRootFilesystem]).toEqual([c.name, true]);
+      expect([c.name, c.volumeMounts.some((m) => m.mountPath === '/tmp')]).toEqual([c.name, true]);
+      expect([c.name, c.volumeMounts.some((m) => m.mountPath === '/app/run-workspaces')]).toEqual([c.name, true]);
+    }
+    expect(server.containers.find((c) => c.name === 'oscar').volumeMounts.some((m) => m.mountPath === '/app/data')).toBe(true);
     expect(dPod.securityContext).toEqual({ runAsNonRoot: true, seccompProfile: { type: 'RuntimeDefault' } });
   });
 

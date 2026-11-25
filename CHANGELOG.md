@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **On Kubernetes, the server's and the runner's root file systems are read-only** (#1441; maintainer's choice, 2026-11-25: the exception #1438 accepted is removed). Deployment files, CI and guides, no version.
+  - `readOnlyRootFilesystem: true` on both containers of `base/deployment.yaml`. What they write was already on volumes: the database, data files and reports on `/app/data`, the runs' folders on `/app/run-workspaces`, HOME and temporary files on `/tmp`. The run pods already ran Bruno with a read-only root. The one other place the server writes, Alertmanager's file (*Server Config*, *Apply*), is the VPS's only: on a cluster the administrator makes Alertmanager's Secret (k3s guide, 8a).
+  - **Proved in CI** (`ci-kubernetes.yml`): in kind after a scenario in isolated mode (server and runner) and after the data moved into the Kubernetes overlay, in k3s after a scenario in pod mode, neither container can write its root and no log holds a refused write (`EROFS`). The Kubescape exception C-0017 is gone from `accepted.json`, so the scan fails if a container's root becomes writable again.
+  - *OSCAR - Server Hardening* 4.2: still open on the VPS only.
+
 - **No container mounts the Docker socket** (#1434; maintainer's choices, 2026-11-24). Deployment files, CI and guides, no version.
   - **Seen:** two containers of a Docker installation mounted the socket, so each was root on the host: `autoheal` (restarts; its `:ro` does not limit Docker's API) and Promtail (log shipping). *OSCAR - Server Hardening* 4.2 listed the first as still open. Watchtower, the third, went with #1428.
   - **Restarts from the host.** `OSCAR_Deploy/scripts/oscar-autoheal.sh`, run every 30 s by a systemd timer, restarts the running containers labelled `autoheal=true` that Docker reports `unhealthy`, as the sidecar did (stop time 20 s). It acts only on container ids, and refuses a label or stop time that is not a plain value. `oscar-autoheal-schedule.sh install` copies it to `/usr/local/sbin/oscar-autoheal` (owned by root, outside the checkout) and starts the timer; `status`, `remove`. Its lines: `journalctl -t oscar-autoheal`. The `autoheal` service and its image leave `docker-compose.yml`; the labels stay.
