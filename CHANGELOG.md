@@ -723,14 +723,14 @@ Decided with the maintainer, who asks the OSDM architect whether such fares are 
 - Every simulator reference changes (the run list).
 
 ### Checked
-- **Replay** with the real Bruno CLI 4.2.1 against simulator 0.76.0, in chunks, of the 228 scenarios of *Checks by scenario* after #1437: the same recording.
+- **Replay** with the real Bruno CLI 4.2.1 against simulator 0.76.0, in chunks, of the 228 scenarios of *Checks by scenario* after #1437: the same checks, results and warnings, but for five check texts that carry a date (it ran a day later).
   - The new scenario passes, 92 checks, the refusal graded.
   - Its five copies pass on their providers.
   - `replay.js catalogue` agrees with all 116 entries.
 - **Simulator**: `non-trip.test.js` covers the refusal on the six providers, by stop places and by zone, a fare part with others, and a request without fare parts; every answer is checked against the OSDM response schema of its version. `datafile.test.js` pins the scenario among the fare ones.
 - **Collection**: `bruno-non-trip.test.js` covers the probe off, a refusal, no fare, fares given (a warning, no failed check), and its place in step 01 and the reset lists.
 - **Server**: `catalogue-match.test.js` (the capability, the expected refusal); `fare-declarations.test.js` (the entry needs the form without a trip); the pinned lists of entries.
-- **Mutation checks**: each new rule, removed one by one, fails a test.
+- **Mutation checks**: each new rule (11), removed one by one, fails a test.
 
 ---
 
