@@ -9,13 +9,6 @@
       "reason": "OpenShift chooses the uid and group itself (its restricted SCC); a fixed one would be refused there. The Kubernetes and k3s overlays name the image's (1000:1000)."
     },
     {
-      "control": "C-0017",
-      "resources": [
-        "Deployment/-/oscar"
-      ],
-      "reason": "The server's and the runner's root file systems stay writable for now: the server and Bruno write outside the volumes, and each of those places must become a volume first (OSCAR - Server Hardening, 4.2). Every other container of OSCAR has a read-only root."
-    },
-    {
       "control": "C-0034",
       "resources": [
         "Deployment/-/oscar-dispatcher",

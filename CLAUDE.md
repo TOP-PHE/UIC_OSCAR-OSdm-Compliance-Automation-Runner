@@ -4833,6 +4833,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   - **The image is `USER 1000` by number and `/app/data` is group 0's too**
     (OpenShift: any uid in group 0; Kubernetes checks `runAsNonRoot` only
     against a numeric user). `HOME=/tmp` (an emptyDir) in the settings.
+  - **Both containers' roots are read-only** (#1441): the server and Bruno
+    write on `/app/data`, `/app/run-workspaces` and `/tmp` only. **A new
+    place a server or a run writes is a volume first**, or it fails with
+    `EROFS`; the CI looks for that in the logs (kind and k3s), and Kubescape's
+    C-0017 is no longer accepted.
   - **The probes send `Host: localhost`**: in production every other host is
     redirected to https (400 once `ALLOWED_REDIRECT_HOSTS` is set).
   - **`METRICS_TOKEN`** (`utils/clusterSettings.js` `metricsAllowed()`): set,

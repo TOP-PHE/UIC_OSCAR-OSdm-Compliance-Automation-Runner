@@ -216,6 +216,16 @@ jobs:
           done
           OSCAR_URL=http://127.0.0.1:3001 SMOKE_ACCOUNT_FILE="$RUNNER_TEMP/smoke-account.json" \
             OSCAR_Deploy/kubernetes/ci/smoke.sh
+          # #1441: neither container can write its root file system, and no
+          # write was refused (a path off the volumes would log EROFS).
+          for c in oscar runner; do
+            if kubectl -n oscar exec deploy/oscar -c "$c" -- sh -c 'touch /app/.write-check' 2> /dev/null; then
+              echo "$c can write its root file system"; exit 1
+            fi
+            if kubectl -n oscar logs deploy/oscar -c "$c" | grep -E 'EROFS|read-only file system'; then
+              echo "$c tried to write off its volumes"; exit 1
+            fi
+          done
 
       - name: Deploy the Kubernetes overlay (ci/kubernetes)
         # With the first deployment's keys: the data moves here below.
@@ -271,6 +281,17 @@ jobs:
             | jq -e --arg s "$(jq -r .scenario "$a")" 'any(.scenarios[]; .code == $s)'
           curl -fsS -H "$auth" "http://127.0.0.1:3011/v1/runs/$(jq -r .run_id "$a")" | jq -e '.status == "COMPLETED"'
           pkill -f 'port-forward service/oscar 3011:3001' || true
+
+      - name: The moved deployment wrote nothing off its volumes (#1441)
+        run: |
+          for c in oscar runner; do
+            if kubectl -n oscar-k8s exec deploy/oscar -c "$c" -- sh -c 'touch /app/.write-check' 2> /dev/null; then
+              echo "$c can write its root file system"; exit 1
+            fi
+            if kubectl -n oscar-k8s logs deploy/oscar -c "$c" | grep -E 'EROFS|read-only file system'; then
+              echo "$c tried to write off its volumes"; exit 1
+            fi
+          done
 
       - name: The OpenShift overlay renders
         # kind has no Route type to check it against; its content is pinned by
@@ -609,6 +630,16 @@ jobs:
           kubectl -n oscar logs deploy/oscar-dispatcher | grep -q 'started oscar-run-'
           # #1438: that run's pod had the uid and group the k3s overlay names.
           test "$(kubectl -n oscar exec deploy/oscar-dispatcher -- printenv RUN_POD_USER)" = 1000:1000
+          # #1441: neither container can write its root file system, and no
+          # write was refused (a path off the volumes would log EROFS).
+          for c in oscar; do
+            if kubectl -n oscar exec deploy/oscar -c "$c" -- sh -c 'touch /app/.write-check' 2> /dev/null; then
+              echo "$c can write its root file system"; exit 1
+            fi
+            if kubectl -n oscar logs deploy/oscar -c "$c" | grep -E 'EROFS|read-only file system'; then
+              echo "$c tried to write off its volumes"; exit 1
+            fi
+          done
 
       - name: Traefik as the guide sets it
         run: |
