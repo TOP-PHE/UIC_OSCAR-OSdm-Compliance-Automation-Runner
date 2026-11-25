@@ -77,7 +77,10 @@ spec:
             requests:
               cpu: 50m
               memory: 128Mi
+            # A ceiling on CPU too (#1438), so that a burst of queries
+            # never takes the machine from OSCAR's runs.
             limits:
+              cpu: "1"
               memory: 1Gi
           volumeMounts:
             - name: config

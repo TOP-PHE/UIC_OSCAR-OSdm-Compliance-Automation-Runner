@@ -189,7 +189,7 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `XS112` (its 0000042 is a wrong variant: use XS111), each admission a
     Zone naming the code, an unknown code 400 pointing at it. The
     reference adds the form only for a profile whose zones name codes.
-    **Sold by product tag** (#1436, 1.11.585 / OTST_V2.0.271, simulator
+    **Sold by product tag** (#1436, 1.11.586 / OTST_V2.0.271, simulator
     0.74.0; maintainer 2026-11-24). Every simulator provider answers
     `GET /product-tags` (`productTags.js`: groups WITHOUT_TRIP, REPLACEMENT,
     WITH_TRIP from the profile) and `GET /products` names each product's tag.
@@ -4758,6 +4758,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   compose files' shared `logging` block (`x-logging`, one per file: **a new
   service names `logging: *logging`**). `docker-socket.test.js` and the CI
   job *Docker host* hold it.
+- **The Kubernetes set-up is scanned in CI** (#1438, 1.11.585): Kubescape
+  (job `kubescape`) on `scans/render.sh`'s render of the overlays, `runs/`,
+  monitoring and the dispatcher's Jobs (`scans/run-pods.js`), kube-bench
+  (CIS k3s) at the end of the k3s job. **A finding fails unless
+  `OSCAR_Deploy/kubernetes/scans/accepted.json` accepts it with its reason**,
+  and an entry that no longer matches fails too (`scans/check-scans.js`, no
+  dependency). A new manifest, overlay or pod field is scanned with it: fix
+  the finding, or add an entry the maintainer agrees to. The dispatcher's
+  `RUN_POD_USER` names the run pods' uid:group (k3s: 1000:1000; empty on
+  OpenShift), and it removes Secrets by label, never lists them.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image**. **The VPS checkout follows the
   newest `release-*` tag on `main`, never `main`'s head** (2026-11-06):

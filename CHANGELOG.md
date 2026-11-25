@@ -683,9 +683,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [server-1.11.585] / [collection-OTST_V2.0.271] — 2026-11-24
+## [server-1.11.586] / [collection-OTST_V2.0.271] — 2026-11-24
 
-Issue #1436, part of #1266, asked by the maintainer: the system request for product tags did not work on the simulator, and no scenario sold a product without a trip asked by its product tag. Simulator 0.74.0. Listed as release 2026.626; `current_release` is not moved (a release PR follows the run of #1266 PRs).
+Issue #1436, part of #1266, asked by the maintainer: the system request for product tags did not work on the simulator, and no scenario sold a product without a trip asked by its product tag. Simulator 0.74.0. Listed as release 2026.627; `current_release` is not moved (a release PR follows the run of #1266 PRs).
 
 OSDM (3.6 to 3.12): `GET /product-tags` answers a `ProductTagsResponse`, `productTagNames` [{ tag, description }] and `productTagGroups` [{ code, description, productTags }], both required. A `ProductTag` is any product type ("All product types can be used as Product Tags in the search"), or `SPLIT_RESERVATION`, `CARD_LOST`, `TICKET_LOST`, which only ask for something. `Product.productTags` "can be omitted outside of the product master data service".
 
@@ -719,6 +719,30 @@ Decided with the maintainer:
 - **Collection**: `bruno-products.test.js` covers the tags asked, the offer of a tag, the fallback, the booking check and its warning.
 - **Server**: `catalogue-match.test.js` covers the capability and pins the search-only tags to the collection's.
 - **Mutation checks**: each new rule (17), removed one by one, fails a test.
+
+---
+
+## [server-1.11.585] — 2026-11-25
+
+**The Kubernetes set-up is scanned in CI, and what the scans found is fixed or accepted with its reason** (#1438; maintainer's choices, 2026-11-24 and 25: Kubescape and kube-bench, a finding fails unless accepted, the two exceptions a small change of the dispatcher removes are removed). Not released on its own: listed in `compatibility.json` (2026.626) without moving `current_release`. Collection unchanged at OTST_V2.0.270.
+
+- **The scans** (`ci-kubernetes.yml`, not a required check):
+  - job *Kubescape* (4.0.17, NSA and MITRE frameworks) on what an operator applies, as `scans/render.sh` renders it: the overlays `kubernetes`, `openshift`, `k3s`, `runs/`, `monitoring/stack`, `monitoring/oscar`, and a run pod's and a kept pod's Job as the dispatcher makes them (`scans/run-pods.js`, with the k3s overlay's settings);
+  - step *kube-bench* (0.16.0, benchmark `k3s-cis-1.9`, the latest it holds) at the end of the k3s job, on the k3s installed as the guide installs it;
+  - both pinned, each download checked against its published sha256;
+  - `scans/check-scans.js` fails on a finding `scans/accepted.json` does not accept, on an accepted entry that matches nothing, and on one without its reason; the benchmark's manual checks (WARN) are listed only. Each finding names its rendered file, resource and what was found, in the log and the job summary.
+- **Fixed from the first pass:**
+  - CPU limits for Loki (1) and Alloy (500m);
+  - a NetworkPolicy for Alloy: no connection comes in (its page listens on the pod's loopback);
+  - the image's uid and group (1000:1000) named in the kubernetes and k3s overlays, and the dispatcher's in k3s (`overlays/k3s/dispatcher-user.yaml`): OpenShift chooses them itself;
+  - **`RUN_POD_USER`** (dispatcher, `uid:group`, both above 0; anything else stops its start): named in each run pod's security context; the k3s overlay sets `1000:1000`, empty leaves them to the platform;
+  - **the dispatcher no longer lists Secrets**: at its start it removes those of runs it lost by label, in one call (`deleteSecrets()`, `DELETE …/secrets?labelSelector=`); its Role gives `deletecollection`, not `list`;
+  - k3s's certificates are root's only after each start (`k3s/cert-permissions.conf`, a drop-in of k3s's service; CIS 1.1.20);
+  - the default ServiceAccount of every namespace mounts no token: OSCAR's (`default-service-account.yaml` in `base`, `runs`, `monitoring/stack`) and k3s's (at install; CIS 5.1.5).
+- **Accepted, each with its reason in `accepted.json`:** OpenShift's server pod names no uid or group (C-0013); the server's root file system is still writable (C-0017, *Server Hardening* 4.2, its own issue); the dispatcher and Alloy mount an API token (C-0034, C-0053) and the dispatcher's Role removes its Jobs and Secrets (C-0007); kube-bench 1.2.23 (it reads the API server's first start, on SQLite before the move to etcd; the CI checks the latest start names both arguments) and 5.1.6 (k3s's own pods need their tokens).
+- **The CI checks the fixes:** the dispatcher may not list Secrets and may delete them by label, removed its leftovers without error, and its run pod ran with `RUN_POD_USER` on k3s; k3s's certificates are 600 after its last start.
+- Guides: *OSCAR - k3s on one VPS* (section 3: the drop-in and the default ServiceAccounts at install; section 9, *The CIS benchmark and Kubescape*: running both on the machine, what is accepted, and a machine installed before), *Kubernetes and OpenShift Deployment Guide* (10a: `RUN_POD_USER`).
+- Tests: `kubernetes-scans.test.js` (the checker on Kubescape- and kube-bench-shaped reports, `accepted.json`, the run pods as scanned, the pins the same in CI and guide), `run-dispatcher.test.js` (`RUN_POD_USER`, Secrets removed by label and never listed), `kubernetes-manifests.test.js` and `kubernetes-monitoring.test.js`.
 
 ---
 

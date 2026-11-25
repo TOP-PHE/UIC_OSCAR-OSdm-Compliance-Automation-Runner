@@ -24,6 +24,7 @@ labels:
 resources:
   - namespace.yaml
   - run-account.yaml
+  - default-service-account.yaml
   - dispatcher-role.yaml
   - quota.yaml
   - network-policy.yaml

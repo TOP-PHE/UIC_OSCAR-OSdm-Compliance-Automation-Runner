@@ -22,6 +22,7 @@ kind: Kustomization
 
 resources:
   - namespace.yaml
+  - default-service-account.yaml
   - kube-prometheus-stack.yaml
   # The VPS's Loki configuration, as a ConfigMap (OSCAR_Deploy/loki).
   - ../../../loki

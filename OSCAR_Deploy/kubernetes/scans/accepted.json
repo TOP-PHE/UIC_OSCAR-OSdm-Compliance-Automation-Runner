@@ -1,0 +1,52 @@
+{
+  "about": "Findings of the Kubernetes scans accepted on purpose, each with its reason (#1438). check-scans.js fails on any other finding, and on an entry here that no longer matches anything. Kubescape: control + resources ([file:]Kind/namespace/name, * for any part). kube-bench: check number.",
+  "kubescape": [
+    {
+      "control": "C-0013",
+      "resources": [
+        "overlays-openshift:Deployment/-/oscar"
+      ],
+      "reason": "OpenShift chooses the uid and group itself (its restricted SCC); a fixed one would be refused there. The Kubernetes and k3s overlays name the image's (1000:1000)."
+    },
+    {
+      "control": "C-0017",
+      "resources": [
+        "Deployment/-/oscar"
+      ],
+      "reason": "The server's and the runner's root file systems stay writable for now: the server and Bruno write outside the volumes, and each of those places must become a volume first (OSCAR - Server Hardening, 4.2). Every other container of OSCAR has a read-only root."
+    },
+    {
+      "control": "C-0034",
+      "resources": [
+        "Deployment/-/oscar-dispatcher",
+        "Deployment/monitoring/alloy"
+      ],
+      "reason": "Both talk to the Kubernetes API by design: the dispatcher makes and removes the run Jobs and Secrets in oscar-runs, Alloy reads the oscar pods' logs. Every other pod of OSCAR mounts no token."
+    },
+    {
+      "control": "C-0053",
+      "resources": [
+        "ServiceAccount/oscar/oscar-dispatcher",
+        "ServiceAccount/monitoring/alloy"
+      ],
+      "reason": "The same two accounts as C-0034, for the same reason: their tokens are what lets them do their work, each limited to one namespace by a Role."
+    },
+    {
+      "control": "C-0007",
+      "resources": [
+        "ServiceAccount/oscar/oscar-dispatcher"
+      ],
+      "reason": "The dispatcher removes the Jobs and Secrets it made when their run ends, or when it starts again after losing runs (Secrets by label, in one call), in oscar-runs only (a Role, not a ClusterRole). It never lists nor reads a Secret."
+    }
+  ],
+  "kube-bench": [
+    {
+      "check": "1.2.23",
+      "reason": "The benchmark reads the first start of the API server in k3s's log. A k3s moved from SQLite to etcd as the guide does (k3s guide, section 9; the CI does the same) first started without etcd. On etcd k3s sets both arguments: the CI checks that the latest start names them."
+    },
+    {
+      "check": "5.1.6",
+      "reason": "k3s's own pods (CoreDNS, Traefik, metrics-server, the volume provisioner) need their tokens, and k3s writes their manifests. OSCAR's pods are Kubescape's C-0034 to check, where only the dispatcher and Alloy mount one."
+    }
+  ]
+}

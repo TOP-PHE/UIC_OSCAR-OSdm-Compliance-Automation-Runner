@@ -83,13 +83,24 @@ function runJob({ runId, deadlineSeconds }, settings) {
 }
 
 // The Job of a run, or of a kept pod: one pod spec for both.
+// RUN_POD_USER, "uid:group", both above 0 (#1438): the run pods' user and
+// group, named in their pod (a scanner cannot see the image's). Empty: the
+// platform's own (OpenShift chooses them, and refuses a fixed uid).
+const POD_USER_RE = /^[1-9]\d{0,9}:[1-9]\d{0,9}$/;
+
+function podUserOf(value) {
+  if (!value || !POD_USER_RE.test(value)) return {};
+  const [runAsUser, runAsGroup] = value.split(':').map(Number);
+  return { runAsUser, runAsGroup };
+}
+
 function jobOf(name, labels, deadlineSeconds, settings) {
   const podSpec = {
     restartPolicy: 'Never',
     serviceAccountName: settings.serviceAccount,
     automountServiceAccountToken: false,
     enableServiceLinks: false,
-    securityContext: { runAsNonRoot: true, seccompProfile: { type: 'RuntimeDefault' } },
+    securityContext: { runAsNonRoot: true, ...podUserOf(settings.podUser), seccompProfile: { type: 'RuntimeDefault' } },
     containers: [{
       name: CONTAINER,
       image: settings.image,
@@ -159,5 +170,5 @@ function ownedBy(job) {
 module.exports = {
   runSecret, runJob, ownedBy, jobNameOf, keptPodSecret, keptPodJob, podJobNameOf,
   LABELS, RUN_ID_LABEL, POD_ID_LABEL, CONTAINER, MANAGED_SELECTOR, DEADLINE_MARGIN_S, TTL_AFTER_FINISHED_S,
-  WORK_FOLDERS, FOLDER_SIZES,
+  WORK_FOLDERS, FOLDER_SIZES, POD_USER_RE, podUserOf,
 };

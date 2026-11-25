@@ -638,6 +638,12 @@ Details to know:
 - **A sandboxed runtime** (gVisor, Kata Containers / OpenShift sandboxed
   containers) puts each run behind a kernel of its own. Set `RUN_RUNTIME_CLASS`
   to the RuntimeClass your cluster offers.
+- **The run pods' uid and group** (#1438): `RUN_POD_USER=1000:1000` in
+  `oscar-dispatcher-settings` (the run image's own) names them in each run
+  pod, as the k3s overlay does. Leave it out on OpenShift, which chooses them
+  and refuses a fixed uid. Two numbers above 0, or the dispatcher does not
+  start. The CI scans the manifests with Kubescape and the k3s nodes with
+  kube-bench (*OSCAR - k3s on one VPS*, section 9).
 - **Going back:** remove the component from the overlay and apply. OSCAR's
   pod gets its `runner` container again. The runs' namespace can stay.
 

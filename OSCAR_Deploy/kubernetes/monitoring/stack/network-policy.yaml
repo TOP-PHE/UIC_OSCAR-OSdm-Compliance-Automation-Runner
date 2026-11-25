@@ -12,7 +12,9 @@
 # - Grafana: Traefik only (the way in, behind OSCAR's sign-in check);
 # - Prometheus: Grafana, and Prometheus itself (its own figures);
 # - Alertmanager: Prometheus, which sends it the alerts, and Grafana;
-# - Loki: Alloy, which writes, and Grafana, which reads.
+# - Loki: Alloy, which writes, and Grafana, which reads;
+# - Alloy: nobody (it reads the logs and writes to Loki; its own page
+#   listens on the pod's loopback only).
 # The other pods of the chart (operator, kube-state-metrics) are left as the
 # chart makes them: the API server calls the operator's admission webhook.
 apiVersion: networking.k8s.io/v1
@@ -108,3 +110,17 @@ spec:
               app.kubernetes.io/name: grafana
       ports:
         - { protocol: TCP, port: 3100 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: alloy
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: oscar-monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alloy
+  policyTypes: [Ingress]
+  # No rule: no connection comes in.

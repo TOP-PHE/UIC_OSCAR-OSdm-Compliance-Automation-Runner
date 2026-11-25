@@ -43,6 +43,8 @@ patches:
   # The volume (k3s's local-path, a folder of the machine) written by the
   # image's uid.
   - path: data-volume-group.yaml
+  # The dispatcher's uid and group, named as the server's are.
+  - path: dispatcher-user.yaml
   # 3 GiB for the server: its database stays in the kernel's cache.
   - path: server-memory.yaml
   # The run image of the same release. A patch, not a configMapGenerator
@@ -54,3 +56,6 @@ patches:
         name: oscar-dispatcher-settings
       data:
         RUN_IMAGE: ghcr.io/top-phe/oscar-run:release-2026.529
+        # The run pods under the run image's own uid and group, named
+        # (#1438), as the server's and the dispatcher's are.
+        RUN_POD_USER: "1000:1000"

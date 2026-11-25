@@ -23,6 +23,7 @@ resources:
   - deployment.yaml
   - service.yaml
   - data-volume.yaml
+  - default-service-account.yaml
 
 # Settings that are not secret. The secrets (ENCRYPTION_KEY and the others in
 # secrets.env.example) are a Secret named oscar-secrets that you create
