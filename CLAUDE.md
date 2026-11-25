@@ -4785,6 +4785,11 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   compose files' shared `logging` block (`x-logging`, one per file: **a new
   service names `logging: *logging`**). `docker-socket.test.js` and the CI
   job *Docker host* hold it.
+- **The VPS's `oscar` and `oscar-runner` containers are read-only** (#1446,
+  as on Kubernetes since #1441): `read_only: true`, a `tmpfs` on `/tmp`,
+  `HOME=/tmp`. **A new place they write is a volume first**, or it fails with
+  `EROFS`. The kind job runs the real compose file (isolated mode, the job's
+  image, `smoke.sh` with `OSCAR_CONTAINER=oscar`) and checks it.
 - **The Kubernetes set-up is scanned in CI** (#1438, 1.11.585): Kubescape
   (job `kubescape`) on `scans/render.sh`'s render of the overlays, `runs/`,
   monitoring and the dispatcher's Jobs (`scans/run-pods.js`), kube-bench
