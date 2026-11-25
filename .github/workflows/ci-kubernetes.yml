@@ -152,6 +152,49 @@ jobs:
           cat "$RUNNER_TEMP/simulator.log"
           exit 1
 
+      # #1446: the VPS's own compose file (isolated mode, as production), with
+      # the image this job built: a scenario passes with both containers
+      # read-only, and neither writes off its volumes.
+      - name: The VPS's compose file, read-only, runs a scenario (#1446)
+        run: |
+          set -euo pipefail
+          cd OSCAR_Deploy
+          node_ip=$(ip -4 route get 1.1.1.1 | sed -n 's/.* src \([0-9.]*\).*/\1/p')
+          boot=$(openssl rand -hex 24); metrics=$(openssl rand -hex 32)
+          echo "::add-mask::$boot"; echo "::add-mask::$metrics"
+          cp .env.example .env
+          {
+            echo "OSCAR_IMAGE_DIGEST=sha256:$(printf '%064d' 0)"
+            echo "ENCRYPTION_KEY=$(openssl rand -hex 32)"
+            echo "JWT_SECRET=$(openssl rand -hex 32)"
+            echo "PLATFORM_BOOTSTRAP_TOKEN=$boot"
+            echo "METRICS_TOKEN=$metrics"
+            echo "ALLOW_PRIVATE_TARGETS=1"
+            echo "RUN_ISOLATION=isolated"
+            echo "RUN_AGENT_TOKEN=$(openssl rand -hex 32)"
+            echo "COMPOSE_PROFILES=isolated"
+          } >> .env
+          # The image this job built, in place of the published digest.
+          printf 'services:\n  oscar:\n    image: local/oscar-server:ci\n  oscar-runner:\n    image: local/oscar-server:ci\n' > "$RUNNER_TEMP/ci-image.yml"
+          mkdir -p data && sudo chown 1000:1000 data
+          compose() { docker compose -f docker-compose.yml -f "$RUNNER_TEMP/ci-image.yml" "$@"; }
+          compose up -d
+          for _ in $(seq 1 60); do
+            if curl -fsS -o /dev/null http://127.0.0.1:3001/health; then break; fi
+            sleep 2
+          done
+          test "$(docker inspect oscar --format '{{.HostConfig.ReadonlyRootfs}}')" = true
+          test "$(docker inspect oscar-runner --format '{{.HostConfig.ReadonlyRootfs}}')" = true
+          OSCAR_URL=http://127.0.0.1:3001 SIM_BASE="http://$node_ip:3002" BOOTSTRAP_TOKEN="$boot" METRICS_TOKEN="$metrics" \
+            OSCAR_CONTAINER=oscar SMOKE_ACCOUNT_FILE="$RUNNER_TEMP/smoke-account-vps.json" kubernetes/ci/smoke.sh \
+            || { docker logs oscar | tail -n 80; docker logs oscar-runner | tail -n 40; exit 1; }
+          for c in oscar oscar-runner; do
+            if docker exec "$c" sh -c 'touch /app/.write-check' 2> /dev/null; then echo "$c can write its root file system"; exit 1; fi
+            if docker logs "$c" 2>&1 | grep -E 'EROFS|read-only file system'; then echo "$c tried to write off its volumes"; exit 1; fi
+          done
+          compose down -v
+          sudo rm -rf data .env
+
       - name: Create the kind cluster
         run: |
           kind create cluster --name oscar --wait 180s

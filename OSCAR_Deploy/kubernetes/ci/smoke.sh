@@ -19,6 +19,8 @@
 #   SCENARIO         optional, SIM_SALE_SEARCH_1ADT_38 by default
 #   OSCAR_NAMESPACE  optional, the namespace of deploy/oscar (oscar by default);
 #                    kubectl reads the Test Manager's activation link there
+#   OSCAR_CONTAINER  optional: a Docker container to read it from instead
+#                    (docker exec), for the VPS's compose file (#1446)
 #   SMOKE_ACCOUNT_FILE  optional: where to write the Test Manager's and the
 #                    administrator's e-mail and password, the administrator's
 #                    second factor (#1414), the scenario and the run, as JSON,
@@ -26,6 +28,11 @@
 #                    oscar-data.sh; Grafana's sign-in check)
 set -euo pipefail
 OSCAR_NAMESPACE=${OSCAR_NAMESPACE:-oscar}
+# A command in OSCAR's container: the pod's, or a Docker container's.
+in_oscar() {
+  if [ -n "${OSCAR_CONTAINER:-}" ]; then docker exec "$OSCAR_CONTAINER" "$@"
+  else kubectl -n "$OSCAR_NAMESPACE" exec deploy/oscar -- "$@"; fi
+}
 
 : "${OSCAR_URL:?}" "${SIM_BASE:?}" "${SIM_SECRET:?}" "${BOOTSTRAP_TOKEN:?}" "${METRICS_TOKEN:?}"
 root=$(cd "$(dirname "$0")/../../.." && pwd)
@@ -126,7 +133,7 @@ tm_password=$(password)
 body=$(json --arg e "$tm_email" --arg c "$company_id" '{email: $e, role: "test_manager", company_id: $c}')
 code=$(call POST /v1/admin/users "$admin_token" "$body")
 expect "invite the first Test Manager" 201 "$code"
-token=$(kubectl -n "$OSCAR_NAMESPACE" exec deploy/oscar -- node -e '
+token=$(in_oscar node -e '
   const { DatabaseSync } = require("node:sqlite");
   const db = new DatabaseSync(process.env.OSCAR_DB_PATH || "/app/data/oscar.db");
   const row = db.prepare("SELECT t.token FROM password_reset_tokens t JOIN users u ON u.id = t.user_id WHERE u.email = ?").get(process.argv[1]);

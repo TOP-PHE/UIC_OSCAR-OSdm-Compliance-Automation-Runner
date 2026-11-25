@@ -52,6 +52,21 @@ describe('compose files', () => {
     expect(lines.filter((l) => l.includes('docker.sock'))).toEqual([]);
   });
 
+  test('the server and its runner: a read-only root, a tmpfs on /tmp, HOME there (#1446)', () => {
+    const compose = yaml.load(read('OSCAR_Deploy/docker-compose.yml'));
+    for (const name of ['oscar', 'oscar-runner']) {
+      const s = compose.services[name];
+      expect([name, s.read_only]).toEqual([name, true]);
+      expect([name, (s.tmpfs || []).some((t) => /^\/tmp(:|$)/.test(t))]).toEqual([name, true]);
+      expect([name, s.environment.HOME]).toEqual([name, '/tmp']);
+      expect([name, (s.volumes || []).some((v) => String(v).startsWith('run-workspaces:/app/run-workspaces'))]).toEqual([name, true]);
+    }
+    expect(compose.services.oscar.volumes).toContain('./data:/app/data');
+    const smoke = read('OSCAR_Deploy/kubernetes/ci/smoke.sh');
+    expect(smoke).toContain('docker exec "$OSCAR_CONTAINER" "$@"');
+    expect(smoke).not.toMatch(/kubectl -n "\$OSCAR_NAMESPACE" exec deploy\/oscar -- node/);
+  });
+
   test('no autoheal service; the server and its runner keep the label the host timer reads', () => {
     const compose = yaml.load(read('OSCAR_Deploy/docker-compose.yml'));
     expect(compose.services.autoheal).toBeUndefined();

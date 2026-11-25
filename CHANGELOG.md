@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **On the VPS too, the server's and the runner's root file systems are read-only** (#1446; maintainer's request, 2026-11-25, after #1441 did it on Kubernetes). Deployment files, CI and guides, no version.
+  - `docker-compose.yml`: `read_only: true` on `oscar` and `oscar-runner`, a `tmpfs` on `/tmp` (1 GB) and `HOME=/tmp` for both. What they write was on volumes already: `./data`, `run-workspaces`, Alertmanager's volume (metrics overlay).
+  - **Proved in CI** (`ci-kubernetes.yml`, job *kind*): the real compose file, in isolated mode as production, with the image the job built and the simulator: `smoke.sh` passes its scenario, both containers read `ReadonlyRootfs`, neither can write its root, no log holds a refused write. `smoke.sh` reads the Test Manager's activation link with `docker exec` when `OSCAR_CONTAINER` names a container.
+  - **On the VPS, once:** a promotion makes `oscar` again; `oscar-runner` takes it with `up -d oscar oscar-runner` from the running server's compose files (*Server Admin Guide*, 13.9).
+  - *Server Hardening* 4.2: closed. `docker-socket.test.js` pins both services.
+
 - **On Kubernetes, the server's and the runner's root file systems are read-only** (#1441; maintainer's choice, 2026-11-25: the exception #1438 accepted is removed). Deployment files, CI and guides, no version.
   - `readOnlyRootFilesystem: true` on both containers of `base/deployment.yaml`. What they write was already on volumes: the database, data files and reports on `/app/data`, the runs' folders on `/app/run-workspaces`, HOME and temporary files on `/tmp`. The run pods already ran Bruno with a read-only root. The one other place the server writes, Alertmanager's file (*Server Config*, *Apply*), is the VPS's only: on a cluster the administrator makes Alertmanager's Secret (k3s guide, 8a).
   - **Proved in CI** (`ci-kubernetes.yml`): in kind after a scenario in isolated mode (server and runner) and after the data moved into the Kubernetes overlay, in k3s after a scenario in pod mode, neither container can write its root and no log holds a refused write (`EROFS`). The Kubescape exception C-0017 is gone from `accepted.json`, so the scan fails if a container's root becomes writable again.
