@@ -22,11 +22,19 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   of the region"; a validity naming no code asked (Zone.nutsCode) is a
  *   WARNING, as for places and zones. `nutsCodeExpectRejection` expects an
  *   unknown code refused or answered without an offer.
+ * - The zone of a stop place of the trip (#1449): `nonTrip.zoneOf` names a
+ *   stop place, and the zone (or its NUTS codes) asked is the zone of
+ *   `GET /zones` whose places hold it: the link a distributor makes between
+ *   the trip of its product-based sale and the provider's zones. No zone
+ *   holding it is a failed check, and the scenario ends.
  * - Fares (#1444): OSDM's page on fares says online fares are "always part
  *   of an offer for a specified trip", and its page on sales without a trip
- *   names none. `nonTripFaresExpectRejection` asks fares without a trip:
- *   refused, or answered without a fare, passes; fares given are a WARNING
- *   (OSDM says it in prose, not in the schema).
+ *   names none; the OSDM architect (2026-11-25): implicitly trip-related,
+ *   theoretically sold without a trip. `nonTripFaresExpectRejection` asks
+ *   fares without a trip of a provider that does not declare them sold so:
+ *   refused, or answered without a fare, passes; fares given are a WARNING.
+ *   A sale of them (#1449) is checked in fares.js and fareBooking.js
+ *   (nonTripFares.js).
  * - The answer has no trip and no trip coverage; each admission says where it
  *   is valid: `regionalValidities` from OSDM 3.7 (the single
  *   `regionalValidity`, which 3.7 deprecated, is then a WARNING), the single
@@ -84,6 +92,10 @@ function nonTripRequirementOf(requirement) {
   if (!BY.has(by)) return { problem: `nonTrip.by must be PLACES, ZONES or NUTS (got ${JSON.stringify(nonTrip.by).slice(0, 40)})` };
   const lookup = typeof nonTrip.placeLookup === 'string' ? nonTrip.placeLookup.trim().slice(0, 120) : '';
   const out = { by, validFrom: typeof nonTrip.validFrom === 'string' ? nonTrip.validFrom : null, places: [], placeLookup: lookup || null, zones: [], nutsCodes: [] };
+  // #1449: the stop place of the trip whose zone is asked.
+  const zoneOf = zoneOfRequirement(nonTrip, by);
+  if (zoneOf?.problem) return zoneOf;
+  if (zoneOf) out.zoneOf = zoneOf;
   if (by === 'NUTS') return withNutsCodes(out, nonTrip.nutsCodes);
   if (by === 'PLACES') {
     if (!isAuto(nonTrip.places)) {
@@ -106,6 +118,19 @@ function nonTripRequirementOf(requirement) {
     out.zones = zones;
   }
   return out;
+}
+
+// #1449: `nonTrip.zoneOf`, a stop place (a URN or a UIC code) whose zone of
+// GET /zones is asked: for ZONES and NUTS only, when the zones or codes are
+// left to the lookup. null when absent, or { problem }.
+function zoneOfRequirement(nonTrip, by) {
+  if (isAuto(nonTrip.zoneOf)) return null;
+  const ref = stopPlaceRefOf(nonTrip.zoneOf);
+  if (!ref) return { problem: `nonTrip.zoneOf must be a stop place (a URN or a UIC code), got ${JSON.stringify(nonTrip.zoneOf).slice(0, 40)}` };
+  if (by === 'PLACES') return { problem: 'nonTrip.zoneOf names the stop place whose zone is asked: for nonTrip.by ZONES or NUTS, not PLACES' };
+  const named = by === 'ZONES' ? !isAuto(nonTrip.zones) : !isAuto(nonTrip.nutsCodes);
+  if (named) return { problem: `nonTrip names its ${by === 'ZONES' ? 'zones' : 'NUTS codes'} and a stop place to look its zone up with (nonTrip.zoneOf): one or the other` };
+  return ref;
 }
 
 // #1266: the NUTS codes a trip names (NUTS form, 1 to 10), or none to take
@@ -181,18 +206,46 @@ function checkPlaceAnswer(status, body, name) {
   return { checks, stops };
 }
 
+// #1449: whether a zone's places (ZoneDefinition.places: PlaceRefs, or ids
+// as text) hold a stop place.
+function zoneHolds(zone, stopPlaceRef) {
+  return list(zone?.places).some((place) => sameStopPlace(typeof place === 'string' ? place : place?.stopPlaceRef || place?.id, stopPlaceRef));
+}
+
 /**
  * The checks of a GET /zones answer, the zone it gives and (#1266) the first
- * zone that lists NUTS codes: `{ checks, zone, nutsZone, notImplemented }`.
+ * zone that lists NUTS codes: `{ checks, zone, nutsZone, holding,
+ * notImplemented }`. #1449: with a stop place (`zoneOf`, a StopPlaceRef),
+ * `holding` is the first zone, with its id and carrier, whose places hold it.
  */
-function checkZonesAnswer(status, body) {
-  if (isNotImplemented(status)) return { checks: [], zone: null, nutsZone: null, notImplemented: true };
+function checkZonesAnswer(status, body, zoneOf = null) {
+  if (isNotImplemented(status)) return { checks: [], zone: null, nutsZone: null, holding: null, notImplemented: true };
   const checks = [{ name: `GET /zones: HTTP 200 — actual ${status}`, ok: status === 200, message: `HTTP ${status}` }];
-  if (status !== 200) return { checks, zone: null, nutsZone: null };
+  if (status !== 200) return { checks, zone: null, nutsZone: null, holding: null };
   const zones = list(body?.zones).filter((z) => isObject(z) && typeof z.id === 'string' && z.id.length > 0 && typeof z.carrier === 'string' && z.carrier.length > 0);
   checks.push({ name: 'GET /zones: at least one zone with its id and carrier (ZoneDefinition.id, .carrier required)', ok: zones.length > 0, message: `${list(body?.zones).length} zone(s), none with both` });
   const nutsZone = list(body?.zones).find((z) => isObject(z) && list(z.nutsCodes).some((c) => typeof c === 'string' && c.length > 0)) || null;
-  return { checks, zone: zones[0] || null, nutsZone };
+  const holding = zoneOf ? zones.find((z) => zoneHolds(z, zoneOf.stopPlaceRef)) || null : null;
+  return { checks, zone: zones[0] || null, nutsZone, holding };
+}
+
+/**
+ * #1449: the check of the zone looked up for a stop place of the trip
+ * (`nonTrip.zoneOf`): a zone of GET /zones holds it and, for NUTS, names
+ * NUTS codes. `{ check, zone }`; the zone is null when it fails.
+ */
+function zoneOfCheck(found, zoneOf, by) {
+  const stop = zoneOf.stopPlaceRef;
+  const zone = found.holding;
+  if (!zone) {
+    const why = found.notImplemented ? 'GET /zones is not implemented by this provider' : `no zone of GET /zones lists it in its places (ZoneDefinition.places)`;
+    return { check: { name: `Non-trip offers: a zone of GET /zones holds stop place ${stop} of the trip (nonTrip.zoneOf)`, ok: false, message: why }, zone: null };
+  }
+  const codes = list(zone.nutsCodes).filter((c) => typeof c === 'string' && c.length > 0);
+  if (by === 'NUTS' && codes.length === 0) {
+    return { check: { name: `Non-trip offers: the zone holding stop place ${stop} of the trip names NUTS codes (nonTrip.zoneOf)`, ok: false, message: `zone ${zone.id} lists no NUTS code (ZoneDefinition.nutsCodes)` }, zone: null };
+  }
+  return { check: { name: `Non-trip offers: a zone of GET /zones holds stop place ${stop} of the trip (nonTrip.zoneOf)`, ok: true, message: '' }, zone };
 }
 
 // ── The answer to the offer request ─────────────────────────────────────────
@@ -237,6 +290,34 @@ const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const firstFew = (items) => items.slice(0, 3).join('; ') + (items.length > 3 ? `; … (${items.length} in all)` : '');
 
 /**
+ * Whether regional validities name what was asked: a NUTS code asked
+ * (Zone.nutsCode), a zone of the carrier asked, every stop place asked. null
+ * when they do, else what they lack, as text ('' when nothing more is to be
+ * said). Shared by admissions and (#1449) fares. Pure.
+ */
+function validityMissing(validities, asked) {
+  if (asked?.by === 'NUTS') {
+    const named = validities.map((v) => v?.zone?.nutsCode).filter((c) => typeof c === 'string');
+    if (list(asked.nutsCodes).some((c) => named.includes(c))) return null;
+    return named.length > 0 ? named.join(', ') : 'no Zone.nutsCode';
+  }
+  if (asked?.by === 'ZONES') {
+    const carriers = validities.map((v) => v?.zone?.carrier).filter(Boolean);
+    const want = list(asked.zones).map((z) => z.carrier);
+    return !validities.some((v) => isObject(v?.zone)) || (carriers.length > 0 && !want.some((c) => carriers.includes(c))) ? '' : null;
+  }
+  if (asked?.by === 'PLACES') {
+    const named = stopPlacesNamedIn(validities);
+    const absent = list(asked.places).filter((p) => !named.some((n) => sameStopPlace(n, p.stopPlaceRef)));
+    return absent.length > 0 ? absent.map((p) => p.stopPlaceRef).join(', ') : null;
+  }
+  return null;
+}
+
+/** What validityMissing() says is missing, in a check's words. */
+const validityWanted = (asked) => ({ ZONES: 'a zone of the carrier asked', NUTS: 'a NUTS code asked (Zone.nutsCode)' }[asked?.by] || 'every stop place asked');
+
+/**
  * The checks of the admissions of a non-trip sale, offered (`where`
  * "offers[i]") or booked: the validity is given in the form of the version,
  * names something, and names what was asked. `summary` checks the
@@ -259,18 +340,8 @@ function admissionValidityChecks(parts, asked, version, { label, summary }) {
     if (form === 'none') { none.push(where); continue; }
     if (form === 'single' && listExpected) deprecated.push(where);
     if (validities.some((v) => !isObject(v) || !VALIDITY_KINDS.some((k) => v[k] != null))) empty.push(where);
-    if (asked?.by === 'NUTS') {
-      const named = validities.map((v) => v?.zone?.nutsCode).filter((c) => typeof c === 'string');
-      if (!list(asked.nutsCodes).some((c) => named.includes(c))) missing.push(`${where} (${named.length > 0 ? named.join(', ') : 'no Zone.nutsCode'})`);
-    } else if (asked?.by === 'ZONES') {
-      const carriers = validities.map((v) => v?.zone?.carrier).filter(Boolean);
-      const want = list(asked.zones).map((z) => z.carrier);
-      if (!validities.some((v) => isObject(v?.zone)) || (carriers.length > 0 && !want.some((c) => carriers.includes(c)))) missing.push(where);
-    } else if (asked?.by === 'PLACES') {
-      const named = stopPlacesNamedIn(validities);
-      const absent = list(asked.places).filter((p) => !named.some((n) => sameStopPlace(n, p.stopPlaceRef)));
-      if (absent.length > 0) missing.push(`${where} (${absent.map((p) => p.stopPlaceRef).join(', ')})`);
-    }
+    const lack = validityMissing(validities, asked);
+    if (lack !== null) missing.push(lack ? `${where} (${lack})` : where);
   }
   const member = listExpected ? 'regionalValidities' : 'regionalValidity';
   checks.push({
@@ -285,8 +356,7 @@ function admissionValidityChecks(parts, asked, version, { label, summary }) {
     checks.push({ name: `${label}: each regional validity names a zone, route, train link, line or polygon`, ok: false, message: firstFew(empty) });
   }
   if (missing.length > 0) {
-    const what = { ZONES: 'a zone of the carrier asked', NUTS: 'a NUTS code asked (Zone.nutsCode)' }[asked?.by] || 'every stop place asked';
-    checks.push({ name: `${label}: the regional validity names ${what}`, ok: false, level: 'warn', message: firstFew(missing) });
+    checks.push({ name: `${label}: the regional validity names ${validityWanted(asked)}`, ok: false, level: 'warn', message: firstFew(missing) });
   }
   if (summary) {
     checks.push({
@@ -436,6 +506,7 @@ async function prepareNonTripRequest() {
     want.places = found.stops.slice(0, 2).map((p) => ({ objectType: 'StopPlaceRef', stopPlaceRef: p.id }));
     log(`[INFO] 📍 Non-trip offers — between ${found.stops.slice(0, 2).map((p) => `${p.name || '?'} (${p.id})`).join(' and ')}`);
   }
+  if (want.zoneOf && !(await lookUpZoneOf(want, checks))) return;
   if (want.by === 'ZONES' && want.zones.length === 0) {
     log('[INFO] 🗺️ Non-trip offers — GET /zones');
     const { status, body } = await sendFromScript('GET', '/zones');
@@ -455,6 +526,28 @@ async function prepareNonTripRequest() {
   bru.setEnvVar('OfferCollectionRequest', JSON.stringify(nonTripOfferRequest(request, criteria)));
   bru.setEnvVar('__nonTripAsked', JSON.stringify({ by: want.by, places: want.places, zones: want.zones, nutsCodes: list(want.nutsCodes) }));
   bru.setEnvVar('__nonTripOutcome', JSON.stringify({ checks }));
+}
+
+// #1449: the zone of GET /zones holding the stop place of the trip
+// (nonTrip.zoneOf): its id and carrier, or its NUTS codes. False when none
+// is found (the scenario ends at 01).
+async function lookUpZoneOf(want, checks) {
+  log(`[INFO] 🗺️ Non-trip offers — GET /zones, for the zone of stop place ${want.zoneOf.stopPlaceRef} of the trip`);
+  const { status, body } = await sendFromScript('GET', '/zones');
+  const found = checkZonesAnswer(status, body, want.zoneOf);
+  checks.push(...found.checks);
+  const { check, zone } = zoneOfCheck(found, want.zoneOf, want.by);
+  checks.push(check);
+  if (!zone) {
+    bru.setEnvVar('__nonTripOutcome', JSON.stringify({ checks, failed: true }));
+    return false;
+  }
+  if (want.by === 'NUTS') want.nutsCodes = list(zone.nutsCodes).filter((c) => typeof c === 'string' && c.length > 0).slice(0, MAX_PLACES_ASKED);
+  else want.zones = [{ id: zone.id, carrier: zone.carrier }];
+  const codes = want.by === 'NUTS' ? ', NUTS code(s) ' + want.nutsCodes.join(', ') : '';
+  const named = zone.name ? ' (' + zone.name + ')' : '';
+  log(`[INFO] 🗺️ Non-trip offers — stop place ${want.zoneOf.stopPlaceRef} is in zone ${zone.id}${named} of ${zone.carrier}${codes}`);
+  return true;
 }
 
 // #1266: the NUTS codes of the first zone of GET /zones that lists some.
@@ -517,7 +610,7 @@ const holdsFares = (offer) => list(offer?.fares).length > 0
  */
 function checkNonTripFaresRefused(status, body) {
   if (String(bruEnv('nonTripFaresExpectRejection')) !== 'true') return false;
-  log('[INFO] 🧪 Fares without a trip probe — fares asked (requestedOfferParts) by a request without a trip; OSDM describes online fares for a trip only (osdm.io, Constructing products from fares).');
+  log('[INFO] 🧪 Fares without a trip probe — fares asked (requestedOfferParts) by a request without a trip, of a provider that does not declare them sold so; OSDM describes online fares for a trip (osdm.io, Constructing products from fares), and the OSDM architect reads a sale without a trip as theoretical only.');
   if (typeof status === 'number' && status >= 300) {
     const { validateProblemResponse } = require('./requestedInformation.js');
     validateProblemResponse({
@@ -533,7 +626,7 @@ function checkNonTripFaresRefused(status, body) {
   }
   const withFares = list(body?.offers).filter(holdsFares);
   if (withFares.length > 0) {
-    log(`[WARNING] 🧪 Fares without a trip probe: ${withFares.length} offer(s) hold fares for a request without a trip (${withFares.map((o) => o?.offerId).filter(Boolean).slice(0, 5).join(', ') || 'no id'}). OSDM describes online fares as part of an offer for a trip; a fare valid without a trip is not described.`);
+    log(`[WARNING] 🧪 Fares without a trip probe: ${withFares.length} offer(s) hold fares for a request without a trip (${withFares.map((o) => o?.offerId).filter(Boolean).slice(0, 5).join(', ') || 'no id'}). OSDM describes online fares as part of an offer for a trip; if this provider sells fares without a trip, declare it (Test Framework › Fares) and test the sale instead.`);
     return true;
   }
   test('🧪 Fares without a trip probe [POST /offers]: no fare is given', () => {});
@@ -609,7 +702,7 @@ function recordNonTripBookingChecks(booking, step, test) {
 
 module.exports = {
   stopPlaceRefOf, sameStopPlace, isAuto, nonTripRequirementOf, nonTripCriteria, nonTripOfferRequest, placeRequest,
-  checkPlaceAnswer, checkZonesAnswer, validityListExpected, validitiesOf, stopPlacesNamedIn, admissionValidityChecks,
+  checkPlaceAnswer, checkZonesAnswer, zoneHolds, zoneOfCheck, validityListExpected, validityMissing, validityWanted, firstFew, askedOfRun: asked, validitiesOf, stopPlacesNamedIn, admissionValidityChecks,
   checkNonTripOffers, checkNonTripBooking, exchangeNonTripCriteria, askedOfCriteria, namesWhere, checkUnknownNutsRefused, checkNonTripFaresRefused, holdsFares,
   isNonTripSale, prepareNonTripRequest, checkNonTripLookup, recordNonTripOfferChecks, recordNonTripBookingChecks,
   recordNonTripExchangeOfferChecks, recordNonTripExchangedPartsChecks,

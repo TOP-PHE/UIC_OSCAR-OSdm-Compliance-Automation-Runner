@@ -96,7 +96,7 @@ function optionRows(fw) {
   return rows;
 }
 
-const FARE_TEXT = Object.freeze({ statedRefundFee: 'Refund fee stated by the distributor', freeUnderAge: 'Free under an age' });
+const FARE_TEXT = Object.freeze({ statedRefundFee: 'Refund fee stated by the distributor', freeUnderAge: 'Free under an age', nonTrip: 'Fares sold without a trip' });
 
 // #937's fare declarations, in force only when FARE is declared (#936): the
 // clusters, the combination models, a stated refund fee, the fare
@@ -112,6 +112,7 @@ function fareRows(fw, modes) {
   ];
   if (fares.statedRefundFee === true) rows.push({ id: 'fare:statedRefundFee', group: 'Fares', label: FARE_TEXT.statedRefundFee });
   if (Number.isInteger(fares.freeUnderAge)) rows.push({ id: 'fare:freeUnderAge', group: 'Fares', label: `Free under ${fares.freeUnderAge}` });
+  if (fares.nonTrip === true) rows.push({ id: 'fare:nonTrip', group: 'Fares', label: FARE_TEXT.nonTrip });
   return rows;
 }
 
@@ -183,13 +184,15 @@ function productIdsOf(wanted, fw) {
 function fareFunctions(scenario, datafile, entry) {
   const parts = arr(scenarioOfferCriteria(scenario, datafile)?.requestedOfferParts).map(String);
   if (!parts.some((p) => p.startsWith('FARE_'))) return [];
-  const needs = fareRequirementsOf(scenario, parts, isObj(entry) ? entry : {});
+  const nonTrip = String(offerRequestFormOf(scenario, datafile) || '').startsWith('NON_TRIP');
+  const needs = fareRequirementsOf(scenario, parts, isObj(entry) ? entry : {}, { nonTrip });
   const ids = ['fareSalesFlow:SALE'];
   if (needs.salesFlow) ids.push(`fareSalesFlow:${needs.salesFlow}`);
   if (needs.combinationModel) ids.push(`fareCombination:${needs.combinationModel}`);
   if (needs.statedRefundFee) ids.push('fare:statedRefundFee');
   if (needs.reservation) ids.push(`fareReservation:${needs.reservation}`);
   if (needs.freeUnderAge) ids.push('fare:freeUnderAge');
+  if (needs.nonTrip) ids.push('fare:nonTrip');
   return ids;
 }
 

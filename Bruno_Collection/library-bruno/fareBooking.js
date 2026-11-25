@@ -329,6 +329,12 @@ function keepPartIds(booking) {
 
 const bookingOf = (body) => (isObject(body?.booking) ? body.booking : body);
 
+// #1449: B7, for a sale of fares without a trip.
+function withoutTripChecks(booking) {
+  const nonTripFares = require('./nonTripFares.js');
+  return nonTripFares.isNonTripFareSale() ? nonTripFares.bookingChecks(booking) : [];
+}
+
 /** Step 02's after-response, for a fare sale: true when it handled the answer (and routed to 05). */
 function checkFareBookingStep(status, body) {
   if (!isFareSale()) return false;
@@ -342,7 +348,7 @@ function checkFareBookingStep(status, body) {
     return true;
   }
   bru.setEnvVar('bookingId', booking.id);
-  recordFareChecks(bookingChecks(booking, readJson('offer'), 'booked'));
+  recordFareChecks([...bookingChecks(booking, readJson('offer'), 'booked'), ...withoutTripChecks(booking)]);
   keepPartIds(booking);
   validationLogger(`[INFO] [fares] Fare offer ${bru.getEnvVar('offerId')} booked: booking ${booking.id}. Next: the booking read, then its confirmation.`);
   bru.runner.setNextRequest('05. GET Booking before Fulfillments');
@@ -353,7 +359,7 @@ function checkFareBookingStep(status, body) {
 function checkFarePrebookedStep(body) {
   if (!isFareSale()) return false;
   const booking = bookingOf(body);
-  recordFareChecks(bookingChecks(booking, readJson('offer'), 'prebooked'));
+  recordFareChecks([...bookingChecks(booking, readJson('offer'), 'prebooked'), ...withoutTripChecks(booking)]);
   keepPartIds(booking);
   return true;
 }
@@ -389,7 +395,7 @@ function checkFareConfirmedStep(body) {
   // #1045: the booking's fulfilments, else those the confirmation gave (a WARNING).
   const confirmation = require('./confirmedFulfillments.js');
   const inUse = confirmation.checkBookingLists(booking);
-  recordFareChecks(confirmedBookingChecks(booking, readJson('offer'), inUse));
+  recordFareChecks([...confirmedBookingChecks(booking, readJson('offer'), inUse), ...withoutTripChecks(booking)]);
   // The booked fares (and fare reservations, #255) are the parts a refund (#907) names.
   bru.setEnvVar('admissionReservationAncillaryBookingPartsIds', farePartIdsOf(booking, readJson('offer')).filter(Boolean));
   const next = require('./fareRefund.js').prepareFareRefund({ ...booking, fulfillments: inUse });

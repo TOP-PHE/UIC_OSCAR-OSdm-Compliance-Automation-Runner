@@ -366,11 +366,14 @@ function providerPartOf(datafile, osdmVersion) {
 }
 
 // The scenarios a provider's companies run by default: those of its OSDM
-// version, but the ones that fail on purpose.
+// version, but the ones that fail on purpose, and (#1449) #1444's probe of
+// fares without a trip when the framework declares them sold so.
 const failsOnPurpose = code => /^SIM_(WRONG|FAULT)_/.test(code);
-function runListFor(datafile, osdmVersion) {
+const ARMED_FLAG = new Set([true, 'true', 'on']);
+const probesWhatIsDeclared = (s, framework) => ARMED_FLAG.has(s.nonTripFaresExpectRejection) && framework?.fares?.nonTrip === true;
+function runListFor(datafile, osdmVersion, framework = null) {
   return (Array.isArray(datafile?.scenarios) ? datafile.scenarios : [])
-    .filter(s => s && s.osdmVersion === osdmVersion && !failsOnPurpose(String(s.code)))
+    .filter(s => s && s.osdmVersion === osdmVersion && !failsOnPurpose(String(s.code)) && !probesWhatIsDeclared(s, framework))
     .map(s => s.code);
 }
 
@@ -403,6 +406,11 @@ function withNonTripForms(framework, profile) {
     }
   }
   withNonTripTags(framework.offerSearchOptions?.productTags, profile.nonTrip);
+  // #1449: nor whether fares are sold without a trip: a profile listing
+  // `nonTrip.fares` declares it, once the checklist's chapter F declares fares.
+  if (Array.isArray(profile.nonTrip.fares) && profile.nonTrip.fares.length > 0 && framework.fares && typeof framework.fares === 'object') {
+    framework.fares.nonTrip = true;
+  }
 }
 
 // #1266: the product tags of what a provider sells without a trip (a pass, a
@@ -446,7 +454,7 @@ function buildReference({ provider, profile, answers, datafile }) {
     },
     framework,
     testResources: namedTrains(testResourcesFromDatafile(providerPartOf(datafile, osdmVersion)), profile?.carrier?.ref),
-    scenariosToRun: runListFor(datafile, osdmVersion),
+    scenariosToRun: runListFor(datafile, osdmVersion, framework),
   };
 }
 

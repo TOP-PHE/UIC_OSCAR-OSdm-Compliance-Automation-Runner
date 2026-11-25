@@ -32,6 +32,8 @@ http://www.apache.org/licenses/LICENSE-2.0
  *   O14 fares that were not asked                             FAIL
  *   O15 products and fares counted                            INFO
  *   O16–O20 cards, ages, class, dates offset, offer coverage  WARNING
+ *   O21–O23 a request without a trip (#1449, nonTripFares.js): no trip,
+ *           no trip coverage FAIL; validity names what was asked WARNING
  *       (`fareDetails.js`, #1045)
  *
  * A negative scenario (#905) sets `expectFares: false`: the answer must hold
@@ -655,7 +657,8 @@ function checkFareOffers(body) {
   // #255: fare reservations that were not asked.
   const unaskedReservations = fareReservations.unaskedReservationsCheck(body, request);
   if (!asksFares(request)) return checkUnaskedFares(body, request, unaskedReservations);
-  if (list(request.requestedSections).length === 0) {
+  // #1449: a request without a trip has no section to name.
+  if (list(request.requestedSections).length === 0 && !request.nonTripSearchCriteria) {
     validationLogger('[WARNING] [fares] The request asks for fares without a requested section; OSDM asks for one when trips are given (processes).');
   }
   const checks = offerStepChecks(body, request, unaskedReservations);
@@ -702,8 +705,12 @@ function offerStepChecks(body, request, unaskedReservations) {
   const fareRules = asksFareProducts(request) || faresOf(body).length > 0
     ? fareChecks(body, request, { travelDay: bru.getEnvVar('__travelDay') })
     : [countCheck(body)];
+  // #1449: fares sold without a trip (O21–O23), with the others: they count for the sale.
+  const nonTripFares = require('./nonTripFares.js');
+  const withoutTrip = nonTripFares.isNonTripFareSale() ? nonTripFares.offerChecks(body, require('./nonTrip.js').askedOfRun()) : [];
   return [
     ...fareRules,
+    ...withoutTrip,
     ...fareReservations.offerChecks(body, request, { osdmVersion: bru.getEnvVar('osdmVersion') }),
     ...(unaskedReservations ? [unaskedReservations] : []),
   ];

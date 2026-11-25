@@ -407,22 +407,105 @@ test("over HTTP, in each provider's version: GET /zones names the NUTS codes; a 
   }
 });
 
-// ── #1444: fares are not sold without a trip ─────────────────────────────────
+// ── #1444, #1449: fares without a trip ──────────────────────────────────────
 
-test('without a trip, a request asking fare parts is refused: 400 pointing at the offer parts; without them, as before', async () => {
+const faresOf = (offers) => offers.flatMap((o) => o.fares || []);
+const fareAsking = (body, criteria) => ({ ...body, offerSearchCriteria: { requestedOfferParts: ['FARE_ADMISSION'], ...criteria } });
+
+test('#1449: every provider lists two fares sold without a trip, by zone (and NUTS region) and between stop places', () => {
+  assert.deepEqual(gamma.nonTrip.fares.map((f) => [f.code, f.tag, f.by.join('+')]), [
+    ['SIM_FARE_ZONE', 'FARE_ZONE', 'ZONES'],
+    ['SIM_FARE_POINT2POINT', 'FARE_POINT2POINT', 'PLACES'],
+  ]);
+  const base = { ...JSON.parse(JSON.stringify(gamma)), key: undefined };
+  const raw = (fares) => ({ ...base, carrier: gamma.carrier, nonTrip: { ...base.nonTrip, fares } });
+  const fare = gamma.nonTrip.fares[0];
+  for (const wrong of [[], [{ ...fare, tag: 'ADMISSION_PASS' }], [fare, { ...fare, tag: 'FARE_POINT2POINT' }], [fare, { ...fare, code: 'SIM_OTHER' }],
+    [{ ...fare, by: ['NUTS'] }], [{ ...fare, factor: 0 }], [{ ...fare, flexibility: 'SOMETIMES' }]]) {
+    assert.throws(() => checkProvider('gamma', raw(wrong)), /nonTrip\.fares/, JSON.stringify(wrong));
+  }
+  assert.equal(checkProvider('gamma', raw(undefined)).nonTrip.fares, undefined, 'absent: no fare without a trip');
+});
+
+test("#1449: without a trip, fares are sold in every provider's version: in a zone, a NUTS region, between stop places; booked and confirmed", async () => {
   for (const key of REAL) {
     const token = await tokenFor(sim.base, key, SECRETS[key][0]);
     const carrier = providers.get(key).carrier.ref;
-    for (const parts of [['FARE_ADMISSION'], ['ADMISSION', 'FARE_ADMISSION'], ['FARE_RESERVATION']]) {
-      for (const body of [byPlaces([CENTRAL, AIRPORT]), byZones([{ id: 'SIM-CITY', carrier }])]) {
-        const res = await call(sim.base, token, 'POST', `/${key}/offers`, { ...body, offerSearchCriteria: { requestedOfferParts: parts } });
-        assert.equal(res.status, 400, `${key} ${parts}`);
-        assert.equal(res.body.code, 'FARE_WITHOUT_TRIP_NOT_SUPPORTED', key);
-        assert.deepEqual(res.body.pointers, [{ requestPointer: '/offerSearchCriteria/requestedOfferParts' }], key);
+    const asks = [
+      ['zone', byZones([{ id: 'SIM-CITY', carrier }]), (v) => v.zone?.name === 'Simtown city' && v.zone.nutsCode === undefined],
+      ['NUTS', { ...byZones([]), nonTripSearchCriteria: { validFrom: '2026-11-20T00:00:00+01:00', nutsCodes: ['XS111'] } }, (v) => v.zone?.nutsCode === 'XS111'],
+      ['places', byPlaces([CENTRAL, AIRPORT]), (v) => v.route?.routeItemList?.length === 2],
+    ];
+    for (const [what, body, validityOk] of asks) {
+      const res = await call(sim.base, token, 'POST', `/${key}/offers`, fareAsking(body, { travelClasses: ['SECOND', 'FIRST'] }));
+      assert.equal(res.status, 200, `${key} ${what} ${JSON.stringify(res.body).slice(0, 300)}`);
+      assert.equal(res.body.trips, undefined, key);
+      const offers = res.body.offers;
+      assert.deepEqual(offers.map((o) => o.fares[0].travelClass), ['SECOND', 'FIRST'], `${key} ${what}: one offer per class asked`);
+      for (const offer of offers) {
+        assert.equal(offer.tripCoverage, undefined, key);
+        assert.equal(offer.products, undefined, `${key} ${what}: fare parts only asked, no product`);
+        assert.equal(offer.fares.length, PAX.length, key);
       }
+      for (const fare of faresOf(offers)) {
+        assert.equal(fare.type, 'ADMISSION');
+        assert.equal(fare.coveredSection, undefined, `${key} ${what}: no section of a trip`);
+        assert.deepEqual(fare.combinationConstraint, [{ model: 'SEPARATE_TICKET' }]);
+        assert.ok(fare.regionalConstraint.regionalValidities.every(validityOk), `${key} ${what} ${JSON.stringify(fare.regionalConstraint)}`);
+        assert.equal(fare.name.text, what === 'places' ? 'Fare between stop places' : 'Zone fare', key);
+      }
+      // The fare offer is booked like any other, and confirmed with a fulfilment of fares.
+      const booked = await call(sim.base, token, 'POST', `/${key}/bookings`, bookingRequest(offers[0]));
+      assert.equal(booked.status, 200, `${key} ${what} ${JSON.stringify(booked.body).slice(0, 300)}`);
+      const bookedOffer = booked.body.booking.bookedOffers[0];
+      assert.equal(bookedOffer.tripCoverage, undefined, key);
+      assert.deepEqual(bookedOffer.fares.map((f) => f.status), ['PREBOOKED'], key);
+      const confirmed = await call(sim.base, token, 'POST', `/${key}/bookings/${booked.body.booking.id}/fulfillments`, {});
+      assert.equal(confirmed.status, 200, `${key} ${what} ${JSON.stringify(confirmed.body).slice(0, 300)}`);
+      assert.equal(confirmed.body.fulfillments.length, 1, key);
+      const read = await call(sim.base, token, 'GET', `/${key}/bookings/${booked.body.booking.id}`);
+      assert.deepEqual(read.body.booking.bookedOffers[0].fares.map((f) => f.status), ['FULFILLED'], key);
     }
-    const products = await call(sim.base, token, 'POST', `/${key}/offers`, { ...byZones([{ id: 'SIM-CITY', carrier }]), offerSearchCriteria: { requestedOfferParts: ['ADMISSION'] } });
-    assert.equal(products.status, 200, key);
-    assert.ok(products.body.offers.length > 0, key);
   }
+});
+
+test('#1449: products and fares asked together are both sold; a fare reservation alone is not, with a warning', async () => {
+  const token = await tokenFor(sim.base, 'gamma', SECRETS.gamma[0]);
+  const zone = byZones([{ id: 'SIM-CITY', carrier: gamma.carrier.ref }]);
+  const both = await call(sim.base, token, 'POST', '/gamma/offers', fareAsking(zone, { requestedOfferParts: ['ADMISSION', 'FARE_ADMISSION'] }));
+  assert.equal(both.status, 200);
+  assert.ok(both.body.offers.some((o) => o.admissionOfferParts?.length > 0), 'product offers');
+  assert.ok(both.body.offers.some((o) => o.fares?.length > 0), 'fare offers');
+  const reservation = await call(sim.base, token, 'POST', '/gamma/offers', fareAsking(zone, { requestedOfferParts: ['FARE_RESERVATION'] }));
+  assert.equal(reservation.status, 200);
+  assert.deepEqual(reservation.body.offers, []);
+  assert.deepEqual(reservation.body.problems.map((p) => p.code), ['OFFER_NO_RESULTS']);
+});
+
+test('#1449: a fare tag asked chooses the fare and is not reported ignored; a tag of the other form gives no fare', () => {
+  const zone = byZones([{ id: 'SIM-CITY', carrier: gamma.carrier.ref }]);
+  const { response } = buildOfferCollection(fareAsking(zone, { productTags: ['FARE_ZONE'] }), gamma, NOW);
+  assert.deepEqual(faresOf(response.offers).map((f) => f.name.text), ['Zone fare']);
+  assert.equal(response.problems, undefined);
+  const other = buildOfferCollection(fareAsking(zone, { productTags: ['FARE_POINT2POINT'] }), gamma, NOW).response;
+  assert.deepEqual(other.offers, []);
+  assert.deepEqual(other.problems.map((p) => p.code), ['OFFER_NO_RESULTS']);
+  // A flexibility the fares are not sold in gives none either.
+  const flexible = buildOfferCollection(fareAsking(zone, { flexibilities: ['FULL_FLEXIBLE'] }), gamma, NOW).response;
+  assert.deepEqual(flexible.offers, []);
+});
+
+test('#1444: a provider whose profile lists no fare without a trip refuses fare parts: 400 pointing at them; without them, as before', () => {
+  const raw = { ...JSON.parse(JSON.stringify(gamma)), key: undefined, carrier: gamma.carrier };
+  delete raw.nonTrip.fares;
+  const without = checkProvider('gamma', raw);
+  for (const parts of [['FARE_ADMISSION'], ['ADMISSION', 'FARE_ADMISSION'], ['FARE_RESERVATION']]) {
+    for (const body of [byPlaces([CENTRAL, AIRPORT]), byZones([{ id: 'SIM-CITY', carrier: gamma.carrier.ref }])]) {
+      assert.throws(() => buildOfferCollection({ ...body, offerSearchCriteria: { requestedOfferParts: parts } }, without, NOW),
+        (err) => err.status === 400 && err.code === 'FARE_WITHOUT_TRIP_NOT_SUPPORTED', String(parts));
+    }
+  }
+  const zone = byZones([{ id: 'SIM-CITY', carrier: gamma.carrier.ref }]);
+  const products = buildOfferCollection({ ...zone, offerSearchCriteria: { requestedOfferParts: ['ADMISSION'] } }, without, NOW);
+  assert.ok(products.response.offers.length > 0);
 });

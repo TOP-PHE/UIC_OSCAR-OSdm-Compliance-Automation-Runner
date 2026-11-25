@@ -19,6 +19,9 @@
  *
  *   - WITHOUT_TRIP: the types of the products sold without a trip (#1266:
  *     single ride, pass, multi-ride), when the provider sells without a trip;
+ *   - FARES_WITHOUT_TRIP (#1449): the tags of the fares sold without a trip,
+ *     the simulator's own (FARE_ZONE, FARE_POINT2POINT), when its profile
+ *     lists `nonTrip.fares`;
  *   - REPLACEMENT: TICKET_LOST and CARD_LOST, when it replaces lost items;
  *   - WITH_TRIP: ADMISSION_POINT2POINT, then UPGRADE_POINT2POINT when some
  *     trains run in second class only, and RESERVATION when it sells
@@ -41,10 +44,14 @@ const NAMES = Object.freeze({
   RESERVATION: ['Reservation', 'A seat reservation on a train.'],
   TICKET_LOST: ['Lost ticket', 'The replacement of a lost ticket.'],
   CARD_LOST: ['Lost card', 'The replacement of a lost card.'],
+  // #1449: tags of the simulator's own; OSDM has none for a fare.
+  FARE_ZONE: ['Zone fare', 'A fare valid in a zone (GET /zones) or a NUTS region, sold without a trip.'],
+  FARE_POINT2POINT: ['Fare between stop places', 'A fare valid between two stop places, sold without a trip.'],
 });
 
 const GROUPS = Object.freeze({
   WITHOUT_TRIP: ['Without a trip', 'What is sold for a zone or between stop places, without a trip.'],
+  FARES_WITHOUT_TRIP: ['Fares without a trip', 'Fares sold for a zone, a NUTS region or between stop places, without a trip; ask them with fare parts (FARE_ADMISSION).'],
   REPLACEMENT: ['Replacement', 'The replacement of a lost ticket or card.'],
   WITH_TRIP: ['With a trip', 'What is sold for a trip.'],
 });
@@ -52,13 +59,14 @@ const GROUPS = Object.freeze({
 /** The groups of a provider, in that order, each with its tags; empty ones left out. */
 function groupsOf(provider) {
   const withoutTrip = provider.nonTrip ? [...new Set(provider.nonTrip.products.map((p) => p.type))] : [];
+  const faresWithoutTrip = (provider.nonTrip?.fares || []).map((f) => f.tag);
   const replacing = provider.nonTrip?.replacements ? [...replacements.KINDS] : [];
   const withTrip = [
     'ADMISSION_POINT2POINT',
     ...(provider.secondClassOnlyCategories ? ['UPGRADE_POINT2POINT'] : []),
     ...(provider.reservations ? ['RESERVATION'] : []),
   ];
-  return [['WITHOUT_TRIP', withoutTrip], ['REPLACEMENT', replacing], ['WITH_TRIP', withTrip]]
+  return [['WITHOUT_TRIP', withoutTrip], ['FARES_WITHOUT_TRIP', faresWithoutTrip], ['REPLACEMENT', replacing], ['WITH_TRIP', withTrip]]
     .filter(([, tags]) => tags.length > 0);
 }
 

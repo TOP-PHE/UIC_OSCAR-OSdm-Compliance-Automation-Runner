@@ -48,7 +48,8 @@ const persons = require('./persons');
 const ticketing = require('./ticketing');
 const { horizonProblem } = require('./salesHorizon');
 const ageTariffs = require('./ageTariffs');
-const { fareOffersOf, asksOnlyFares, noFareOfferProblem, nearbyStopsOf, nearbyTripOffers } = require('./fares');
+const { fareOffersOf, fareClassesOf, asksOnlyFares, noFareOfferProblem, nearbyStopsOf, nearbyTripOffers, asksFares: asksFareAdmissions } = require('./fares');
+const { nonTripFareOffersOf, nonTripFareProductsOf, withoutFareTags } = require('./nonTripFares');
 const { withOfferConditions } = require('./afterSales');
 const nonTrip = require('./nonTrip');
 const replacements = require('./replacements');
@@ -126,6 +127,8 @@ function productsOf(provider) {
     ...(provider.secondClassOnlyCategories && !tariff.group ? [upgradeProductOf(tariff, provider)] : []),
   ]).concat(provider.reservations ? FLEXIBILITIES.map((f) => reservationProductOf(f, provider)) : [])
     .concat(provider.nonTrip ? provider.nonTrip.products.flatMap((item) => Object.keys(TRAVEL_CLASSES).map((c) => nonTripProductOf(item, c, provider))) : [])
+    // #1449: the fares sold without a trip, each with its tag.
+    .concat(nonTripFareProductsOf(provider, { classes: Object.keys(TRAVEL_CLASSES), serviceClassOf }))
     .concat(replacements.productsOf(provider, nonTripProductOf));
 }
 const DEFAULT_FULFILLMENT_OPTIONS = [{ type: 'ETICKET', media: 'PDF_A4' }];
@@ -902,24 +905,35 @@ function buildNonTripOffer({ asked, validity, passengers, item, travelClass, ful
   };
 }
 
-/**
- * The answer to a non-trip offer request: no trip, an offer per class and
- * non-trip product sold for the kind of request (#1266: a single ride, a pass
- * in zones, a multi-ride card), kept to the product tags or codes asked. The
- * wrong variants (nonTrip.applyVariants) are chosen by the first stop place.
- */
 // #1444: a request asking fare parts (FARE_ADMISSION, FARE_RESERVATION, FARE_ANCILLARY).
 const asksFares = (criteria) => Array.isArray(criteria?.requestedOfferParts)
   && criteria.requestedOfferParts.some((part) => typeof part === 'string' && part.startsWith('FARE_'));
 const faresNeedATrip = () => new HttpError(400, 'FARE_WITHOUT_TRIP_NOT_SUPPORTED', 'Fares need a trip',
   'This provider gives fares for a trip only; ask products, or name a trip.', {}, { pointers: [{ requestPointer: '/offerSearchCriteria/requestedOfferParts' }] });
 
+// #1449: only fare parts were asked without a trip, and none of them is sold.
+function noNonTripFareProblem(criteria) {
+  const asked = criteria.requestedOfferParts.filter((p) => typeof p === 'string').join(', ');
+  return {
+    code: 'OFFER_NO_RESULTS',
+    title: 'No offer found',
+    detail: `Only fare parts were asked (${asked}), so no product is offered; without a trip this provider sells fare admissions only (FARE_ADMISSION), for the flexibilities and tags it lists.`,
+  };
+}
+
+/**
+ * The answer to a non-trip offer request: no trip, an offer per class and
+ * non-trip product sold for the kind of request (#1266: a single ride, a pass
+ * in zones, a multi-ride card), kept to the product tags or codes asked. The
+ * wrong variants (nonTrip.applyVariants) are chosen by the first stop place.
+ * #1449: fares asked are sold too (nonTripFares.js), alone when only fare
+ * parts are asked; a profile without `nonTrip.fares` refuses them (#1444).
+ */
 function buildNonTripCollection(request, providerAsIs, nowMs) {
   if (!providerAsIs.nonTrip) throw bad('nonTripSearchCriteria: this provider sells offers for trips only');
   const asked = nonTrip.nonTripAsked(request.nonTripSearchCriteria, providerAsIs);
-  // #1444: fares without a trip are not sold (OSDM: online fares are part of
-  // an offer for a specified trip).
-  if (asksFares(request.offerSearchCriteria)) throw faresNeedATrip();
+  const faresAsked = asksFares(request.offerSearchCriteria);
+  if (faresAsked && !providerAsIs.nonTrip.fares) throw faresNeedATrip();
   // #1437: optional parameters this provider ignores, refuses or answers
   // without offers, from its own stop place or zone.
   const options = applyRequestOptions(request, [], providerAsIs, asked);
@@ -940,19 +954,31 @@ function buildNonTripCollection(request, providerAsIs, nowMs) {
   // with its replacement only.
   const lost = replacements.lostAsked(criteria, provider);
   const offerOf = (item, travelClass) => buildNonTripOffer({ asked, validity, passengers, item, travelClass, fulfillmentOptions, provider, nowMs });
-  const built = lost.length > 0
-    ? lost.flatMap((kind) => classesAsked(criteria).map((travelClass) => replacements.asReplacement(
-      offerOf(replacements.itemOf(kind, provider), travelClass), kind, provider, `${provider.idPrefix}-FEE-${randomId()}`)))
-    : classesAsked(criteria).flatMap((travelClass) => items.map((item) => offerOf(item, travelClass)));
+  // #1449: a request asking fare parts only gets no product offer.
+  const productsAsked = !asksOnlyFares(criteria);
+  let built = [];
+  if (lost.length > 0) {
+    built = lost.flatMap((kind) => classesAsked(criteria).map((travelClass) => replacements.asReplacement(
+      offerOf(replacements.itemOf(kind, provider), travelClass), kind, provider, `${provider.idPrefix}-FEE-${randomId()}`)));
+  } else if (productsAsked) {
+    built = classesAsked(criteria).flatMap((travelClass) => items.map((item) => offerOf(item, travelClass)));
+  }
   nonTrip.applyVariants(asked, built, provider);
-  const selected = selectProducts(criteria, built, { nonTrip: true });
-  const offers = options.noOffer ? [] : selected.offers;
+  // #1449: the fare tags asked choose fares, not products.
+  const selected = selectProducts(withoutFareTags(criteria, provider), built, { nonTrip: true });
+  // Fare admissions only: fare reservations and ancillaries are not sold without a trip.
+  const fareOffers = asksFareAdmissions(criteria) && lost.length === 0 ? nonTripFareOffersOf({
+    asked, criteria, classes: fareClassesOf(criteria), day: isoAt(validity.ms, validity.offset).slice(0, 10), passengers, provider, nowMs, lifetimeMs: OFFER_LIFETIME_MS,
+    serviceClassOf, classFactor: (travelClass) => TRAVEL_CLASSES[travelClass],
+  }) : [];
+  const offers = options.noOffer ? [] : [...selected.offers, ...fareOffers];
   const productProblems = selected.problems;
   const replacementOf = (offer) => replacements.KINDS.find((kind) => offer.products?.[0]?.productTags?.includes(kind)) || null;
   const remembered = offers.map((offer) => ({
-    offer, trips: [], passengers, oneFulfillment: false, shortLivedMs: null, replacement: lost.length > 0 ? replacementOf(offer) : null,
+    offer, trips: [], passengers, oneFulfillment: Array.isArray(offer.fares), shortLivedMs: null, replacement: lost.length > 0 ? replacementOf(offer) : null,
   }));
   const problems = [...problemsOf(passengers, built, false, new Set()), ...productProblems, ...options.problems];
+  if (faresAsked && !productsAsked && fareOffers.length === 0 && !options.noOffer) problems.push(noNonTripFareProblem(criteria));
   const response = { anonymousPassengerSpecifications: passengers, offers };
   if (problems.length > 0) response.problems = problems;
   return { response, remembered, trips: [] };

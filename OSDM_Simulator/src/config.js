@@ -365,6 +365,7 @@ function checkNonTrip(value, bad) {
       places: places.map((p) => ({ id: p.id, name: p.name })),
       zones: zones.map((z) => ({ id: z.id, name: z.name, zoneId: z.zoneId, ...(z.nutsCodes ? { nutsCodes: [...z.nutsCodes] } : {}), places: [...z.places] })),
       products: checkNonTripProducts(value.products, bad),
+      ...checkNonTripFares(value.fares, bad),
       ...(withoutValidityFrom === undefined ? {} : { withoutValidityFrom }),
       ...(variants ? { variants } : {}),
       ...(replacements ? { replacements } : {}),
@@ -416,6 +417,27 @@ function checkNonTripProducts(products, bad) {
   return products.map((p) => ({
     code: p.code, name: p.name, type: p.type, flexibility: p.flexibility, factor: p.factor, validityMinutes: p.validityMinutes, by: [...p.by],
   }));
+}
+
+// #1449: the fares sold without a trip (the OSDM architect: theoretically,
+// between stop places, in zones, in NUTS regions), each with a tag of the
+// simulator's own that GET /product-tags and GET /products name, a price
+// factor, a validity and the kinds of request it is sold for. Absent: fares
+// are sold for a trip only (a fare asked without one is refused).
+const NON_TRIP_FARE_TAGS = new Set(['FARE_ZONE', 'FARE_POINT2POINT']);
+function checkNonTripFares(fares, bad) {
+  if (fares === undefined) return {};
+  if (!Array.isArray(fares) || fares.length === 0 || fares.length > 10) throw bad('nonTrip.fares');
+  const ok = (f) => f && OVERRULE_CODE.test(f.code) && isText(f.name, 1, 80) && NON_TRIP_FARE_TAGS.has(f.tag)
+    && FLEXIBILITY_KEYS.has(f.flexibility) && Number.isFinite(f.factor) && f.factor >= 0.1 && f.factor <= 5
+    && Number.isInteger(f.validityMinutes) && f.validityMinutes >= 30 && f.validityMinutes <= 525600
+    && Array.isArray(f.by) && f.by.length > 0 && f.by.every((b) => NON_TRIP_BY.has(b)) && new Set(f.by).size === f.by.length;
+  if (!fares.every(ok) || new Set(fares.map((f) => f.code)).size !== fares.length || new Set(fares.map((f) => f.tag)).size !== fares.length) throw bad('nonTrip.fares');
+  return {
+    fares: fares.map((f) => ({
+      code: f.code, name: f.name, tag: f.tag, flexibility: f.flexibility, factor: f.factor, validityMinutes: f.validityMinutes, by: [...f.by],
+    })),
+  };
 }
 
 // #1266: wrong variants, each chosen by the first stop place asked (or of the

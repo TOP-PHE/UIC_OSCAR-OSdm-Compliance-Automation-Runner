@@ -626,6 +626,6 @@ function nearbyTripOffers(ctx, trip) {
 }
 
 module.exports = {
-  fareOffersOf, sectionsOf, asksFares, asksFareReservations, asksOnlyFares, noFareOfferProblem, clusterPrices, placesFor, CLUSTERS,
+  fareOffersOf, fareClassesOf, sectionsOf, asksFares, asksFareReservations, asksOnlyFares, noFareOfferProblem, clusterPrices, placesFor, CLUSTERS,
   nearbyStopsOf, nearbyTripOffers, NEARBY_STOPS,
 };

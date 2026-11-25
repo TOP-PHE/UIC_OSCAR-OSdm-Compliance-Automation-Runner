@@ -246,6 +246,10 @@
       { "code": "SIM_DAY_PASS", "name": "Day pass", "type": "ADMISSION_PASS", "flexibility": "SEMI_FLEXIBLE", "factor": 0.6, "validityMinutes": 1440, "by": ["ZONES"] },
       { "code": "SIM_TEN_RIDES", "name": "Ten-ride card", "type": "ADMISSION_MULTI_RIDE", "flexibility": "FULL_FLEXIBLE", "factor": 2, "validityMinutes": 43200, "by": ["PLACES", "ZONES"] }
     ],
+    "fares": [
+      { "code": "SIM_FARE_ZONE", "name": "Zone fare", "tag": "FARE_ZONE", "flexibility": "NON_FLEXIBLE", "factor": 0.3, "validityMinutes": 180, "by": ["ZONES"] },
+      { "code": "SIM_FARE_POINT2POINT", "name": "Fare between stop places", "tag": "FARE_POINT2POINT", "flexibility": "NON_FLEXIBLE", "factor": 0.2, "validityMinutes": 120, "by": ["PLACES"] }
+    ],
     "withoutValidityFrom": "urn:uic:stn:0000042",
     "variants": { "tripCoverage": "urn:uic:stn:0000043", "otherPlaces": "urn:uic:stn:0000044", "otherCarrier": "urn:uic:stn:0000045" },
     "replacements": {

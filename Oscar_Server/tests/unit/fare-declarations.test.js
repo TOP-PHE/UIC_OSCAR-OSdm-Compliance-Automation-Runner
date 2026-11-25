@@ -95,10 +95,10 @@ describe('#937 what a framework declares in fares', () => {
 });
 
 describe('#937 the fare entries of the catalogue', () => {
-  test('a framework declaring everything is offered all twenty-four', () => {
+  test('a framework declaring everything is offered all twenty-four (and #1449\'s three, sold without a trip)', () => {
     const entries = fareEntries(FARE_FW);
-    expect(entries).toHaveLength(24);
-    const refused = entries.filter((e) => e.missing.length && !['NHF_FARE_PRODUCT_ONLY', 'NHF_NONTRIP_FARES_1ADT'].includes(e.code));
+    expect(entries).toHaveLength(27);
+    const refused = entries.filter((e) => e.missing.length && !['NHF_FARE_PRODUCT_ONLY', 'NHF_NONTRIP_FARES_1ADT'].includes(e.code) && !/^OTST_NONTRIP_FARES_/.test(e.code));
     expect(refused.map((e) => [e.code, e.missing])).toEqual([]);
     expect(entries.find((e) => e.code === 'NHF_FARE_PRODUCT_ONLY').missing).toEqual(['product-based distribution (Distribution)']);
     // #1444: the probe of fares without a trip also needs offers without a trip declared.
@@ -108,7 +108,7 @@ describe('#937 the fare entries of the catalogue', () => {
 
   test('a fare entry keeps its form: no _SPEC or _TRIPID twin', () => {
     const entries = fareEntries({ ...FARE_FW, offerRequestForms: ['SEARCH', 'SPECIFICATION', 'TRIP_IDS'] });
-    expect(entries).toHaveLength(24);
+    expect(entries).toHaveLength(27);
     expect(entries.some((e) => e.variantOf)).toBe(false);
   });
 
@@ -255,5 +255,86 @@ describe('#937 a section moved onto the chosen trip', () => {
     const stations = tripStations(trip);
     expect(stations).toEqual(['urn:uic:stn:8500010', 'urn:uic:stn:8507000', 'urn:uic:stn:8000105']);
     expect(sc.requestedSections).toEqual([{ startPlace: stations[1], endPlace: stations[2] }]);
+  });
+});
+
+// #1449: fares sold without a trip, a theoretical case.
+describe('#1449 fares sold without a trip', () => {
+  const { derivedCapability, traitsOf, stepCapabilities, SALE_GOAL } = require('../../src/utils/capabilities');
+  const { declaredFunctions, functionsOf } = require('../../src/utils/frameworkCoverage');
+  const { dataNeedsOf, simulatorFacts } = require('../../src/utils/scenarioCatalogue');
+  const { adaptReferenceScenario } = require('../../src/utils/catalogueMatch');
+  const { runListFor } = require('../../src/utils/referenceConfiguration');
+  const sim = (code) => simulator.scenarios.find((s) => s.code === code);
+  const SALES = ['SIM_FARE_NONTRIP_ZONE_1ADT_38', 'SIM_FARE_NONTRIP_NUTS_1ADT_38', 'SIM_FARE_NONTRIP_PLACES_1ADT_38'];
+  const FORMS = ['SEARCH', 'NON_TRIP_PLACES', 'NON_TRIP_ZONES', 'NON_TRIP_NUTS'];
+  const entry = (fw, code) => fareEntries(fw).find((e) => e.code === code);
+
+  test('fares.nonTrip is true or false; absent is not declared', () => {
+    expect(F.FARE_KEYS).toContain('nonTrip');
+    expect(F.fareDeclarationsProblem({ nonTrip: true })).toBeNull();
+    expect(F.fareDeclarationsProblem({ nonTrip: false })).toBeNull();
+    expect(F.fareDeclarationsProblem({ nonTrip: 'yes' })).toBe('fares.nonTrip must be true or false.');
+    expect(F.nonTripFaresDeclared({})).toBe(false);
+    expect(F.nonTripFaresDeclared({ config: { fares: { nonTrip: true } } })).toBe(true);
+  });
+
+  test('a fare scenario without a trip needs it declared; #1444\'s probe needs it not declared', () => {
+    const parts = ['FARE_ADMISSION'];
+    expect(F.fareRequirementsOf({}, parts, {}, { nonTrip: true })).toEqual({ nonTrip: true });
+    expect(F.fareRequirementsOf({ nonTripFaresExpectRejection: 'on' }, parts, {}, { nonTrip: true })).toEqual({ nonTripRefused: true });
+    expect(F.fareRequirementsOf({}, parts)).toEqual({});
+    expect(F.fareRequirementsOf({}, ['ADMISSION'], {}, { nonTrip: true })).toEqual({});
+    expect(F.fareMissing({ nonTrip: true }, {})).toEqual(['fares sold without a trip (Fares)']);
+    expect(F.fareMissing({ nonTrip: true }, { fares: { nonTrip: true } })).toEqual([]);
+    expect(F.fareMissing({ nonTripRefused: true }, { fares: { nonTrip: true } })).toEqual(['a provider that does not sell fares without a trip: this framework declares them sold (Fares)']);
+    expect(F.fareMissing({ nonTripRefused: true }, {})).toEqual([]);
+  });
+
+  test('the catalogue offers the three sales when declared, with their form; the probe only when not declared', () => {
+    const declared = { ...FARE_FW, offerRequestForms: FORMS, fares: { ...FARE_FW.fares, nonTrip: true } };
+    for (const code of ['OTST_NONTRIP_FARES_ZONE_1ADT', 'OTST_NONTRIP_FARES_NUTS_1ADT', 'OTST_NONTRIP_FARES_PLACES_1ADT']) {
+      expect([code, entry(declared, code).missing]).toEqual([code, []]);
+      expect(entry({ ...FARE_FW, offerRequestForms: FORMS }, code).missing).toEqual(['fares sold without a trip (Fares)']);
+    }
+    expect(entry({ ...declared, offerRequestForms: ['SEARCH', 'NON_TRIP_ZONES'] }, 'OTST_NONTRIP_FARES_NUTS_1ADT').missing).toEqual(['offer requests without a trip, in regions named by NUTS codes']);
+    expect(entry(declared, 'NHF_NONTRIP_FARES_1ADT').missing).toEqual(['a provider that does not sell fares without a trip: this framework declares them sold (Fares)']);
+    expect(entry({ ...FARE_FW, offerRequestForms: FORMS }, 'NHF_NONTRIP_FARES_1ADT').missing).toEqual([]);
+  });
+
+  test('their capability is fares.nonTrip, proved at the sale\'s step; the probe stays a refusal of fare offers', () => {
+    for (const code of SALES) {
+      expect([code, derivedCapability(sim(code), simulator)]).toEqual([code, 'fares.nonTrip']);
+      expect(stepCapabilities(SALE_GOAL, traitsOf(sim(code), simulator))).toEqual(['fares.nonTrip']);
+    }
+    expect(stepCapabilities(SALE_GOAL, traitsOf(sim('SIM_FARE_SRCH_1ADT_38'), simulator))).toEqual(['fares.sale']);
+    expect(derivedCapability(sim('SIM_NHF_FARE_NONTRIP_1ADT_38'), simulator)).toBe('fares.offers');
+  });
+
+  test('the coverage: a row when declared, and the function of each sale', () => {
+    const fw = { distributionModes: ['FARE'], fares: { nonTrip: true } };
+    expect(declaredFunctions(fw).filter((r) => r.id === 'fare:nonTrip')).toEqual([{ id: 'fare:nonTrip', group: 'Fares', label: 'Fares sold without a trip' }]);
+    expect(declaredFunctions({ distributionModes: ['FARE'], fares: {} }).some((r) => r.id === 'fare:nonTrip')).toBe(false);
+    for (const code of SALES) expect(functionsOf(sim(code), simulator)).toContain('fare:nonTrip');
+    expect(functionsOf(sim('SIM_NHF_FARE_NONTRIP_1ADT_38'), simulator)).not.toContain('fare:nonTrip');
+  });
+
+  test('a stop place of the trip whose zone is asked is the simulator\'s: a value to complete in a copy', () => {
+    const facts = simulatorFacts(JSON.parse(fs.readFileSync(path.join(ROOT, 'OSDM_Simulator', 'providers', 'gamma.json'), 'utf8')));
+    const needs = dataNeedsOf(sim('SIM_FARE_NONTRIP_ZONE_1ADT_38'), simulator, facts);
+    expect(needs.providerValues).toEqual(['zoneOf']);
+    expect(adaptReferenceScenario(sim('SIM_FARE_NONTRIP_ZONE_1ADT_38'), needs, {}).toComplete)
+      .toEqual(["a stop place of the provider in one of its zones, whose zone is asked (Trip → Zone of a stop place of the trip, now the simulator's)"]);
+  });
+
+  test('the simulator references declare it, and their run list leaves #1444\'s probe out', () => {
+    for (const provider of ['alpha', 'gamma', 'zeta']) {
+      const ref = JSON.parse(fs.readFileSync(path.join(DATA, 'reference', `simulator-${provider}.json`), 'utf8'));
+      expect([provider, ref.framework.fares.nonTrip]).toEqual([provider, true]);
+      expect(ref.scenariosToRun.some((c) => c.startsWith('SIM_NHF_FARE_NONTRIP_'))).toBe(false);
+      expect(ref.scenariosToRun.filter((c) => c.startsWith('SIM_FARE_NONTRIP_'))).toHaveLength(3);
+    }
+    expect(runListFor(simulator, '3.8.0')).toContain('SIM_NHF_FARE_NONTRIP_1ADT_38');
+    expect(runListFor(simulator, '3.8.0', { fares: { nonTrip: true } })).not.toContain('SIM_NHF_FARE_NONTRIP_1ADT_38');
   });
 });

@@ -113,9 +113,13 @@ test('each provider\'s OSDM version has every scenario of gamma its version can 
   }
   const gamma = providers.find((p) => p.key === 'gamma');
   // The deliberately wrong scenarios (#611) and the injected faults (#833)
-  // fail on purpose: not in the run list.
+  // fail on purpose: not in the run list. Nor (#1449) #1444's probe, which
+  // expects fares without a trip refused: gamma sells them (the references'
+  // rule, runListFor() in referenceConfiguration.js).
+  const probesWhatGammaSells = (s) => s.nonTripFaresExpectRejection === 'on' && Boolean(gamma.nonTrip?.fares);
   assert.deepEqual(fullDatafile.scenariosToRun, fullDatafile.scenarios
-    .filter((s) => s.osdmVersion === gamma.osdmVersion && !s.code.startsWith('SIM_WRONG_') && !s.code.startsWith('SIM_FAULT_')).map((s) => s.code));
+    .filter((s) => s.osdmVersion === gamma.osdmVersion && !s.code.startsWith('SIM_WRONG_') && !s.code.startsWith('SIM_FAULT_') && !probesWhatGammaSells(s))
+    .map((s) => s.code));
 });
 
 test('a copy asks its own provider for a train of its own carrier, never gamma\'s (#1022)', () => {
@@ -817,6 +821,10 @@ test('the fare scenarios: a section inside the trip; each wrong one starts its s
     SIM_FARE_NEARBY_STOP_SRCH_1ADT_38: [v.nearbyStopTrip, 'SEARCH', undefined, true, undefined],
     // #1444: fares asked without a trip, a probe (nonTripFaresExpectRejection): no section.
     SIM_NHF_FARE_NONTRIP_1ADT_38: [undefined, 'NON_TRIP', undefined, true, undefined],
+    // #1449: fares sold without a trip, in a zone, a NUTS region, between stop places.
+    SIM_FARE_NONTRIP_ZONE_1ADT_38: [undefined, 'NON_TRIP', undefined, true, undefined],
+    SIM_FARE_NONTRIP_NUTS_1ADT_38: [undefined, 'NON_TRIP', undefined, true, undefined],
+    SIM_FARE_NONTRIP_PLACES_1ADT_38: [undefined, 'NON_TRIP', undefined, true, undefined],
   };
   const found = Object.fromEntries(fareScenarios.map((s) => [s.code, [
     startOf(s), tripOf(s).tripType, s.isPartOfInternationalTrip, s.offerSearchCriteria.requestedOfferParts.includes('FARE_ADMISSION'), s.expectFares,

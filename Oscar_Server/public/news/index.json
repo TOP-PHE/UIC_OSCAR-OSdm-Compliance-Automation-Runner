@@ -1,5 +1,13 @@
 [
   {
+    "id": "2026-11-25-fares-sold-without-a-trip",
+    "date": "November 25, 2026",
+    "tag": "New Feature",
+    "title": "Fares sold without a trip: a theoretical scenario",
+    "summary": "Three new scenarios buy fares without a trip, in a zone, in a NUTS region and between two stop places, for a provider that declares it.",
+    "content": "OSDM describes online fares as part of an offer for a trip. Asked about fares without a trip, the OSDM architect answered that fares are trip-related, but could in theory be sold between stop places, in zones or in regions named by NUTS codes. The distributor then has to link the trip of its own sale to the provider's zones.\n\nThree new reference scenarios test that case. The zone and NUTS scenarios start from a stop place of the trip: OSCAR looks up the provider's zone holding it in GET /zones, then asks the fares of that zone, or of its NUTS region. The third asks fares between two stop places. The fares are checked as any fares, and also for no trip in the answer, no trip coverage, and a validity naming what was asked. The fare offer is then booked, confirmed and read.\n\nA provider declares this in the Test Framework, under Fares: Sells fares without a trip too. The scenarios are offered only then. The probe that expects such fares refused is offered only to a provider that does not tick it.\n\nThe OSDM simulator now sells these fares on every provider. If your company follows a simulator reference configuration, update it from Test Config. Otherwise no action is required."
+  },
+  {
     "id": "2026-11-25-fares-without-a-trip-refused",
     "date": "November 25, 2026",
     "tag": "New",

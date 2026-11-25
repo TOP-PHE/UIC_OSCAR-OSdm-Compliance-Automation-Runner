@@ -498,9 +498,9 @@ describe('#1444 fares asked without a trip in the coverage', () => {
     for (const code of ['SIM_NHF_FARE_NONTRIP_1ADT_38', 'SIM_NHF_FARE_NONTRIP_1ADT_36', 'SIM_NHF_FARE_NONTRIP_1ADT_312']) {
       expect([code, derivedCapability(sim(code), simulator), isRefusalTest(sim(code))]).toEqual([code, 'fares.offers', true]);
     }
-    // Without the flag, the same request is a fare sale, and no refusal.
+    // Without the flag, the same request is a fare sale without a trip (#1449), and no refusal.
     const plain = { ...sim('SIM_NHF_FARE_NONTRIP_1ADT_38'), nonTripFaresExpectRejection: 'off' };
-    expect([derivedCapability(plain, simulator), isRefusalTest(plain)]).toEqual(['fares.sale', false]);
+    expect([derivedCapability(plain, simulator), isRefusalTest(plain)]).toEqual(['fares.nonTrip', false]);
   });
 });
 
