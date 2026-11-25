@@ -4,6 +4,17 @@
   "current_release": "2026.625",
   "releases": [
     {
+      "release": "2026.626",
+      "date": "2026-11-25",
+      "server": "1.11.585",
+      "collection": "OTST_V2.0.270",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.585 (#1438): the run dispatcher takes RUN_POD_USER (uid:group, both above 0) and names them in each run pod; empty, the platform's own (OpenShift). It removes the Secrets of runs it lost by label, in one call, and no longer lists Secrets: its Role gives deletecollection, not list. With it, the Kubernetes scans in CI: Kubescape on the manifests, kube-bench (CIS k3s) on the k3s the guide installs, failing unless accepted with a reason (OSCAR_Deploy/kubernetes/scans). Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.625",
       "date": "2026-11-24",
       "server": "1.11.584",

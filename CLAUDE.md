@@ -4743,6 +4743,16 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   compose files' shared `logging` block (`x-logging`, one per file: **a new
   service names `logging: *logging`**). `docker-socket.test.js` and the CI
   job *Docker host* hold it.
+- **The Kubernetes set-up is scanned in CI** (#1438, 1.11.585): Kubescape
+  (job `kubescape`) on `scans/render.sh`'s render of the overlays, `runs/`,
+  monitoring and the dispatcher's Jobs (`scans/run-pods.js`), kube-bench
+  (CIS k3s) at the end of the k3s job. **A finding fails unless
+  `OSCAR_Deploy/kubernetes/scans/accepted.json` accepts it with its reason**,
+  and an entry that no longer matches fails too (`scans/check-scans.js`, no
+  dependency). A new manifest, overlay or pod field is scanned with it: fix
+  the finding, or add an entry the maintainer agrees to. The dispatcher's
+  `RUN_POD_USER` names the run pods' uid:group (k3s: 1000:1000; empty on
+  OpenShift), and it removes Secrets by label, never lists them.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image**. **The VPS checkout follows the
   newest `release-*` tag on `main`, never `main`'s head** (2026-11-06):

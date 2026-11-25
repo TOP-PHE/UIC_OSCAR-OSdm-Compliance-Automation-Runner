@@ -438,7 +438,8 @@ describe('pod mode (option 4)', () => {
   test('the dispatcher may make and remove runs there, and nothing more', () => {
     const role = byKind(runsDocs, 'Role', 'oscar-dispatcher');
     const rights = role.rules.flatMap(r => r.resources.map(res => `${res}:${[...r.verbs].sort().join(',')}`)).sort();
-    expect(rights).toEqual(['jobs:create,delete,get,list', 'pods/log:get', 'pods:get,list', 'secrets:create,delete,list,patch']);
+    // Secrets removed by label, never listed nor read (#1438).
+    expect(rights).toEqual(['jobs:create,delete,get,list', 'pods/log:get', 'pods:get,list', 'secrets:create,delete,deletecollection,patch']);
     const binding = byKind(runsDocs, 'RoleBinding', 'oscar-dispatcher');
     expect(binding.roleRef).toMatchObject({ kind: 'Role', name: 'oscar-dispatcher' });
     expect(binding.subjects).toEqual([{ kind: 'ServiceAccount', name: 'oscar-dispatcher', namespace: 'oscar' }]);

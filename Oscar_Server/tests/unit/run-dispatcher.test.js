@@ -154,6 +154,11 @@ function fakeApi() {
         return json(res, 201, obj);
       }
       if (req.method === 'GET' && !name) return json(res, 200, { items: [...store.values()].filter((o) => !selector || matches(o, selector)) });
+      // deletecollection, by label (#1438).
+      if (req.method === 'DELETE' && !name) {
+        for (const [key, o] of [...store]) if (!selector || matches(o, selector)) store.delete(key);
+        return json(res, 200, { kind: 'Status', status: 'Success' });
+      }
       const obj = store.get(name);
       if (!obj) return json(res, 404, { message: 'not found' });
       if (req.method === 'GET') return json(res, 200, obj);
@@ -773,6 +778,21 @@ describe('start-up', () => {
     expect(api.s.jobs.has('oscar-run-old')).toBe(false);
     expect(api.s.secrets.has('oscar-run-old')).toBe(false);
     expect(api.s.secrets.has('someone-else')).toBe(true);
+    // The Secrets by label, in one call; none ever listed (#1438).
+    const selector = encodeURIComponent(J.MANAGED_SELECTOR);
+    expect(api.s.calls).toContain(`DELETE /api/v1/namespaces/oscar-runs/secrets?labelSelector=${selector}`);
+    expect(api.s.calls.filter((c) => c.startsWith('GET ') && c.includes('/secrets'))).toEqual([]);
+  });
+
+  test('RUN_POD_USER: the run pods\' uid and group, named; none by default; refused unless two numbers above 0', () => {
+    const job = (podUser) => J.runJob({ runId: '00000000-0000-4000-8000-000000000001', deadlineSeconds: 60 },
+      D.settingsOf({ ...good, ...(podUser === undefined ? {} : { RUN_POD_USER: podUser }) })).spec.template.spec.securityContext;
+    expect(job('1000:1000')).toEqual({ runAsNonRoot: true, runAsUser: 1000, runAsGroup: 1000, seccompProfile: { type: 'RuntimeDefault' } });
+    expect(job(undefined)).toEqual({ runAsNonRoot: true, seccompProfile: { type: 'RuntimeDefault' } });
+    expect(D.startupProblem({ ...good, RUN_POD_USER: '1000:1000' }, undefined, () => false)).toBeNull();
+    for (const bad of ['0:1000', '1000:0', '1000', 'root:root', '1000:1000:1', ' 1000:abc']) {
+      expect([bad, D.startupProblem({ ...good, RUN_POD_USER: bad }, undefined, () => false)]).toEqual([bad, expect.stringMatching(/RUN_POD_USER/)]);
+    }
   });
 
   const good = { RUN_AGENT_TOKEN: AGENT_TOKEN, RUN_IMAGE: 'r/oscar-run:1', RUN_RESULTS_URL: 'http://oscar-internal:3003' };

@@ -11,7 +11,8 @@
 // dispatcher makes them, written as JSON for the scanners (#1438). No
 // manifest holds them: the dispatcher builds them at each run. The settings
 // are those of the pod-runs component (components/pod-runs), read by the
-// dispatcher's own settingsOf().
+// dispatcher's own settingsOf(), and RUN_POD_USER as the k3s overlay sets it
+// (render.sh reads it there).
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -25,6 +26,7 @@ function jobs() {
     RUN_NAMESPACE: 'oscar-runs',
     RUN_IMAGE: 'ghcr.io/top-phe/oscar-run:release-scan',
     RUN_RESULTS_URL: 'http://oscar-internal.oscar.svc:3003',
+    RUN_POD_USER: process.env.RUN_POD_USER || '',
   });
   // The dispatcher names the namespace in the address it posts to; the
   // scanners read it from the object.

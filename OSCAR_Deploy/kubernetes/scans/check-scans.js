@@ -111,7 +111,7 @@ function kubeBenchFindings(report) {
     for (const group of section.tests || []) {
       for (const r of group.results || []) {
         if (r.status !== 'FAIL' && r.status !== 'WARN') continue;
-        const detail = String(r.actual_value || r.reason || '').replace(/s+/g, ' ').slice(0, 300);
+        const detail = String(r.actual_value || r.reason || '').replace(/\s+/g, ' ').slice(0, 300);
         findings.push({ id: r.test_number, name: r.test_desc || '', where: section.text || '', warn: r.status === 'WARN', detail });
       }
     }

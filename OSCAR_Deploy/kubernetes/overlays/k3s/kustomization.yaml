@@ -56,3 +56,6 @@ patches:
         name: oscar-dispatcher-settings
       data:
         RUN_IMAGE: ghcr.io/top-phe/oscar-run:release-2026.529
+        # The run pods under the run image's own uid and group, named
+        # (#1438), as the server's and the dispatcher's are.
+        RUN_POD_USER: "1000:1000"

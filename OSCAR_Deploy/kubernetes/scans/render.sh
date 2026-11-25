@@ -29,4 +29,7 @@ for target in overlays/kubernetes overlays/openshift overlays/k3s runs monitorin
   echo "$name: $(grep -c '^kind:' "$OUT/$name.yaml") objects"
 done
 
-node "$K8S/scans/run-pods.js" "$OUT"
+# The run pods as the k3s overlay has the dispatcher make them.
+RUN_POD_USER=$(sed -n 's/^  RUN_POD_USER: "\{0,1\}\([0-9:]*\)"\{0,1\}$/\1/p' "$OUT/overlays-k3s.yaml" | head -n 1)
+[ -n "$RUN_POD_USER" ] || { echo "the k3s overlay names no RUN_POD_USER" >&2; exit 1; }
+RUN_POD_USER="$RUN_POD_USER" node "$K8S/scans/run-pods.js" "$OUT"
