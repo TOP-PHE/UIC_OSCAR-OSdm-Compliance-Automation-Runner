@@ -63,6 +63,8 @@ services:
       # the canonical OSCAR deployment is hosted; override via OSCAR_TZ
       # in .env if you self-host elsewhere (e.g. OSCAR_TZ=America/New_York).
       TZ: ${OSCAR_TZ:-Europe/Paris}
+      # The root file system is read-only (#1446): HOME is the tmpfs below.
+      HOME: /tmp
     ports:
       # Bind to localhost only — front with nginx for HTTPS termination.
       - "127.0.0.1:3001:3001"
@@ -86,9 +88,13 @@ services:
     # setuid binary, and a cap on processes and threads: every run is a Bruno
     # CLI process (about a dozen threads each), MAX_CONCURRENT_RUNS of them at
     # most, so 2048 leaves room and still stops a runaway fork.
-    # The root file system stays writable for now: Bruno and the server write
-    # outside /app/data, and a read-only root needs each of those places
-    # listed first.
+    # The root file system is read-only (#1446): what the server writes is on
+    # ./data (database, data files, reports), the run-workspaces volume (the
+    # runs' folders), Alertmanager's volume (metrics overlay), and /tmp, a
+    # tmpfs (HOME too). A write anywhere else fails with EROFS.
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g,mode=1777
     cap_drop:
       - ALL
     security_opt:
@@ -134,12 +140,17 @@ services:
       BRU_CMD: /usr/local/bin/bru
       NODE_ENV: production
       TZ: ${OSCAR_TZ:-Europe/Paris}
+      HOME: /tmp
     volumes:
       - run-workspaces:/app/run-workspaces
     depends_on:
       - oscar
     restart: unless-stopped
     logging: *logging
+    # Read-only (#1446): Bruno writes in the run's folder and /tmp only.
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g,mode=1777
     cap_drop:
       - ALL
     security_opt:

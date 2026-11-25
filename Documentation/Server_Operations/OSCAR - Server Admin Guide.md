@@ -965,6 +965,22 @@ docker inspect oscar --format '{{.HostConfig.LogConfig.Type}} {{.HostConfig.LogC
 
 In Grafana, *OSCAR · Logs* shows the `oscar` container's new lines. A promotion keeps all of it: it makes the server again from the same compose files (*auto-deploy-setup.md*, step 4).
 
+### 13.9 Read-only containers (#1446)
+
+The `oscar` and `oscar-runner` containers run with a read-only root file system (`read_only: true` in `docker-compose.yml`). What they write is on `./data` (database, data files, reports), the `run-workspaces` volume (the runs' folders), Alertmanager's volume (metrics overlay) and a `tmpfs` on `/tmp` of 1 GB, which is also HOME. A write anywhere else fails with `EROFS` in the container's log.
+
+An installed server takes it when its containers are made again from the new compose file: a promotion makes `oscar` again; `oscar-runner` with a full `up -d`, from the running server's compose files:
+
+```bash
+cd /opt/OSCAR/OSCAR_Deploy
+FILES=$(docker inspect oscar --format '{{index .Config.Labels "com.docker.compose.project.config_files"}}')
+C="docker compose $(printf -- '-f %s ' ${FILES//,/ })"
+sudo $C up -d oscar oscar-runner
+docker inspect oscar oscar-runner --format '{{.Name}} read-only={{.HostConfig.ReadonlyRootfs}}'
+```
+
+Both lines end `read-only=true`. Then run a scenario, and `docker logs oscar 2>&1 | grep -c EROFS` (and `oscar-runner`) answer `0`.
+
 ## 14. Operational Monitoring & Alerting (v1.8)
 
 OSCAR ships a self-healing + paging stack so production incidents get caught and (where possible) fixed before an admin notices.
