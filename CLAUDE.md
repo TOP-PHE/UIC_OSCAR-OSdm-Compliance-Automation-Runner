@@ -4822,7 +4822,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   the finding, or add an entry the maintainer agrees to. The dispatcher's
   `RUN_POD_USER` names the run pods' uid:group (k3s: 1000:1000; empty on
   OpenShift), and it removes Secrets by label, never lists them.
-- **Trivy scans every image we publish and every image we pin** (#1453).
+- **Trivy scans every image we publish and every image we pin** (#1453,
+  1.11.590).
   The required job *Container image scan (Trivy)* builds the three images
   with `build-images.sh` (server, run, cluster) and scans each. The
   Kubernetes CI's `kubescape` job runs `trivy config` on the same render and
@@ -4834,7 +4835,8 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
   Dockerfile FROMs, the kube-prometheus-stack chart rendered with helm),
   with no credential, and on a PR changing the scan or a pinned image (not
   `compatibility.json`: a release PR names images not yet published): **a new pinned image is scanned by itself, and must
-  name its digest** (`image-scans.test.js`).
+  name its digest** (`image-scans.test.js`). **The promotion builds without
+  the cache**: from it, the `apt-get upgrade` layer was weeks old.
 - **Deploy:** VPS Docker image; `Bruno_Collection/` + `compatibility.json` are
   **bind-mounted, not baked into the image**. **The VPS checkout follows the
   newest `release-*` tag on `main`, never `main`'s head** (2026-11-06):

@@ -66,6 +66,16 @@ describe('the required job scans the three images a release publishes', () => {
   });
 });
 
+describe('a release\'s image is built afresh', () => {
+  test('the promotion builds without the cache, so that apt-get upgrade runs at each release', () => {
+    const build = workflow('promote-release.yml').jobs[Object.keys(workflow('promote-release.yml').jobs)[0]].steps
+      .find((s) => /docker\/build-push-action@/.test(s.uses || ''));
+    expect(build.with['no-cache']).toBe(true);
+    expect(build.with['cache-from']).toBeUndefined();
+    expect(read('Oscar_Server/Dockerfile')).toMatch(/apt-get upgrade -y/);
+  });
+});
+
 describe('Trivy config in the Kubernetes CI', () => {
   const job = workflow('ci-kubernetes.yml').jobs.kubescape;
 
@@ -196,6 +206,8 @@ describe('the weekly job', () => {
     expect(steps).toContain('sha256sum -c -');
     for (const command of ['images.js list', 'images.js chart)', 'images.js chart-values', 'images.js from-render <']) expect(steps).toContain(command);
     expect(steps.indexOf('sha256sum -c -')).toBeLessThan(steps.indexOf('helm template'));
+    // The chart's test pods run only under `helm test`, never on k3s.
+    expect(steps).toMatch(/helm template [^\n]*\\\n[^\n]*--skip-tests/);
   });
 
   test('one job per image, every one run, the build\'s rule', () => {

@@ -136,12 +136,29 @@ function trivyTarget(target) {
   return base.replace(/\.(ya?ml|json)$/, '');
 }
 
-// The resource a Kubernetes check's message names: "Container 'x' of
-// Deployment 'oscar' should …" or "Role 'oscar-dispatcher' should …".
+// The resource a Kubernetes check's message names, in the four ways Trivy
+// writes it: "Container 'x' of Deployment 'oscar' should …", "Role 'r'
+// should …", "Container x in deployment oscar (namespace: …) uses …",
+// "deployment oscar in default namespace should …". A ConfigMap or Secret
+// kustomize made loses its content hash ("oscar-settings-26d6768gk7"), which
+// changes with every setting.
+const RESOURCE_FORMS = [
+  /\bof (\w+) '([^']+)'/,
+  /^(\w+) '([^']+)'/,
+  /\bin (\w+) ([\w.-]+) \(namespace/,
+  /^(\w+) ([\w.-]+) in [\w-]+ namespace/,
+];
+
 function trivyResource(message) {
   const text = String(message || '');
-  const m = /\bof (\w+) '([^']+)'/.exec(text) || /^(\w+) '([^']+)'/.exec(text);
-  return m ? `${m[1]}/${m[2]}` : '';
+  for (const form of RESOURCE_FORMS) {
+    const m = form.exec(text);
+    if (!m) continue;
+    const kind = m[1].charAt(0).toUpperCase() + m[1].slice(1);
+    const name = /^(ConfigMap|Secret)$/.test(kind) ? m[2].replace(/-[2456789bcdfghkmt]{10}$/, '') : m[2];
+    return `${kind}/${name}`;
+  }
+  return '';
 }
 
 function trivyFindings(report) {

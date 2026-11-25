@@ -11,12 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Trivy scans the run and cluster images, the Dockerfiles and manifests, and every week the published and pinned images** (#1453; auditor's point; maintainer's choices, 2026-11-25). CI, scripts and documentation, no version.
-  - **Each PR** (required check *Container image scan (Trivy)*): the three images a release publishes, built by `build-images.sh` as a release builds them (`oscar-server`, `oscar-run`, `oscar`), each scanned with the server's rule (CRITICAL or HIGH with a fix fails). Each scan runs even when another failed.
-  - **The configuration** (*CI · Kubernetes*, job *Kubescape and Trivy*): `trivy config` on the render Kubescape reads and on the three Dockerfiles. A finding fails unless `scans/accepted.json` accepts it with its reason (its new `trivy` list), and an entry that no longer matches fails, as for Kubescape (`check-scans.js trivy`).
-  - **Every week** (`scan-images.yml`, Monday, by hand, and on a PR that changes the scan, its list or a pinned image, a Dependabot bump included): the current release's images on GHCR, and every third-party image the deployments pin, listed by `OSCAR_Deploy/scans/images.js` (Docker Compose and Kubernetes `image:` lines, the Dockerfiles' FROM, the kube-prometheus-stack chart rendered at its pinned version with its values by a pinned, checked helm). One job per image, red on a CRITICAL or HIGH finding with a fix: a flaw found after a build was seen nowhere. No credential is sent to any registry.
-  - Tests: `image-scans.test.js` (the three jobs, the list read another way, every pinned image named by its digest), `kubernetes-scans.test.js` (Trivy's report).
-
 - **The GitHub and CI set-up is recorded** (#1372, maintainer's request). Documentation only, no version. New page *OSCAR - GitHub and CI set-up*, read from GitHub's API on 2026-11-22: repository settings, the protection of `main` and its seven required checks (and the checks that run without being required), the release tag ruleset and its one bypass, the four environments with their rules and secret names (never values), the GitHub Apps, every workflow, SonarCloud and its gate, the security features and Dependabot, the test environments, the commands to read it all again and the order to set it up from nothing. Linked from `CONTRIBUTING.md` and *auto-deploy-setup.md*.
 - **A production smoke test through the test automation API** (#1359). CI and documentation, no version.
   - `.github/workflows/production-smoke.yml`: after each successful promotion, and every morning, production is asked for three GAMMA scenarios through the API by the example client, as a company's CI would. After a promotion it first waits until `/health` shows the promoted release (Watchtower takes about five minutes). The client's report is the job's summary, and its exit code the verdict.
@@ -701,6 +695,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `buildOfferCollection()` is back under the complexity limit (S3776), and the
   trip id's seed is a string of its own (S4624). The answers are the same, trip
   ids included: no simulator version, nothing to install.
+
+---
+
+## [server-1.11.590] — 2026-11-25
+
+**Trivy scans the run and cluster images, the Dockerfiles and manifests, and every week the published and pinned images** (#1453; auditor's point; maintainer's choices, 2026-11-25). Not released on its own: listed in `compatibility.json` (2026.631) without moving `current_release`. Collection unchanged at OTST_V2.0.274.
+
+- **Each PR** (required check *Container image scan (Trivy)*): the three images a release publishes, built by `build-images.sh` as a release builds them (`oscar-server`, `oscar-run`, `oscar`), each scanned with the server's rule (CRITICAL or HIGH with a fix fails). Each scan runs even when another failed.
+- **The configuration** (*CI · Kubernetes*, job *Kubescape and Trivy*): `trivy config` on the render Kubescape reads and on the three Dockerfiles. A finding fails unless `scans/accepted.json` accepts it with its reason (its new `trivy` list), and an entry that no longer matches fails, as for Kubescape (`check-scans.js trivy`).
+- **Every week** (`scan-images.yml`, Monday, by hand, and on a PR that changes the scan, its list or a pinned image, a Dependabot bump included): the current release's images on GHCR, and every third-party image the deployments pin, listed by `OSCAR_Deploy/scans/images.js` (Docker Compose and Kubernetes `image:` lines, the Dockerfiles' FROM, the kube-prometheus-stack chart rendered at its pinned version with its values by a pinned, checked helm). One job per image, red on a CRITICAL or HIGH finding with a fix: a flaw found after a build was seen nowhere. No credential is sent to any registry.
+- Tests: `image-scans.test.js` (the three jobs, the list read another way, every pinned image named by its digest), `kubernetes-scans.test.js` (Trivy's report).
+- **Found by the first weekly scan, fixed here:**
+  - the promotion built the server image from the Actions cache, so the Dockerfile's `apt-get upgrade` layer could be weeks old: 2026.629 went out with `apt` 2.6.1, whose HIGH finding (CVE-2026-109518) 2.6.2 fixes. `promote-release.yml` builds with `no-cache: true` now; the next promotion carries the fix;
+  - the configuration scan's Dockerfile findings: Bruno is installed with `npm ci --prefix /opt/bruno-cli` (no `cd` in a `RUN`, both images alike, as `kubernetes-manifests.test.js` asks), and the cluster image names its user (`USER 1000`);
+  - the chart is rendered with `--skip-tests`: its test pods run only under `helm test`, which k3s never runs.
 
 ---
 

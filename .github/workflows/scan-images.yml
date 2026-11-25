@@ -85,8 +85,10 @@ jobs:
           node OSCAR_Deploy/scans/images.js list > "$out"
           read -r repo chart version < <(node OSCAR_Deploy/scans/images.js chart)
           node OSCAR_Deploy/scans/images.js chart-values > "$RUNNER_TEMP/values.yaml"
+          # --skip-tests: the chart's test pods run only under `helm test`,
+          # which k3s's Helm controller never runs.
           helm template kube-prometheus-stack "$chart" --repo "$repo" --version "$version" \
-            --namespace monitoring -f "$RUNNER_TEMP/values.yaml" > "$RUNNER_TEMP/chart.yaml"
+            --namespace monitoring --skip-tests -f "$RUNNER_TEMP/values.yaml" > "$RUNNER_TEMP/chart.yaml"
           node OSCAR_Deploy/scans/images.js from-render < "$RUNNER_TEMP/chart.yaml" >> "$out"
           sort -u -o "$out" "$out"
           {

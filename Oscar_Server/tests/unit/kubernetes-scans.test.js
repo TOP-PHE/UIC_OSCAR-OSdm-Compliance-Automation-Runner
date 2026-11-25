@@ -195,7 +195,13 @@ describe('check-scans.js, Trivy (#1453)', () => {
     expect(C.trivyTarget('run-pod-job.json')).toBe('run-pod-job');
     expect(C.trivyResource("Container 'c' of StatefulSet 'loki' should set …")).toBe('StatefulSet/loki');
     expect(C.trivyResource("ClusterRole 'x' should not …")).toBe('ClusterRole/x');
+    expect(C.trivyResource('Container run in job oscar-pod-kept-scan (namespace: oscar-runs) uses an image from an untrusted registry.')).toBe('Job/oscar-pod-kept-scan');
+    expect(C.trivyResource('deployment oscar in default namespace should set metadata.namespace to a non-default namespace')).toBe('Deployment/oscar');
+    // kustomize's content hash is left out: it changes with every setting.
+    expect(C.trivyResource("ConfigMap 'oscar-settings-26d6768gk7' in 'default' namespace stores sensitive contents")).toBe('ConfigMap/oscar-settings');
+    expect(C.trivyResource("Role 'oscar-settings-26d6768gk7' should not …")).toBe('Role/oscar-settings-26d6768gk7');
     expect(C.trivyResource('Specify at least 1 USER command')).toBe('');
+    expect(C.trivyResource('A resource quota policy with hard memory and CPU limits should be configured per namespace')).toBe('');
   });
 
   test('a report with nothing found has no finding; not a Trivy report is said', () => {
