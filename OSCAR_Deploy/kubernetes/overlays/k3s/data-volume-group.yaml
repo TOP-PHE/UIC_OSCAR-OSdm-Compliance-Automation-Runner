@@ -6,8 +6,10 @@
 #        http://www.apache.org/licenses/LICENSE-2.0
 
 # The image runs as uid 1000. Most storage classes give a new volume to root:
-# fsGroup 1000 lets that uid write the database there. (OpenShift chooses
-# fsGroup itself, which is why this is not in the base.)
+# fsGroup 1000 lets that uid write the database there. The uid and group are
+# named too (#1438): the image's own, which a scanner cannot see from the
+# manifest. (OpenShift chooses all three itself, which is why this is not in
+# the base.)
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,5 +18,7 @@ spec:
   template:
     spec:
       securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
         fsGroup: 1000
         fsGroupChangePolicy: OnRootMismatch

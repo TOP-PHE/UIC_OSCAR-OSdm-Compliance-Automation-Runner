@@ -252,6 +252,7 @@ sudo sysctl --system > /dev/null
 sysctl fs.inotify.max_user_instances
 sudo cp OSCAR_Deploy/kubernetes/k3s/config.yaml /etc/rancher/k3s/config.yaml
 if [ -f /etc/rancher/k3s/resolv.conf ]; then echo 'resolv-conf: /etc/rancher/k3s/resolv.conf' | sudo tee -a /etc/rancher/k3s/config.yaml; fi
+sudo install -D -m 0644 OSCAR_Deploy/kubernetes/k3s/cert-permissions.conf /etc/systemd/system/k3s.service.d/oscar-cert-permissions.conf
 curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.36.6+k3s1 sh -
 ```
 
@@ -263,7 +264,7 @@ then run `sudo sysctl --system > /dev/null` again. The `if` line prints
 `resolv-conf: /etc/rancher/k3s/resolv.conf` when you wrote the pods'
 resolvers above, and nothing otherwise.
 
-What the three files do:
+What the four files do:
 - [`k3s/sysctl-oscar.conf`](../../OSCAR_Deploy/kubernetes/k3s/sysctl-oscar.conf):
   the machine's inotify instances go from Ubuntu's 128 to 8192, the usual
   value on Kubernetes nodes. k3s and each container hold some, and the kubelet
@@ -281,6 +282,10 @@ What the three files do:
     converted in section 9, *k3s on etcd*.
 
   This file must be in place before the first start.
+- [`k3s/cert-permissions.conf`](../../OSCAR_Deploy/kubernetes/k3s/cert-permissions.conf):
+  after each start of k3s, its certificates are readable by root only (the
+  CIS benchmark of k3s, 1.1.20; section 9, *The CIS benchmark*). k3s renews
+  them when it starts, so a renewed one is closed too.
 - [`k3s/traefik-config.yaml`](../../OSCAR_Deploy/kubernetes/k3s/traefik-config.yaml):
   - `http` is sent to `https`;
   - Let's Encrypt certificates, by the TLS challenge on port 443, kept on the
@@ -317,6 +322,18 @@ line is missing from `/etc/rancher/k3s/config.yaml` (section 11).
 
 `kubectl` is k3s itself, which reads `/etc/rancher/k3s/k3s.yaml`. If another
 `kubectl` was already installed, write `sudo k3s kubectl` instead.
+
+Then the default ServiceAccount of each namespace there is mounts no token
+(the CIS benchmark's 5.1.5). OSCAR's own namespaces carry it in their files;
+these are k3s's:
+
+```bash
+for ns in $(sudo kubectl get namespaces -o name); do sudo kubectl -n "${ns#namespace/}" patch serviceaccount default -p '{"automountServiceAccountToken": false}'; done
+```
+
+Each line ends `patched` (or `no change` when run again). k3s's own pods
+(CoreDNS, Traefik, metrics-server, the volume provisioner) use accounts of
+their own, which keep their tokens.
 
 Then check the firewall from your PC (section 1, *Check it from your PC*):
 443 must answer `True`; 6443, 10250 and 9100 `False`. 443 `False` while every
@@ -1255,6 +1272,58 @@ sudo rm -f /root/k3s-server-before-etcd.tar.gz /var/lib/rancher/k3s/server/db/st
 ```
 
 The copy holds the cluster's keys: do not leave it on the machine.
+
+### The CIS benchmark and Kubescape (#1438)
+
+The CI runs both on every change of the Kubernetes files: kube-bench (the CIS
+benchmark of k3s) on a k3s installed as this guide installs it, Kubescape
+(NSA and MITRE frameworks) on the manifests. A finding fails the CI unless
+[`scans/accepted.json`](../../OSCAR_Deploy/kubernetes/scans/accepted.json)
+accepts it, with its reason. To run them on this machine (both pinned, their
+downloads checked):
+
+```bash
+mkdir -p /tmp/oscar-scans && cd /tmp/oscar-scans
+curl -fsSLO https://github.com/aquasecurity/kube-bench/releases/download/v0.16.0/kube-bench_0.16.0_linux_amd64.tar.gz
+echo "82dbc7e598740dc9344d41f8ad0b8210d57c4c00bdb2c5f1d8a69a2b98baddcf  kube-bench_0.16.0_linux_amd64.tar.gz" | sha256sum -c -
+mkdir -p kube-bench && tar -xzf kube-bench_0.16.0_linux_amd64.tar.gz -C kube-bench
+(cd kube-bench && sudo ./kube-bench run --config-dir cfg --config cfg/config.yaml --benchmark k3s-cis-1.9) | grep -E '^\[FAIL\]|^== Summary total' -A4
+```
+
+```bash
+cd /tmp/oscar-scans
+curl -fsSLO https://github.com/kubescape/kubescape/releases/download/v4.0.17/kubescape_4.0.17_linux_amd64.tar.gz
+echo "9ed580e7c9b1e2e5b8f0adcfdf2bf2fd8856e7297125fc9aa10cdcb97813a4fa  kubescape_4.0.17_linux_amd64.tar.gz" | sha256sum -c -
+mkdir -p kubescape && tar -xzf kubescape_4.0.17_linux_amd64.tar.gz -C kubescape
+sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml "$(find kubescape -type f -name kubescape | head -n 1)" scan framework nsa,mitre --include-namespaces oscar,oscar-runs,monitoring
+```
+
+Each `sha256sum` line ends `OK`. What kube-bench may fail, and why it is
+accepted (`accepted.json` has the full text):
+
+- **1.2.23** (etcd certificate arguments) on a machine moved to etcd in
+  *k3s on etcd* below: the benchmark reads the first start of the API server
+  in k3s's log, which was on SQLite. k3s sets both arguments on etcd; the CI
+  checks the current start names them.
+- **5.1.6** (tokens mounted only where needed): k3s's own pods (CoreDNS,
+  Traefik, metrics-server, the volume provisioner) need theirs, and k3s writes
+  their manifests. OSCAR's pods are Kubescape's to check: only the dispatcher
+  and Alloy mount one.
+
+Its `[WARN]` lines are the benchmark's manual checks. Any other `[FAIL]`:
+compare with the CI's last run of *k3s on one machine* (its step *kube-bench*);
+a machine installed before #1438 needs the two settings of section 3 first:
+
+```bash
+cd /opt/oscar
+sudo install -D -m 0644 OSCAR_Deploy/kubernetes/k3s/cert-permissions.conf /etc/systemd/system/k3s.service.d/oscar-cert-permissions.conf
+sudo systemctl daemon-reload
+sudo find /var/lib/rancher/k3s/server/tls -name '*.crt' -exec chmod 600 {} +
+for ns in $(sudo kubectl get namespaces -o name); do sudo kubectl -n "${ns#namespace/}" patch serviceaccount default -p '{"automountServiceAccountToken": false}'; done
+```
+
+The `find` closes the certificates now; the drop-in does it after each
+start of k3s from then on. Nothing restarts.
 
 ### The rest
 

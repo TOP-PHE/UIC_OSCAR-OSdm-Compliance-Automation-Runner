@@ -4,25 +4,36 @@
   "current_release": "2026.625",
   "releases": [
     {
-      "release": "2026.627",
+      "release": "2026.628",
       "date": "2026-11-25",
-      "server": "1.11.586",
+      "server": "1.11.587",
       "collection": "OTST_V2.0.272",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.586 / collection OTST_V2.0.272 / simulator 0.75.0 (#1437, part of #1266): the offer request options test (#227) on a request without a trip. Its request with the mandatory parameters only keeps the passengers and where the offers are valid (stop places, zones or NUTS codes); nonTripSearchCriteria.validFrom is an option of its own; the options of a trip (inboundDate, the trip search options, requestedSections, tripResponseParameters) are reported as not tested. The report says the request is without a trip (the coverage and the Report Builder show it). The simulator applies its request option behaviours to a request without a trip from stop place 0000046 or in zone SIM-OPTIONS, in every provider. Two simulator scenarios with their copies, two reference scenarios (OTST_NONTRIP_OFFER_OPTION_DISCOVERY_PLACES, _ZONES), the references regenerated. No other scenario's checks change. Not released on its own: current_release is not moved."
+        "Server 1.11.587 / collection OTST_V2.0.272 / simulator 0.75.0 (#1437, part of #1266): the offer request options test (#227) on a request without a trip. Its request with the mandatory parameters only keeps the passengers and where the offers are valid (stop places, zones or NUTS codes); nonTripSearchCriteria.validFrom is an option of its own; the options of a trip (inboundDate, the trip search options, requestedSections, tripResponseParameters) are reported as not tested. The report says the request is without a trip (the coverage and the Report Builder show it). The simulator applies its request option behaviours to a request without a trip from stop place 0000046 or in zone SIM-OPTIONS, in every provider. Two simulator scenarios with their copies, two reference scenarios (OTST_NONTRIP_OFFER_OPTION_DISCOVERY_PLACES, _ZONES), the references regenerated. No other scenario's checks change. Not released on its own: current_release is not moved."
       ]
     },
     {
-      "release": "2026.626",
+      "release": "2026.627",
       "date": "2026-11-24",
-      "server": "1.11.585",
+      "server": "1.11.586",
       "collection": "OTST_V2.0.271",
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.585 / collection OTST_V2.0.271 / simulator 0.74.0 (#1436, part of #1266): a sale without a trip by product tag. A sale asking a product type by its tag (productTags, or a productSelections entry naming a tag) books an offer holding a product of that tag when one does, and step 07 fails a booking holding no product of the tag (a warning when its products name neither a type nor a tag); TICKET_LOST, CARD_LOST and SPLIT_RESERVATION only ask for something and choose nothing. Coverage: such a sale is under Named products and tariff choice (sale.products). The simulator answers GET /product-tags on every provider (three groups: without a trip, replacement, with a trip; OSDM 3.6.0 requires two members it does not declare, so alpha answers as 3.7 does), and GET /products names each product's tag: every scenario run on the simulator has 11 more checks, and every catalogue count moved. Three simulator scenarios with their version copies, three reference scenarios (OTST_NONTRIP_SALE_SINGLE_RIDE_BY_TAG_1ADT, _PASS_BY_TAG_1ADT, _MULTI_RIDE_BY_TAG_1ADT), the simulator references regenerated. Not released on its own: current_release is not moved."
+        "Server 1.11.586 / collection OTST_V2.0.271 / simulator 0.74.0 (#1436, part of #1266): a sale without a trip by product tag. A sale asking a product type by its tag (productTags, or a productSelections entry naming a tag) books an offer holding a product of that tag when one does, and step 07 fails a booking holding no product of the tag (a warning when its products name neither a type nor a tag); TICKET_LOST, CARD_LOST and SPLIT_RESERVATION only ask for something and choose nothing. Coverage: such a sale is under Named products and tariff choice (sale.products). The simulator answers GET /product-tags on every provider (three groups: without a trip, replacement, with a trip; OSDM 3.6.0 requires two members it does not declare, so alpha answers as 3.7 does), and GET /products names each product's tag: every scenario run on the simulator has 11 more checks, and every catalogue count moved. Three simulator scenarios with their version copies, three reference scenarios (OTST_NONTRIP_SALE_SINGLE_RIDE_BY_TAG_1ADT, _PASS_BY_TAG_1ADT, _MULTI_RIDE_BY_TAG_1ADT), the simulator references regenerated. Not released on its own: current_release is not moved."
+      ]
+    },
+    {
+      "release": "2026.626",
+      "date": "2026-11-25",
+      "server": "1.11.585",
+      "collection": "OTST_V2.0.270",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.585 (#1438): the run dispatcher takes RUN_POD_USER (uid:group, both above 0) and names them in each run pod; empty, the platform's own (OpenShift). It removes the Secrets of runs it lost by label, in one call, and no longer lists Secrets: its Role gives deletecollection, not list. With it, the Kubernetes scans in CI: Kubescape on the manifests, kube-bench (CIS k3s) on the k3s the guide installs, failing unless accepted with a reason (OSCAR_Deploy/kubernetes/scans). Not released on its own: current_release is not moved. Collection unchanged."
       ]
     },
     {

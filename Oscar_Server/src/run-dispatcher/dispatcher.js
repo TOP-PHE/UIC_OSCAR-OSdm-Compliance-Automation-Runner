@@ -130,6 +130,7 @@ function settingsOf(env = process.env) {
     memoryLimit: env.RUN_MEMORY_LIMIT || '1Gi',
     workFolders: (env.RUN_WORK_FOLDERS || 'memory').trim().toLowerCase(),
     runtimeClass: env.RUN_RUNTIME_CLASS || '',
+    podUser: (env.RUN_POD_USER || '').trim(),
     maxRuns: int(env.RUN_DISPATCHER_MAX_RUNS, 50),
     startTimeoutMs: int(env.RUN_POD_START_TIMEOUT_MS, 300000),
     apiWaitMs: int(env.RUN_DISPATCHER_API_WAIT_MS, 120000),
@@ -146,6 +147,7 @@ function startupProblem(env = process.env, settings = settingsOf(env), exists = 
   if (!NAME_RE.test(settings.serviceAccount)) return 'RUN_SERVICE_ACCOUNT is not a name.';
   if (!J.WORK_FOLDERS.includes(settings.workFolders)) return `RUN_WORK_FOLDERS is neither ${J.WORK_FOLDERS.join(' nor ')}.`;
   if (settings.namespace && !NAME_RE.test(settings.namespace)) return 'RUN_NAMESPACE is not a name.';
+  if (settings.podUser && !J.POD_USER_RE.test(settings.podUser)) return 'RUN_POD_USER is not uid:group (two numbers above 0, e.g. 1000:1000).';
   if (!Number.isInteger(settings.port) || settings.port < 1 || settings.port > 65535) return 'RUN_DISPATCHER_PORT is not a port.';
   const held = SERVER_SECRETS.filter((k) => env[k] !== undefined && env[k] !== '');
   if (held.length > 0) return `The dispatcher can see the server's ${held.join(', ')}: give it none of the server's settings.`;
@@ -265,13 +267,13 @@ function endedWith(ended, send, run) {
 /** Removes the Jobs and Secrets the dispatcher made before (a restart ends their runs). */
 async function removeLeftovers(kube, log = console) {
   const jobs = (await kube.listJobs(J.MANAGED_SELECTOR))?.items || [];
-  const secrets = (await kube.listSecrets(J.MANAGED_SELECTOR))?.items || [];
-  await Promise.all([
-    ...jobs.map((j) => ignoreGone(kube.deleteJob(j.metadata.name))),
-    ...secrets.map((s) => ignoreGone(kube.deleteSecret(s.metadata.name))),
-  ]);
-  if (jobs.length + secrets.length > 0) log.info?.(`[run-dispatcher] removed ${jobs.length} job(s) and ${secrets.length} secret(s) left from before`);
-  return { jobs: jobs.length, secrets: secrets.length };
+  await Promise.all(jobs.map((j) => ignoreGone(kube.deleteJob(j.metadata.name))));
+  // The Secrets by their label, in one call (#1438): the dispatcher may
+  // remove them but not list them, so it never reads a Secret it did not
+  // just make.
+  await kube.deleteSecrets(J.MANAGED_SELECTOR);
+  if (jobs.length > 0) log.info?.(`[run-dispatcher] removed ${jobs.length} job(s) left from before, and the Secrets of the runs it lost`);
+  return { jobs: jobs.length };
 }
 
 /**
