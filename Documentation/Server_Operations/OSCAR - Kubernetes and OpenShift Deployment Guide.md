@@ -451,6 +451,18 @@ as such at the start (as after a restart of the VPS), and can be run again.
 To go back, apply the previous tag, **before** anyone has used the new one
 for long: a migration is not undone.
 
+**In pod mode, apply the new release's runs' namespace first** (a cluster
+administrator, section 10a step 2), from that release's files:
+
+```bash
+kubectl apply -k OSCAR_Deploy/kubernetes/runs
+```
+
+It holds the dispatcher's rights, and a release may change them (2026.629:
+the dispatcher removes its runs' Secrets by label, `deletecollection`, and no
+longer lists them; without it, its log says `leftovers not removed` at each
+start). What did not move prints `unchanged`.
+
 ## 10a. Each run in a pod of its own (pod mode)
 
 By default the runs execute in the pod's `runner` container. Runs that execute
