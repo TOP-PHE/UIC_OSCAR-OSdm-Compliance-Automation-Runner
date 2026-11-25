@@ -244,6 +244,9 @@ function requestVersionOf(scenario, model) {
 // #1266: the product tags a scenario's own offer request asks.
 const productTagsOf = (scenario) => arr(scenario.offerSearchCriteria?.productTags).filter((t) => typeof t === 'string' && t.trim() !== '');
 
+// #1449: a scenario whose trip is NON_TRIP (its offer request has no trip).
+const isNonTripScenario = (scenario, datafile) => String(offerRequestFormOf(scenario, datafile) || '').startsWith('NON_TRIP');
+
 /** What a reference scenario needs the Test Framework to declare. */
 function requirementsOf(scenario, datafile) {
   const list = arr(datafile.passengersList).find((l) => isObj(l) && l.id === scenario.passengersListId);
@@ -264,7 +267,7 @@ function requirementsOf(scenario, datafile) {
     // #936: product-based, fare-based, or both.
     distributionModes: require('./distributionModes').distributionModesOf(scenario, datafile),
     // #937: what its fares need declared under `fares`.
-    fares: fareRequirementsOf(scenario, scenarioOfferCriteria(scenario, datafile)?.requestedOfferParts),
+    fares: fareRequirementsOf(scenario, scenarioOfferCriteria(scenario, datafile)?.requestedOfferParts, {}, { nonTrip: isNonTripScenario(scenario, datafile) }),
     // #1266: the product tags it asks (a pass, a multi-ride card…).
     productTags: productTagsOf(scenario),
   };
@@ -437,6 +440,8 @@ function dataNeedsOf(scenario, datafile, facts) {
     ...(nonTrip && arr(nonTrip.places).length ? ['nonTripPlaces'] : []),
     ...(nonTrip && typeof nonTrip.placeLookup === 'string' && nonTrip.placeLookup.trim() ? ['placeLookup'] : []),
     ...(nonTrip && arr(nonTrip.zones).length ? ['nonTripZones'] : []),
+    // #1449: the stop place whose zone is asked is the simulator's.
+    ...(nonTrip && typeof nonTrip.zoneOf === 'string' && nonTrip.zoneOf.trim() ? ['zoneOf'] : []),
     // #1266: NUTS codes named (none: those of GET /zones); a probe's unknown
     // code is made up, and stays unknown.
     ...(nonTrip && arr(nonTrip.nutsCodes).length && !ARMED.has(scenario.nutsCodeExpectRejection) ? ['nutsCodes'] : []),
@@ -486,6 +491,7 @@ const RETURN_TEXT = { COMBINED: 'one offer for both directions', SEPARATE: 'one 
 // #1258: the provider's values of a non-trip request, in words.
 const PROVIDER_VALUE_TEXT = Object.freeze({
   nonTripPlaces: 'stop places to sell between', placeLookup: 'name for POST /places', nonTripZones: 'zone', nutsCodes: 'NUTS codes',
+  zoneOf: 'stop place of the trip whose zone is asked',
   productCode: 'product code (Product selections)',
   lostCard: 'lost card (lostCard: its number and code)',
   lostTicketHolder: "holder of a lost ticket (the passenger's last name and date of birth)",
@@ -778,7 +784,7 @@ function baseEntries(catalogue, simulator, framework) {
     if (entry.limit === 'OVER_GROUP_SIZE') requirements.groupProductMax = true;
     // #937: the entry's model and free age; a fare scenario keeps its form,
     // whose sections are its trip's stations.
-    requirements.fares = fareRequirementsOf(scenario, scenarioOfferCriteria(scenario, datafile)?.requestedOfferParts, entry);
+    requirements.fares = fareRequirementsOf(scenario, scenarioOfferCriteria(scenario, datafile)?.requestedOfferParts, entry, { nonTrip: isNonTripScenario(scenario, datafile) });
     if (requirements.distributionModes.includes('FARE')) requirements.offerRequest = { ...requirements.offerRequest, convertible: false };
     // #780: the offer search probes keep their search: they test the options, not the form.
     if (entry.probe) requirements.offerRequest = { ...requirements.offerRequest, convertible: false };

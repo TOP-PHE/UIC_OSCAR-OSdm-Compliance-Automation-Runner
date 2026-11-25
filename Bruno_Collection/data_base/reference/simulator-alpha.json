@@ -278,7 +278,8 @@
         "SALE",
         "REFUND_FULL"
       ],
-      "freeUnderAge": 6
+      "freeUnderAge": 6,
+      "nonTrip": true
     }
   },
   "testResources": [
@@ -1540,6 +1541,8 @@
     "SIM_NONTRIP_SALE_TAG_MULTI_RIDE_1ADT_36",
     "SIM_NONTRIP_OFFER_OPTION_DISCOVERY_PLACES_36",
     "SIM_NONTRIP_OFFER_OPTION_DISCOVERY_ZONES_36",
-    "SIM_NHF_FARE_NONTRIP_1ADT_36"
+    "SIM_FARE_NONTRIP_ZONE_1ADT_36",
+    "SIM_FARE_NONTRIP_NUTS_1ADT_36",
+    "SIM_FARE_NONTRIP_PLACES_1ADT_36"
   ]
 }

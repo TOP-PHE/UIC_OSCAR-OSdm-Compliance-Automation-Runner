@@ -21,7 +21,11 @@
  *     provisional form of #242 D6);
  *   - `reservations`: none (`FARE_RESERVATION` for a BICYCLE, OSDM 3.8+, #255);
  *   - `salesFlows`: SALE only (a refund of fares, #907, is REFUND_FULL);
- *   - `freeUnderAge`: not declared.
+ *   - `freeUnderAge`: not declared;
+ *   - `nonTrip` (#1449): no, fares are sold for a trip only. True: fares are
+ *     sold without a trip too (nonTripSearchCriteria with FARE_ADMISSION), a
+ *     theoretical case the OSDM architect reads as possible (2026-11-25), in
+ *     the non-trip forms the framework declares (offerRequestForms).
  *
  * A reference scenario needs what its source exercises (fareRequirementsOf),
  * and fareMissing() says what a framework lacks for it, as sentences.
@@ -31,7 +35,7 @@ const FARE_CLUSTERS = Object.freeze(['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_
 const COMBINATION_MODELS = Object.freeze(['CLUSTERING', 'COMBINING']);
 const FARE_RESERVATIONS = Object.freeze(['BICYCLE']);
 const FARE_SALES_FLOWS = Object.freeze(['SALE', 'REFUND_FULL']);
-const FARE_KEYS = Object.freeze(['clusters', 'combinationModels', 'statedRefundFee', 'reservations', 'salesFlows', 'freeUnderAge']);
+const FARE_KEYS = Object.freeze(['clusters', 'combinationModels', 'statedRefundFee', 'reservations', 'salesFlows', 'freeUnderAge', 'nonTrip']);
 const MAX_FREE_UNDER_AGE = 30;
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -64,6 +68,11 @@ function combinationModelDeclared(framework, model) {
 /** True when the provider takes a refund fee the distributor states. */
 function statedRefundFeeDeclared(framework) {
   return faresOf(framework).statedRefundFee === true;
+}
+
+/** #1449: true when the provider sells fares without a trip too. */
+function nonTripFaresDeclared(framework) {
+  return faresOf(framework).nonTrip === true;
 }
 
 /** True when the provider sells this fare reservation (none when none is named). */
@@ -119,19 +128,32 @@ function fareDeclarationsProblem(value) {
     if (problem) return problem;
   }
   if (value.salesFlows !== undefined && !value.salesFlows.includes('SALE')) return 'fares.salesFlows must hold SALE: a fare is sold before it is refunded.';
-  if (value.statedRefundFee !== undefined && typeof value.statedRefundFee !== 'boolean') return 'fares.statedRefundFee must be true or false.';
+  const yesOrNo = ['statedRefundFee', 'nonTrip'].find((key) => value[key] !== undefined && typeof value[key] !== 'boolean');
+  if (yesOrNo) return `fares.${yesOrNo} must be true or false.`;
   if (value.freeUnderAge !== undefined && (!Number.isInteger(value.freeUnderAge) || value.freeUnderAge < 1 || value.freeUnderAge > MAX_FREE_UNDER_AGE)) {
     return `fares.freeUnderAge must be a whole number of years, 1 to ${MAX_FREE_UNDER_AGE}.`;
   }
   return null;
 }
 
+const ARMED = new Set([true, 'true', 'on']);
+
+// #1449: what a fare scenario without a trip needs: fares sold so, or, for
+// #1444's probe, not declared.
+function nonTripRequirement(scenario, nonTrip) {
+  if (!nonTrip) return {};
+  return ARMED.has(scenario?.nonTripFaresExpectRejection) ? { nonTripRefused: true } : { nonTrip: true };
+}
+
 /**
  * What a fare scenario needs declared in `fares`, from the scenario and its
  * catalogue entry: a refund of fares, a fee the distributor states, a model,
  * a fare reservation, the free age. Nothing for a scenario asking no fare.
+ * #1449: `nonTrip` (the caller reads it from the data file: the scenario's
+ * trip is NON_TRIP) needs fares sold without a trip, unless the scenario is
+ * #1444's probe, which needs them not declared (`nonTripRefused`).
  */
-function fareRequirementsOf(scenario, parts, entry = {}) {
+function fareRequirementsOf(scenario, parts, entry = {}, options = {}) {
   const asked = Array.isArray(parts) ? parts : [];
   if (!asked.some((p) => String(p).startsWith('FARE_'))) return {};
   const refund = String(scenario?.scenarioType || 'SALE').toUpperCase() === 'REFUND';
@@ -143,6 +165,7 @@ function fareRequirementsOf(scenario, parts, entry = {}) {
   if (model) out.combinationModel = model;
   if (asked.includes('FARE_RESERVATION')) out.reservation = 'BICYCLE';
   if (entry.limit === 'FREE_CHILD') out.freeUnderAge = true;
+  Object.assign(out, nonTripRequirement(scenario, options.nonTrip === true));
   // OSDM 3.8 brought RefundSpecification.refundFee and fare reservations.
   if (out.statedRefundFee || out.reservation) out.minOsdmVersion = '3.8';
   return out;
@@ -185,12 +208,20 @@ function fareMissing(requirements, framework) {
   if (r.combinationModel && !combinationModelDeclared(framework, r.combinationModel)) missing.push(`fares combined by ${r.combinationModel} (Fares › Combination models)`);
   if (r.reservation && !fareReservationDeclared(framework, r.reservation)) missing.push('a fare reservation for a bicycle (Fares › Reservations)');
   if (r.freeUnderAge && freeUnderAgeOf(framework) === null) missing.push('the age under which a fare is free (Fares)');
-  return missing;
+  return [...missing, ...nonTripMissing(r, framework)];
+}
+
+// #1449: fares sold without a trip, needed, or (#1444's probe) not declared.
+function nonTripMissing(r, framework) {
+  const declared = nonTripFaresDeclared(framework);
+  if (r.nonTrip && !declared) return ['fares sold without a trip (Fares)'];
+  if (r.nonTripRefused && declared) return ['a provider that does not sell fares without a trip: this framework declares them sold (Fares)'];
+  return [];
 }
 
 module.exports = {
   FARE_CLUSTERS, COMBINATION_MODELS, FARE_RESERVATIONS, FARE_SALES_FLOWS, FARE_KEYS, MAX_FREE_UNDER_AGE,
   faresOf, declaredFareClusters, combinationModelDeclared, statedRefundFeeDeclared, fareReservationDeclared,
-  fareSalesFlowDeclared, freeUnderAgeOf, fareClusterFor, fareDeclarationsProblem, fareRequirementsOf, fareMissing,
+  fareSalesFlowDeclared, freeUnderAgeOf, nonTripFaresDeclared, fareClusterFor, fareDeclarationsProblem, fareRequirementsOf, fareMissing,
   versionAtLeast, referenceFares,
 };

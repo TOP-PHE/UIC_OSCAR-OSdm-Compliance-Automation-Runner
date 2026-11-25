@@ -430,6 +430,7 @@ function faresPanelHtml(fw) {
     return `<div class="fw-subsection-label">${esc(FW_FARE_LABELS[key])}</div><div class="pill-group">${pills}</div>`;
   }).join('');
   const fee = fw?.fares?.statedRefundFee === true;
+  const nonTrip = fw?.fares?.nonTrip === true;
   const age = Number.isInteger(fw?.fares?.freeUnderAge) ? String(fw.fares.freeUnderAge) : '';
   return `
       <div id="fw-fares-panel" style="margin-top:10px;border-top:1px solid #e0e0e0;padding-top:8px"${fwDistributionModes(fw).includes('FARE') ? '' : ' hidden'}>
@@ -437,20 +438,27 @@ function faresPanelHtml(fw) {
         <div style="font-size:12px;color:#546e7a;margin:4px 0 6px">What the provider sells in fares. The fare reference scenarios of the catalogue are offered for what is ticked here.</div>
         ${lists}
         <div class="pill-group"><div class="pill${fee ? ' selected' : ''}" data-action="fw-fare-fee">Takes a refund fee the distributor states (RefundSpecification.refundFee, OSDM 3.8)</div></div>
+        <div class="pill-group"><div class="pill${nonTrip ? ' selected' : ''}" data-action="fw-fare-nontrip">Sells fares without a trip too (nonTripSearchCriteria with FARE_ADMISSION, in the forms without a trip ticked under Offer request forms)</div></div>
+        <div style="font-size:12px;color:#546e7a;margin:-2px 0 6px">A theoretical case (#1449): OSDM describes online fares for a trip; the OSDM architect reads a sale without a trip as possible, by stop places, zones or NUTS regions.</div>
         <div style="margin:6px 0;font-size:12px"><label for="fw-fare-free-age">A fare is free under the age of</label>
           <input id="fw-fare-free-age" data-action="fw-fare-free-age" type="number" min="1" max="${FW_FARE_MAX_FREE_AGE}" step="1" value="${esc(age)}" style="width:60px"> years (empty: not declared)</div>
       </div>`;
 }
 
 // #937: a click in the Fares panel, tried before the table of click actions.
-// True when it was one.
+// True when it was one. #1449: the yes-or-no declarations, by action.
+const FW_FARE_FLAGS = {
+  'fw-fare-fee': 'statedRefundFee',
+  'fw-fare-nontrip': 'nonTrip',
+};
 function clickFarePanel(action, el) {
-  if (action !== 'fw-fare-pill' && action !== 'fw-fare-fee') return false;
+  if (action !== 'fw-fare-pill' && !FW_FARE_FLAGS[action]) return false;
   const fw = wizData.framework;
   fw.fares = fw.fares && typeof fw.fares === 'object' ? fw.fares : {};
-  if (action === 'fw-fare-fee') {
-    fw.fares.statedRefundFee = fw.fares.statedRefundFee !== true;
-    el.classList.toggle('selected', fw.fares.statedRefundFee);
+  const flag = FW_FARE_FLAGS[action];
+  if (flag) {
+    fw.fares[flag] = fw.fares[flag] !== true;
+    el.classList.toggle('selected', fw.fares[flag]);
   } else {
     const key = el.dataset.key;
     if (!FW_FARE_LISTS[key]) return true;
@@ -3551,10 +3559,14 @@ function buildNonTripFields(tIdx, trip, depDayField) {
       data-action="set-nontrip-field" data-tidx="${esc(tIdx)}" data-field="${name}">
   </div>`;
   const zone = Array.isArray(nt.zones) && nt.zones[0] && typeof nt.zones[0] === 'object' ? nt.zones[0] : {};
+  // #1449: the stop place of the trip whose zone of GET /zones is asked.
+  const zoneOf = field('zoneOf', 'Zone of a stop place of the trip <span class="param-hint">a URN or UIC code; the zone of GET /zones holding it is asked (its NUTS codes for NUTS). Leave the zone or codes empty</span>', nt.zoneOf, 'urn:uic:stn:...');
   const what = {
     ZONES: `${field('zoneId', 'Zone id <span class="param-hint">empty: the first zone of GET /zones</span>', zone.id, 'SIM-CITY')}
-      ${field('zoneCarrier', 'Zone carrier <span class="param-hint">the carrier GET /zones names for it</span>', zone.carrier, 'urn:uic:rics:NNNN')}`,
-    NUTS: field('nutsCodes', 'NUTS codes <span class="param-hint">1 to 10, comma-separated (two capital letters, then up to three letters or digits); empty: those of the first zone of GET /zones that lists some</span>', (Array.isArray(nt.nutsCodes) ? nt.nutsCodes : []).join(', '), 'CZ010, CZ020'),
+      ${field('zoneCarrier', 'Zone carrier <span class="param-hint">the carrier GET /zones names for it</span>', zone.carrier, 'urn:uic:rics:NNNN')}
+      ${zoneOf}`,
+    NUTS: `${field('nutsCodes', 'NUTS codes <span class="param-hint">1 to 10, comma-separated (two capital letters, then up to three letters or digits); empty: those of the first zone of GET /zones that lists some</span>', (Array.isArray(nt.nutsCodes) ? nt.nutsCodes : []).join(', '), 'CZ010, CZ020')}
+      ${zoneOf}`,
     PLACES: `${field('places', 'Stop places <span class="param-hint">two or more, comma-separated URNs or UIC codes; empty: looked up by name</span>', (Array.isArray(nt.places) ? nt.places : []).join(', '), 'urn:uic:stn:..., urn:uic:stn:...')}
       ${field('placeLookup', 'Look up by name <span class="param-hint">POST /places (stop places only), the first two found</span>', nt.placeLookup, 'Praha')}`,
   }[by];
@@ -3576,6 +3588,7 @@ function buildNonTripFields(tIdx, trip, depDayField) {
     <div style="font-size:11px;color:#90a4ae;margin-top:6px;line-height:1.4">
       No trip is sent: the offers are checked for no trip and no trip coverage, and each admission for where it is valid (regionalValidities, or regionalValidity in OSDM 3.6) (#1258).
       To ask a kind of product (a single ride, a pass, a multi-ride card), name its tag in the scenario's Offer search criteria (productTags: ADMISSION_POINT2POINT, ADMISSION_PASS, ADMISSION_MULTI_RIDE), or select one of the provider's products by its code (productSelections, OSDM 3.7 or later) and expect it (Expected product) (#1266).
+      To buy fares without a trip, a theoretical case, ask FARE_ADMISSION only (Offer search criteria → Offer parts), of a provider that declares them sold so (Test Framework → Fares) (#1449).
     </div>`;
 }
 
@@ -3598,9 +3611,10 @@ function withNonTripValue(nonTrip, field, raw) {
     nt.nutsCodes = value ? value.split(',').map((c) => c.trim().toUpperCase()).filter(Boolean) : [];
   } else if (field === 'places') {
     nt.places = value ? value.split(',').map((p) => p.trim()).filter(Boolean) : [];
-  } else if (field === 'placeLookup') {
-    if (value) nt.placeLookup = value;
-    else delete nt.placeLookup;
+  } else if (field === 'placeLookup' || field === 'zoneOf') {
+    // #1449: zoneOf, the stop place of the trip whose zone is asked.
+    if (value) nt[field] = value;
+    else delete nt[field];
   } else if (field === 'zoneId' || field === 'zoneCarrier') {
     const first = Array.isArray(nt.zones) && nt.zones[0] && typeof nt.zones[0] === 'object' ? nt.zones[0] : {};
     const zone = { ...first, [field === 'zoneId' ? 'id' : 'carrier']: value };

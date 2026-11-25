@@ -140,6 +140,10 @@ function adaptReferenceScenario(scenario, needs, frameworkConfig) {
   if (arr(n.providerValues).includes('nonTripZones')) {
     toComplete.push('a zone of the provider, its id and carrier (Trip → Zone; empty: the first of GET /zones)');
   }
+  // #1449: the stop place whose zone is asked is one of the simulator's.
+  if (arr(n.providerValues).includes('zoneOf')) {
+    toComplete.push('a stop place of the provider in one of its zones, whose zone is asked (Trip → Zone of a stop place of the trip, now the simulator\'s)');
+  }
   // #1266: the simulator's NUTS codes are made up.
   if (arr(n.providerValues).includes('nutsCodes')) {
     toComplete.push('the NUTS codes of the provider\'s regions (Trip → NUTS codes; empty: those of the first zone of GET /zones that lists some)');

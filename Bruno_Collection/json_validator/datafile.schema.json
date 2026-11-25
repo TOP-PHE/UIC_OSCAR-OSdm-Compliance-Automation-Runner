@@ -373,7 +373,7 @@
             "enum": ["on", "off", true, false, "", null]
           },
           "nonTripFaresExpectRejection": {
-            "description": "Negative test (#1444). When on, the scenario asks fares (requestedOfferParts FARE_*) for a trip requirement without a trip: POST /offers must refuse it with a 4xx RFC-9457 Problem, or give no fare; fares given are a WARNING (OSDM describes online fares for a trip only). The scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
+            "description": "Negative test (#1444). When on, the scenario asks fares (requestedOfferParts FARE_*) for a trip requirement without a trip: POST /offers must refuse it with a 4xx RFC-9457 Problem, or give no fare; fares given are a WARNING (OSDM describes online fares for a trip; a sale without a trip, #1449, is for a provider that declares it). The scenario ends there. Accepts boolean true/false or the strings 'on'/'off'.",
             "type": ["string", "boolean", "null"],
             "enum": ["on", "off", true, false, "", null]
           },
@@ -776,6 +776,7 @@
               "nutsCodes": { "type": "array", "description": "By NUTS (#1266): 1 to 10 NUTS codes; empty to take those of the first zone of GET /zones that lists some.", "items": { "type": "string" } },
               "places": { "type": "array", "description": "Two or more stop places (URN or UIC code); empty to take them from POST /places by placeLookup.", "items": { "type": "string" } },
               "placeLookup": { "type": ["string", "null"], "description": "A name to look the stop places up with (POST /places, type STOP)." },
+              "zoneOf": { "type": ["string", "null"], "description": "By ZONES or NUTS (#1449): a stop place of the trip (URN or UIC code); the zone asked, or its NUTS codes, is the zone of GET /zones whose places hold it. None holding it fails the step and ends the scenario. Not with zones or nutsCodes named." },
               "zones": {
                 "type": "array",
                 "description": "Zones by id and carrier; empty to take the first of GET /zones.",

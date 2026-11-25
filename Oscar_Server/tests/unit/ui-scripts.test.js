@@ -1582,6 +1582,9 @@ describe('js/scenarios.js — the Fares panel (#937)', () => {
     expect(panel({})).toContain('id="fw-fares-panel" style="margin-top:10px;border-top:1px solid #e0e0e0;padding-top:8px" hidden');
     const html = panel({ distributionModes: ['FARE'], fares: { clusters: ['NON_FLEX'], statedRefundFee: true, freeUnderAge: 6 } });
     expect(html).not.toContain(' hidden>');
+    // #1449: fares sold without a trip, off unless declared.
+    expect(html).toContain('class="pill" data-action="fw-fare-nontrip"');
+    expect(panel({ distributionModes: ['FARE'], fares: { nonTrip: true } })).toContain('class="pill selected" data-action="fw-fare-nontrip"');
     expect(html).toContain('class="pill selected" data-action="fw-fare-pill" data-key="clusters" data-val="NON_FLEX"');
     expect(html).toContain('class="pill" data-action="fw-fare-pill" data-key="clusters" data-val="PROMO"');
     expect(html).toContain('class="pill selected" data-action="fw-fare-fee"');
@@ -1594,12 +1597,18 @@ describe('js/scenarios.js — the Fares panel (#937)', () => {
     const opt = { dataset: { key: 'clusters', val: 'PROMO' }, classList: { toggle() {} } };
     const wizData = { framework: {} };
     const document = { querySelectorAll: () => [opt] };
-    const click = loadFunction(page, 'clickFarePanel', { wizData, document, FW_FARE_LISTS, toggledFareList, saveFrameworkDebounced: () => saved.push(1) });
+    const click = loadFunction(page, 'clickFarePanel', { wizData, document, FW_FARE_LISTS, FW_FARE_FLAGS: constant('FW_FARE_FLAGS'), toggledFareList, saveFrameworkDebounced: () => saved.push(1) });
     expect(click('fw-pill', opt)).toBe(false);
     expect(click('fw-fare-pill', opt)).toBe(true);
     expect(wizData.framework.fares.clusters).toEqual(['BUSINESS', 'FULL_FLEX', 'SEMI_FLEX', 'NON_FLEX']);
     expect(click('fw-fare-fee', { classList: { toggle() {} } })).toBe(true);
     expect(wizData.framework.fares.statedRefundFee).toBe(true);
+    // #1449: on, then off again; every value the panel stores is one the server takes.
+    expect(click('fw-fare-nontrip', { classList: { toggle() {} } })).toBe(true);
+    expect(wizData.framework.fares.nonTrip).toBe(true);
+    expect(fares.fareDeclarationsProblem(wizData.framework.fares)).toBeNull();
+    click('fw-fare-nontrip', { classList: { toggle() {} } });
+    expect(wizData.framework.fares.nonTrip).toBe(false);
     const change = loadFunction(page, 'changeFareAge', { wizData, fareAgeOf, saveFrameworkDebounced: () => saved.push(1) });
     const input = { value: '7' };
     expect(change('fw-fare-free-age', input)).toBe(true);
@@ -1608,7 +1617,7 @@ describe('js/scenarios.js — the Fares panel (#937)', () => {
     change('fw-fare-free-age', input);
     expect(wizData.framework.fares.freeUnderAge).toBeUndefined();
     expect(input.value).toBe('');
-    expect(saved).toHaveLength(4);
+    expect(saved).toHaveLength(6);
     const source = read(page);
     expect(source).toContain('if (clickFarePanel(action, el)) return;');
     expect(source).toMatch(/const CHANGE_GROUPS = \[[^\]]*\n {2}changeFareAge,\n/);

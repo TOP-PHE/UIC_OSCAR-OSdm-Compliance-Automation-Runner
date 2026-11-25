@@ -4,6 +4,17 @@
   "current_release": "2026.629",
   "releases": [
     {
+      "release": "2026.630",
+      "date": "2026-11-25",
+      "server": "1.11.589",
+      "collection": "OTST_V2.0.274",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.589 / collection OTST_V2.0.274 / simulator 0.77.0 (#1449, part of #1266): fares sold without a trip, a theoretical case. OSDM describes online fares for a trip; the OSDM architect reads a sale without a trip as possible, between stop places, in zones and in NUTS regions, the distributor linking its trip to the provider's zones. Test Framework: fares.nonTrip. A non-trip requirement may name a stop place of its trip (nonTrip.zoneOf): step 01 asks the zone of GET /zones holding it, or its NUTS codes. A fare offer without a trip is checked as any (O1 to O20) and for no trip, no trip coverage (O21, O22) and where it is valid (O23, a warning), then booked and confirmed (B7: nothing covers a trip). The simulator sells them on every provider (FARE_ZONE, FARE_POINT2POINT, its own tags in GET /product-tags and GET /products); #1444's probe now ends with its warning there and leaves the reference run lists. Capability fares.nonTrip. Three simulator scenarios with their copies, three reference scenarios. Not released on its own: listed without moving current_release. No migration."
+      ]
+    },
+    {
       "release": "2026.629",
       "date": "2026-11-25",
       "server": "1.11.588",

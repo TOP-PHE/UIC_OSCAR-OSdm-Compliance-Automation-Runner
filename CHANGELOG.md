@@ -694,6 +694,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [server-1.11.589] / [collection-OTST_V2.0.274] — 2026-11-25
+
+Issue #1449, part of #1266. Simulator 0.77.0. Fares sold without a trip: a theoretical scenario. Listed as release 2026.630; `current_release` is not moved (the release is made with other PRs).
+
+OSDM:
+- osdm.io, *Constructing products from fares*: online fares are part of an offer for a trip.
+- The OSDM architect's reading (by e-mail to the maintainer, 2026-11-25): the fare approach combines parts along a journey into through tickets, so it is implicitly trip-related; a fare might be one for a zone, sold for a city part of the trip. Theoretically a fare could be sold without a trip, between stop places, in zones and in regions named by NUTS codes. It is complex: the distributor must link the trip of its product-based sale to the provider's zones.
+- OSDM links no product to a zone: `Product` names no zone or place; a `ZoneDefinition` lists its places and NUTS codes.
+
+Decided with the maintainer (2026-11-25):
+- an offer and a sale (02 to 07), no refund;
+- the three forms: in a zone, in a NUTS region, between two stop places;
+- a fare declaration in the Test Framework, `fares.nonTrip`;
+- the simulator sells them on every provider, for a well-expressed request;
+- tags of the simulator's own in its catalogues, the link to the trip through `GET /zones`;
+- the scenario does the distributor's work: from a stop place of its trip to the zone holding it;
+- #1444's probe stays, for a provider that does not declare the sale.
+
+### Added
+- **Collection**:
+  - `nonTrip.zoneOf` (by ZONES or NUTS, zones or codes left empty): a stop place of the trip; step 01 asks the zone of `GET /zones` whose places hold it (`zoneOfCheck()`, `nonTrip.js`), or its NUTS codes. None holding it, or a zone naming no code for NUTS, is a failed check and the scenario ends. In the data file schema.
+  - A request without a trip asking `FARE_ADMISSION` gets the fare checks O1 to O20 (no section, so no O8 and no warning about one), then `nonTripFares.js`: O21 no trip in the answer and O22 no fare offer covering a trip (failures, which count for the sale's decision), O23 each fare's regional validity names what was asked (a warning; `validityMissing()`, the admissions' rule, now shared). The fare offer is booked as any; at 02, 05 and 07, B7: nothing of the booking covers a trip.
+- **Server**:
+  - `fares.nonTrip` (true or false, refused otherwise, at the three framework writers); Test Config's switch *Sells fares without a trip too* (Fares panel), and the field *Zone of a stop place of the trip* of a trip without a trip.
+  - The catalogue: a fare scenario without a trip needs `fares.nonTrip`; #1444's probe needs it not declared. Provider value `zoneOf`, to complete in a copy.
+  - Capability `fares.nonTrip` (*Fare sale without a trip*), proved at the sale's step; the coverage row `fare:nonTrip`.
+  - The simulator references declare `fares.nonTrip` from the profile (the checklist does not ask it), and their run lists leave the probe out.
+- **Catalogue**: `OTST_NONTRIP_FARES_ZONE_1ADT` (142 checks), `OTST_NONTRIP_FARES_NUTS_1ADT` (142), `OTST_NONTRIP_FARES_PLACES_1ADT` (139).
+- **Simulator scenarios** (gamma, with their version copies, in the run list instead of the probe): `SIM_FARE_NONTRIP_ZONE_1ADT_38` (trip 56, `zoneOf` 0000041), `SIM_FARE_NONTRIP_NUTS_1ADT_38` (trip 57, `zoneOf` 0000042, XS112), `SIM_FARE_NONTRIP_PLACES_1ADT_38` (trip 45).
+- **Docs and page**: *What is tested*, *OSCAR - OSDM Simulator scenarios*, the simulator's README, the Tester User Guide (the Distribution row), CLAUDE.md, a welcome-page news entry.
+
+### Simulator 0.77.0
+- **Fares sold without a trip** (`nonTripFares.js`), on every provider whose profile lists `nonTrip.fares` (all six): a zone fare (`SIM_FARE_ZONE`, tag `FARE_ZONE`) in a zone of `GET /zones` or a NUTS region one names, a fare between two stop places (`SIM_FARE_POINT2POINT`, `FARE_POINT2POINT`). One offer per fare and travel class asked, one fare per passenger, valid where asked, `SEPARATE_TICKET`, no section, no trip coverage, its travel dates the day of `validFrom` in its own offset. Booked and fulfilled as fare offers.
+- `FARE_ADMISSION` only: fare reservations or ancillaries asked alone get no offer and `OFFER_NO_RESULTS`. The fare tags asked choose the fares and are not reported ignored. A profile without `nonTrip.fares` still refuses fares without a trip (400, #1444).
+- `GET /product-tags`: a fourth group, `FARES_WITHOUT_TRIP`; `GET /products`: the two fares in both classes, each with its tag and, in its description, the zones it is valid in.
+
+### Changed
+- #1444's probe: on the simulator it now gets fares, a WARNING and no failed check (its description and its copies' say so). It is offered only to a provider that declares fares but not fares sold without a trip, and leaves the run list of the data file and of the references (the rule of `runListFor()`, which `datafile.test.js` applies too).
+- *OSCAR - Checks by scenario* regenerated, and the simulator hints of the finding drafts.
+- Every simulator reference changes (`fares.nonTrip`, the run list).
+
+### Checked
+- **Replay** with the real Bruno CLI 4.2.1 against simulator 0.77.0, in chunks, of the 229 scenarios of *Checks by scenario* (the same day as #1444's): the same checks, results and warnings for 228 of them, `GET /product-tags` and `GET /products` included. The 229th is #1444's probe: 92 → 90 checks, no failed check, and its WARNING that fares are given instead of the graded refusal.
+  - The three new scenarios pass, without warning: zone 142 checks, NUTS 142, between stop places 139.
+  - Their 15 copies and the probe's 5 pass on their providers (90 / 142 / 142 / 139).
+  - `replay.js catalogue` agrees with all 119 entries.
+- **Simulator**: `non-trip.test.js` covers, on the six providers and in each one's version, the fares by zone, by NUTS code and between stop places, booked and confirmed; products and fares asked together; a fare reservation alone (no offer, a warning); the fare tags; a flexibility not sold; a profile without `nonTrip.fares` (400); the profile checks. Every answer is checked against the OSDM response schema of its version. `app.test.js` covers both catalogues, `datafile.test.js` the scenarios.
+- **Collection**: `bruno-non-trip-fares.test.js` runs the checks on the simulator's own answers for the three forms (every check passes, no O8). It also breaks the answers for O21, O22, O23 and B7. It runs step 01's glue (O21–O23 recorded, the offer booked, not booked when O22 fails, nothing for a sale with a trip) and the glue of 05 and 07 (B7). It covers `nonTrip.zoneOf`: the requirement, the zone holding it, the check, and the run's lookups with `GET /zones` from the simulator.
+- **Server**: `fare-declarations.test.js` covers the declaration, the requirements and what is missing, the catalogue for each framework, the capability and the step that proves it, the coverage row and functions, the provider value `zoneOf`, and the references; the editor's switch and field (`ui-scripts.test.js`, `non-trip-forms.test.js`); the pinned lists of entries.
+- **Mutation checks**: each new rule, removed or changed one by one, fails a test: 58 of 58 (server 15, page 3, simulator 16, collection 24).
+- On Windows the known failures only (`/metrics`, `runner-agent`, `mcp-end-to-end`, the timing of `answer-threats`, the file mode of the simulator's `admin.test.js`).
+
+---
+
 ## [server-1.11.588] / [collection-OTST_V2.0.273] — 2026-11-25
 
 Issue #1444, the last case of #1266. Simulator 0.76.0. Fares asked without a trip: a negative probe.

@@ -1481,12 +1481,54 @@
     {
       "code": "NHF_NONTRIP_FARES_1ADT",
       "source": "SIM_NHF_FARE_NONTRIP_1ADT_38",
-      "checks": 92,
-      "purpose": "Negative test (#1444): fares asked without a trip (nonTripSearchCriteria in the first zone of GET /zones, requestedOfferParts FARE_ADMISSION only, nonTripFaresExpectRejection). OSDM describes online fares as part of an offer for a trip (osdm.io, Constructing products from fares) and names no fare on its page on sales without a trip. POST /offers must refuse it with a 4xx Problem, or give no fare; fares given are a WARNING, not a failure. The scenario ends there.",
+      "checks": 90,
+      "purpose": "Negative test (#1444): fares asked without a trip (nonTripSearchCriteria in the first zone of GET /zones, requestedOfferParts FARE_ADMISSION only, nonTripFaresExpectRejection). OSDM describes online fares as part of an offer for a trip (osdm.io, Constructing products from fares) and names no fare on its page on sales without a trip. Offered to a provider that declares fares (FARE) but not fares sold without a trip (fares.nonTrip, #1449): POST /offers must refuse it with a 4xx Problem, or give no fare; fares given are a WARNING, not a failure. The scenario ends there.",
       "capability": "fares.offers",
       "needs": {
         "trip": "NON_TRIP",
         "passengers": 1
+      }
+    },
+    {
+      "code": "OTST_NONTRIP_FARES_ZONE_1ADT",
+      "source": "SIM_FARE_NONTRIP_ZONE_1ADT_38",
+      "checks": 142,
+      "purpose": "Fares sold without a trip in a zone (#1449), a theoretical case: OSDM describes online fares as part of an offer for a trip (osdm.io, Constructing products from fares), and the OSDM architect reads a sale without a trip as possible, between stop places, in zones and in regions named by NUTS codes. One adult; the scenario names a stop place of its trip (nonTrip.zoneOf) and step 01 finds in GET /zones the zone holding it (ZoneDefinition.places), the link a distributor makes between the trip of its product-based sale and the provider's zones; none holding it fails and ends the scenario. Then offers in that zone (nonTripSearchCriteria.zones), requestedOfferParts FARE_ADMISSION only. The fares are checked as any (O1 to O20; no section to cover), and: no trip in the answer and no fare offer covering a trip (failures), each fare valid where asked (a WARNING: OSDM leaves the reading of a validity open). The fare offer is booked, confirmed and read (02 to 07), nothing of the booking covering a trip.",
+      "capability": "fares.nonTrip",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1,
+        "providerValues": [
+          "zoneOf"
+        ]
+      }
+    },
+    {
+      "code": "OTST_NONTRIP_FARES_NUTS_1ADT",
+      "source": "SIM_FARE_NONTRIP_NUTS_1ADT_38",
+      "checks": 142,
+      "purpose": "Fares sold without a trip in a NUTS region (#1449), a theoretical case: OSDM describes online fares as part of an offer for a trip (osdm.io, Constructing products from fares), and the OSDM architect reads a sale without a trip as possible, between stop places, in zones and in regions named by NUTS codes. One adult; the scenario names a stop place of its trip (nonTrip.zoneOf) and step 01 finds in GET /zones the zone holding it and its NUTS codes (ZoneDefinition.nutsCodes); none holding it, or a zone naming no code, fails and ends the scenario. Then offers in that region (nonTripSearchCriteria.nutsCodes), requestedOfferParts FARE_ADMISSION only; a fare's zone names the code asked (Zone.nutsCode). The fares are checked as any (O1 to O20; no section to cover), and: no trip in the answer and no fare offer covering a trip (failures), each fare valid where asked (a WARNING: OSDM leaves the reading of a validity open). The fare offer is booked, confirmed and read (02 to 07), nothing of the booking covering a trip.",
+      "capability": "fares.nonTrip",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1,
+        "providerValues": [
+          "zoneOf"
+        ]
+      }
+    },
+    {
+      "code": "OTST_NONTRIP_FARES_PLACES_1ADT",
+      "source": "SIM_FARE_NONTRIP_PLACES_1ADT_38",
+      "checks": 139,
+      "purpose": "Fares sold without a trip between stop places (#1449), a theoretical case: OSDM describes online fares as part of an offer for a trip (osdm.io, Constructing products from fares), and the OSDM architect reads a sale without a trip as possible, between stop places, in zones and in regions named by NUTS codes. One adult asks offers between two stop places of the provider (nonTripSearchCriteria.places), requestedOfferParts FARE_ADMISSION only; a fare's validity names both. The fares are checked as any (O1 to O20; no section to cover), and: no trip in the answer and no fare offer covering a trip (failures), each fare valid where asked (a WARNING: OSDM leaves the reading of a validity open). The fare offer is booked, confirmed and read (02 to 07), nothing of the booking covering a trip.",
+      "capability": "fares.nonTrip",
+      "needs": {
+        "trip": "NON_TRIP",
+        "passengers": 1,
+        "providerValues": [
+          "nonTripPlaces"
+        ]
       }
     }
   ]

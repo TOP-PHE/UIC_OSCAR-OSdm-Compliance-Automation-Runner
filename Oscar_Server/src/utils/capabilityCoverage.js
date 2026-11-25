@@ -80,7 +80,8 @@ const CAPABILITY_FUNCTIONS = Object.freeze({
   'refund.partial.fulfillment': ['partialRefund:FULFILLMENT'], 'refund.partial.passenger': ['partialRefund:PASSENGER'],
   'refund.partial.leg': ['partialRefund:LEG'], 'exchange.full': ['salesFlow:EXCHANGE_FULL'], sale: ['distribution:PRODUCT'],
   'fares.offers': ['distribution:FARE'], 'fares.sale': ['distribution:FARE'], 'fares.refund': ['distribution:FARE'],
-  'fares.reservation': ['distribution:FARE'], 'reservation.preferences': ['placeSelection:AUTOMATIC_PLACE_SELECTION_PREFERENCES'],
+  'fares.reservation': ['distribution:FARE'], 'fares.nonTrip': ['fare:nonTrip'],
+  'reservation.preferences': ['placeSelection:AUTOMATIC_PLACE_SELECTION_PREFERENCES'],
   'reservation.nearby': ['placeSelection:AUTOMATIC_PLACE_SELECTION_NEARBY'],
   'reservation.namedPlace': ['placeSelection:MANUAL_PLACE_SELECTION_WITHOUT_FEE', 'placeSelection:MANUAL_PLACE_SELECTION_WITH_FEE'],
 });

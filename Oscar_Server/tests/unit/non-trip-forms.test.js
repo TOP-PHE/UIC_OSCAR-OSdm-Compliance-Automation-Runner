@@ -105,7 +105,7 @@ describe('the catalogue', () => {
     const { catalogue, simulator } = readCatalogue();
     const nonTrip = catalogueFor(catalogue, simulator, { offerRequestForms: ['SEARCH'] })
       .filter((e) => /^OTST_NONTRIP_/.test(e.code));
-    expect(nonTrip.map((e) => e.code).sort()).toEqual(['OTST_NONTRIP_CARD_LOST_1ADT', 'OTST_NONTRIP_EXCHANGE_1ADT', 'OTST_NONTRIP_NUTS_1ADT', 'OTST_NONTRIP_OFFER_OPTION_DISCOVERY_PLACES', 'OTST_NONTRIP_OFFER_OPTION_DISCOVERY_ZONES', 'OTST_NONTRIP_PASS_BY_TAG', 'OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_PRODUCT_BY_CODE_1ADT', 'OTST_NONTRIP_REFUND_1ADT', 'OTST_NONTRIP_SALE_MULTI_RIDE_BY_TAG_1ADT', 'OTST_NONTRIP_SALE_PASS_BY_TAG_1ADT', 'OTST_NONTRIP_SALE_SINGLE_RIDE_BY_TAG_1ADT', 'OTST_NONTRIP_SINGLE_RIDE_BY_TAG', 'OTST_NONTRIP_TICKET_LOST_1ADT', 'OTST_NONTRIP_ZONES_1ADT']);
+    expect(nonTrip.map((e) => e.code).sort()).toEqual(['OTST_NONTRIP_CARD_LOST_1ADT', 'OTST_NONTRIP_EXCHANGE_1ADT', 'OTST_NONTRIP_FARES_NUTS_1ADT', 'OTST_NONTRIP_FARES_PLACES_1ADT', 'OTST_NONTRIP_FARES_ZONE_1ADT', 'OTST_NONTRIP_NUTS_1ADT', 'OTST_NONTRIP_OFFER_OPTION_DISCOVERY_PLACES', 'OTST_NONTRIP_OFFER_OPTION_DISCOVERY_ZONES', 'OTST_NONTRIP_PASS_BY_TAG', 'OTST_NONTRIP_PLACES_1ADT', 'OTST_NONTRIP_PRODUCT_BY_CODE_1ADT', 'OTST_NONTRIP_REFUND_1ADT', 'OTST_NONTRIP_SALE_MULTI_RIDE_BY_TAG_1ADT', 'OTST_NONTRIP_SALE_PASS_BY_TAG_1ADT', 'OTST_NONTRIP_SALE_SINGLE_RIDE_BY_TAG_1ADT', 'OTST_NONTRIP_SINGLE_RIDE_BY_TAG', 'OTST_NONTRIP_TICKET_LOST_1ADT', 'OTST_NONTRIP_ZONES_1ADT']);
     for (const entry of nonTrip) expect(entry.missing.join(' ')).toMatch(/offer requests without a trip/);
     const declared = catalogueFor(catalogue, simulator, { offerRequestForms: ['NON_TRIP_PLACES', 'NON_TRIP_ZONES', 'NON_TRIP_NUTS'] })
       .filter((e) => /^OTST_NONTRIP_/.test(e.code));
@@ -116,7 +116,7 @@ describe('the catalogue', () => {
     const { catalogue, simulator } = readCatalogue();
     const noList = catalogueFor(catalogue, simulator, {});
     const nonTrip = noList.filter((e) => /^OTST_NONTRIP_/.test(e.code));
-    expect(nonTrip).toHaveLength(15);
+    expect(nonTrip).toHaveLength(18);
     for (const entry of nonTrip) expect(entry.missing.join(' ')).toMatch(/offer requests without a trip/);
     // The trip entries read as before: no form is missing for them.
     const tripForms = catalogueFor(catalogue, simulator, { offerRequestForms: [...G.TRIP_REQUEST_FORMS] });
@@ -238,6 +238,10 @@ describe('the Test Config page', () => {
     expect(nt.zones).toEqual([{ id: 'SIM-CITY', carrier: 'urn:c' }]);
     nt = withNonTripValue(withNonTripValue(nt, 'zoneId', ''), 'zoneCarrier', '');
     expect(nt.zones).toEqual([]);
+    // #1449: the stop place of the trip whose zone is asked; emptied: none.
+    nt = withNonTripValue(nt, 'zoneOf', ' urn:uic:stn:0000041 ');
+    expect(nt.zoneOf).toBe('urn:uic:stn:0000041');
+    expect(withNonTripValue(nt, 'zoneOf', '')).not.toHaveProperty('zoneOf');
   });
 
   test('switching a trip to NON_TRIP starts by stop places and keeps its search', () => {

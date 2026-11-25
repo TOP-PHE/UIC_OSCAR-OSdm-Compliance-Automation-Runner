@@ -216,6 +216,28 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     fare naming rule (`SIM_NHF_FARE_NONTRIP_1ADT_38`, which
     `distribution-modes.test.js` reads as FARE), the catalogue entry the
     non-trip one (`NHF_NONTRIP_FARES_1ADT`, which the forms tests read).
+    **Fares sold without a trip** (#1449, 1.11.589 / OTST_V2.0.274,
+    simulator 0.77.0), after the OSDM architect's answer (2026-11-25:
+    implicitly trip-related, theoretically sold by stop places, zones and
+    NUTS regions, the distributor linking its trip to the provider's zones).
+    Framework `fares.nonTrip` (`nonTripFaresDeclared()`; the catalogue's
+    `fareRequirementsOf(…, { nonTrip })`: `nonTrip` needs it,
+    #1444's probe `nonTripRefused` needs it absent); the checklist does not
+    ask it: `withNonTripForms()` sets it from a profile's `nonTrip.fares`, and
+    `runListFor(…, framework)` leaves the probe out of such a reference.
+    `nonTrip.zoneOf` (ZONES / NUTS, zones or codes left empty): 01 asks the
+    zone of `GET /zones` holding that stop place (`zoneOfCheck()`, none =
+    FAIL + stop), provider value `zoneOf`. A non-trip fare offer gets O1–O20
+    (no O8, no section warning) and `nonTripFares.js` O21 trips, O22 trip
+    coverage (FAIL, so the sale's decision), O23 validity names what was
+    asked (`validityMissing()`, shared with the admissions; WARNING); B7 at
+    02/05/07. Capability `fares.nonTrip` (`traits.nonTripFare` proves it at
+    the sale's step; declared by `fare:nonTrip`). Simulator
+    (`nonTripFares.js`, every profile): `FARE_ZONE` / `FARE_POINT2POINT`,
+    tags of its own in `GET /product-tags` (group `FARES_WITHOUT_TRIP`) and
+    `GET /products` (not in the framework's product tags), `SEPARATE_TICKET`,
+    dated by validFrom's own day; FARE_ADMISSION only (else
+    `OFFER_NO_RESULTS`); a profile without `nonTrip.fares` still refuses.
     #1266 is done but for what the maintainer left for later (a lost
     electronic or anonymous ticket refused; other Place kinds).
     **To regenerate *Checks by scenario* from a partial change**, record the

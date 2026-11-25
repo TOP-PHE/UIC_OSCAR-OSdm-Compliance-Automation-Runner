@@ -1,9 +1,9 @@
 {
  "about": {
-  "collection": "OTST_V2.0.273",
-  "simulator": "0.76.0",
+  "collection": "OTST_V2.0.274",
+  "simulator": "0.77.0",
   "day": "2026-11-25",
-  "scenarios": 177
+  "scenarios": 180
  },
  "checks": {
   "del exchange offer|Status code is N, offer is deleted": [
@@ -307,7 +307,7 @@
    0
   ],
   "get booking after fulfillments|HTTP response status — expected N, actual: N": [
-   137,
+   140,
    0
   ],
   "get booking after fulfillments|Price fields exist (currency, amount) in confirmedPrice": [
@@ -335,39 +335,43 @@
    0
   ],
   "get booking after fulfillments|[OSDM] Content-Type is JSON": [
-   139,
+   142,
    0
   ],
   "get booking after fulfillments|[fares B1] The booking holds the fares booked (bookedOffers[].fares)": [
-   21,
+   24,
    0
   ],
   "get booking after fulfillments|[fares B2] Every fare of the offer is in the booking (paired by id, else passengers, section and price)": [
-   21,
+   24,
    0
   ],
   "get booking after fulfillments|[fares B3] Each booked fare has the members OSDM requires (Fare.required, passengerRefs)": [
-   21,
+   24,
    0
   ],
   "get booking after fulfillments|[fares B6] Each booked fare's status is CONFIRMED or FULFILLED": [
-   21,
+   24,
+   0
+  ],
+  "get booking after fulfillments|[fares B7] Nothing of a booking without a trip covers a trip (tripCoverage absent)": [
+   3,
    0
   ],
   "get booking after fulfillments|[fares F1] Each fare fulfilment is CONFIRMED or FULFILLED": [
-   22,
+   25,
    0
   ],
   "get booking after fulfillments|[fares F3] Each fare fulfilment names only parts of this booking (Fulfillment.bookingParts)": [
-   22,
+   25,
    0
   ],
   "get booking after fulfillments|[fares F4] No fulfilment holds both fares and product booking parts (OSDM processes)": [
-   22,
+   25,
    0
   ],
   "get booking after fulfillments|[fares F5] Every booked fare is in a fare fulfilment": [
-   22,
+   25,
    0
   ],
   "get booking after fulfillments|[fares V10] Each booked fare reservation's status is CONFIRMED or FULFILLED": [
@@ -1215,7 +1219,7 @@
    0
   ],
   "get booking before fulfillments|HTTP response status — expected N, actual: N": [
-   139,
+   142,
    0
   ],
   "get booking before fulfillments|Pre-booked: non-trip booking — nothing covers a trip (tripCoverage absent)": [
@@ -1239,27 +1243,31 @@
    0
   ],
   "get booking before fulfillments|[OSDM] Content-Type is JSON": [
-   139,
+   142,
    0
   ],
   "get booking before fulfillments|[fares B1] The booking holds the fares booked (bookedOffers[].fares)": [
-   21,
+   24,
    0
   ],
   "get booking before fulfillments|[fares B2] Every fare of the offer is in the booking (paired by id, else passengers, section and price)": [
-   21,
+   24,
    0
   ],
   "get booking before fulfillments|[fares B3] Each booked fare has the members OSDM requires (Fare.required, passengerRefs)": [
-   21,
+   24,
    0
   ],
   "get booking before fulfillments|[fares B4] Each booked fare'…'s": [
-   21,
+   24,
    0
   ],
   "get booking before fulfillments|[fares B6] Each booked fare's status is PREBOOKED": [
-   21,
+   24,
+   0
+  ],
+  "get booking before fulfillments|[fares B7] Nothing of a booking without a trip covers a trip (tripCoverage absent)": [
+   3,
    0
   ],
   "get booking before fulfillments|[fares V10] Each booked fare reservation's status is PREBOOKED": [
@@ -2007,7 +2015,7 @@
    0
   ],
   "get coach|[OSDM] Content-Type is JSON": [
-   177,
+   180,
    0
   ],
   "get exchange offer|'…' exists in response": [
@@ -2083,31 +2091,31 @@
    0
   ],
   "get fulfillment|HTTP response status — expected N, actual: N": [
-   185,
+   188,
    0
   ],
   "get fulfillment|[OSDM] Content-Type is JSON": [
-   185,
+   188,
    0
   ],
   "get fulfillment|[fares F1] Each fare fulfilment is CONFIRMED or FULFILLED": [
-   22,
+   25,
    0
   ],
   "get fulfillment|[fares F1] GET /fulfillments/{id} gives the fulfilment asked": [
-   22,
+   25,
    0
   ],
   "get fulfillment|[fares F3] Each fare fulfilment names only parts of this booking (Fulfillment.bookingParts)": [
-   22,
+   25,
    0
   ],
   "get fulfillment|[fares F4] No fulfilment holds both fares and product booking parts (OSDM processes)": [
-   22,
+   25,
    0
   ],
   "get passenger categories|[OSDM] Content-Type is JSON": [
-   177,
+   180,
    0
   ],
   "get passenger|HTTP response status — expected N, actual: N": [
@@ -2595,187 +2603,187 @@
    0
   ],
   "get product by productid|GET /products/{productId} response body is present": [
-   177,
+   180,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is array": [
-   177,
+   180,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is boolean": [
-   354,
+   360,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is object": [
-   177,
+   180,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" (when present) is string": [
-   885,
+   900,
    0
   ],
   "get product by productid|GET /products/{productId} → \"…\" is a Product object": [
-   177,
+   180,
    0
   ],
   "get product by productid|GET /products/{productId} → N OK": [
-   177,
+   180,
    0
   ],
   "get product by productid|GET /products/{productId} → Product has required \"…\" (string)": [
-   708,
+   720,
    0
   ],
   "get product by productid|GET /products/{productId} → conforms to OSDM N.N Product schema (deep)": [
-   177,
+   180,
    0
   ],
   "get product by productid|GET /products/{productId} → response is a resource object": [
-   177,
+   180,
    0
   ],
   "get product by productid|[OSDM] Content-Type is JSON": [
-   177,
+   180,
    0
   ],
   "get product tags|GET /product-tags response body is present and not empty": [
-   177,
+   180,
    0
   ],
   "get product tags|GET /product-tags → N OK": [
-   177,
+   180,
    0
   ],
   "get product tags|GET /product-tags → conforms to OSDM N.N ProductTagGroup schema (deep)": [
-   177,
+   180,
    0
   ],
   "get product tags|GET /product-tags → conforms to OSDM N.N ProductTagName schema (deep)": [
-   177,
+   180,
    0
   ],
   "get product tags|GET /product-tags → every productTagGroup has required \"…\" (Text object)": [
-   177,
+   180,
    0
   ],
   "get product tags|GET /product-tags → every productTagGroup has required \"…\" (string)": [
-   177,
+   180,
    0
   ],
   "get product tags|GET /product-tags → every productTagName has required \"…\" (Text object)": [
-   177,
+   180,
    0
   ],
   "get product tags|GET /product-tags → every productTagName has required \"…\" (string)": [
-   177,
+   180,
    0
   ],
   "get product tags|GET /product-tags → required \"…\" is an array<ProductTagGroup>": [
-   177,
+   180,
    0
   ],
   "get product tags|GET /product-tags → required \"…\" is an array<ProductTagName>": [
-   177,
+   180,
    0
   ],
   "get product tags|GET /product-tags → response is a ProductTagsResponse object": [
-   177,
+   180,
    0
   ],
   "get product tags|[OSDM] Content-Type is JSON": [
-   177,
+   180,
    0
   ],
   "get products|GET /products response body is present and not empty": [
-   177,
+   180,
    0
   ],
   "get products|GET /products response contains at least one product id": [
-   177,
+   180,
    0
   ],
   "get products|GET /products → \"…\" (when present) is array": [
-   177,
+   180,
    0
   ],
   "get products|GET /products → \"…\" (when present) is boolean": [
-   354,
+   360,
    0
   ],
   "get products|GET /products → \"…\" (when present) is object": [
-   177,
+   180,
    0
   ],
   "get products|GET /products → \"…\" (when present) is string": [
-   885,
+   900,
    0
   ],
   "get products|GET /products → \"…\" is an array<Product>": [
-   177,
+   180,
    0
   ],
   "get products|GET /products → N OK": [
-   177,
+   180,
    0
   ],
   "get products|GET /products → conforms to OSDM N.N Product schema (deep)": [
-   177,
+   180,
    0
   ],
   "get products|GET /products → every Product has required \"…\" (string)": [
-   708,
+   720,
    0
   ],
   "get products|GET /products → response is a collection object": [
-   177,
+   180,
    0
   ],
   "get products|[OSDM] Content-Type is JSON": [
-   177,
+   180,
    0
   ],
   "get promotion codes|[OSDM] Content-Type is JSON": [
-   177,
+   180,
    0
   ],
   "get reduction cards|GET /reduction-cards response body is present and not empty": [
-   177,
+   180,
    0
   ],
   "get reduction cards|GET /reduction-cards → \"…\" (when present) is boolean": [
-   177,
+   180,
    0
   ],
   "get reduction cards|GET /reduction-cards → \"…\" (when present) is string": [
-   177,
+   180,
    0
   ],
   "get reduction cards|GET /reduction-cards → \"…\" is an array<ReductionCardType>": [
-   177,
+   180,
    0
   ],
   "get reduction cards|GET /reduction-cards → N OK": [
-   177,
+   180,
    0
   ],
   "get reduction cards|GET /reduction-cards → conforms to OSDM N.N ReductionCardType schema (deep)": [
-   177,
+   180,
    0
   ],
   "get reduction cards|GET /reduction-cards → every ReductionCardType has required \"…\" (object)": [
-   177,
+   180,
    0
   ],
   "get reduction cards|GET /reduction-cards → every ReductionCardType has required \"…\" (string)": [
-   354,
+   360,
    0
   ],
   "get reduction cards|GET /reduction-cards → response is a collection object": [
-   177,
+   180,
    0
   ],
   "get reduction cards|[OSDM] Content-Type is JSON": [
-   177,
+   180,
    0
   ],
   "get refund offer|'…' array exists with N refund offer(s)": [
@@ -2899,35 +2907,35 @@
    0
   ],
   "get system version check|GET /versions → \"…\" (when present) is an ISO-N date-time": [
-   177,
+   180,
    0
   ],
   "get system version check|GET /versions → \"…\" (when present) is an object": [
-   177,
+   180,
    0
   ],
   "get system version check|GET /versions → N OK": [
-   177,
+   180,
    0
   ],
   "get system version check|GET /versions → at least one ApiVersion entry": [
-   177,
+   180,
    0
   ],
   "get system version check|GET /versions → conforms to OSDM N.N ApiVersion schema (deep)": [
-   177,
+   180,
    0
   ],
   "get system version check|GET /versions → every entry has required \"…\" (non-empty string)": [
-   177,
+   180,
    0
   ],
   "get system version check|GET /versions → response is an array<ApiVersion>": [
-   177,
+   180,
    0
   ],
   "get system version check|OSDM version check (soft): data file \"…\" vs API [N.N] — match": [
-   177,
+   180,
    0
   ],
   "get system version check|Trip Search Criteria has at least one leg": [
@@ -2939,43 +2947,43 @@
    0
   ],
   "get system version check|[OSDM] Content-Type is JSON": [
-   177,
+   180,
    0
   ],
   "get zones|GET /zones response body is present and not empty": [
-   177,
+   180,
    0
   ],
   "get zones|GET /zones → \"…\" (when present) is array": [
-   177,
+   180,
    0
   ],
   "get zones|GET /zones → \"…\" (when present) is string": [
-   177,
+   180,
    0
   ],
   "get zones|GET /zones → \"…\" is an array<ZoneDefinition>": [
-   177,
+   180,
    0
   ],
   "get zones|GET /zones → N OK": [
-   177,
+   180,
    0
   ],
   "get zones|GET /zones → conforms to OSDM N.N ZoneDefinition schema (deep)": [
-   177,
+   180,
    0
   ],
   "get zones|GET /zones → every ZoneDefinition has required \"…\" (string)": [
-   354,
+   360,
    0
   ],
   "get zones|GET /zones → response is a collection object": [
-   177,
+   180,
    0
   ],
   "get zones|[OSDM] Content-Type is JSON": [
-   177,
+   180,
    0
   ],
   "patch multi passenger|HTTP response status — expected N, actual: N": [
@@ -3763,7 +3771,7 @@
    0
   ],
   "post create booking|HTTP response status — expected N, actual: N": [
-   125,
+   128,
    0
   ],
   "post create booking|Idempotency-Key, POST /bookings sent again with the same key: HTTP status N — actual N": [
@@ -3831,7 +3839,7 @@
    0
   ],
   "post create booking|[OSCAR request] POST /bookings conforms to OSDM N.N BookingRequest": [
-   145,
+   148,
    0
   ],
   "post create booking|[OSCAR request] POST /bookings does not conform to OSDM N.N BookingRequest, on purpose (negative test: purchaser negative sweep in the booking)": [
@@ -3839,7 +3847,7 @@
    0
   ],
   "post create booking|[OSDM] Content-Type is JSON": [
-   147,
+   150,
    0
   ],
   "post create booking|[OSDM] Vendor books a round trip (both offers) in a single booking": [
@@ -3847,19 +3855,23 @@
    0
   ],
   "post create booking|[fares B1] The booking holds the fares booked (bookedOffers[].fares)": [
-   21,
+   24,
    0
   ],
   "post create booking|[fares B2] Every fare of the offer is in the booking (paired by id, else passengers, section and price)": [
-   21,
+   24,
    0
   ],
   "post create booking|[fares B3] Each booked fare has the members OSDM requires (Fare.required, passengerRefs)": [
-   21,
+   24,
    0
   ],
   "post create booking|[fares B4] Each booked fare'…'s": [
-   21,
+   24,
+   0
+  ],
+  "post create booking|[fares B7] Nothing of a booking without a trip covers a trip (tripCoverage absent)": [
+   3,
    0
   ],
   "post create booking|[fares V1] Each booked fare reservation is in FARE_MODE (Reservation.distributionMode; absent = PRODUCT_MODE)": [
@@ -4463,11 +4475,11 @@
    0
   ],
   "post get offer|GET /zones: HTTP N — actual N": [
-   11,
+   13,
    0
   ],
   "post get offer|GET /zones: at least one zone with its id and carrier (ZoneDefinition.id, .carrier required)": [
-   11,
+   13,
    0
   ],
   "post get offer|Group offer: admission <id> names the passenger type of each passenger — N: ADULT, N: ADULT, N: ADULT, N: ADULT, N: ADULT, N: ADULT": [
@@ -4487,7 +4499,11 @@
    0
   ],
   "post get offer|HTTP response status — expected N, actual: N": [
-   166,
+   169,
+   0
+  ],
+  "post get offer|Non-trip offers: a zone of GET /zones holds stop place urn:uic:stn:N of the trip (nonTrip.zoneOf)": [
+   2,
    0
   ],
   "post get offer|Non-trip offers: each admission says where it is valid (regionalValidities) — N admission": [
@@ -4819,7 +4835,7 @@
    0
   ],
   "post get offer|[OSCAR request] POST /offers conforms to OSDM N.N OfferCollectionRequest": [
-   177,
+   180,
    0
   ],
   "post get offer|[OSCAR request] POST /offers does not conform to OSDM N.N OfferCollectionRequest, on purpose (negative test: empty passenger list)": [
@@ -4827,7 +4843,7 @@
    0
   ],
   "post get offer|[OSDM] Content-Type is JSON": [
-   178,
+   181,
    0
   ],
   "post get offer|[fares N] No fare in the answer, as the scenario expects (expectFares: false)": [
@@ -4835,7 +4851,7 @@
    0
   ],
   "post get offer|[fares O13] No fare price is negative": [
-   21,
+   24,
    0
   ],
   "post get offer|[fares O14] No fare when the request asks for ADMISSION only": [
@@ -4843,15 +4859,23 @@
    0
   ],
   "post get offer|[fares O1] At least one offer holds fares (offers[].fares)": [
-   21,
+   24,
+   0
+  ],
+  "post get offer|[fares O21] A request without a trip gets no trip in the answer (trips)": [
+   3,
+   0
+  ],
+  "post get offer|[fares O22] No fare offer of a request without a trip covers a trip (tripCoverage absent)": [
+   3,
    0
   ],
   "post get offer|[fares O2] Each fare has the members OSDM requires (Fare.required, passengerRefs)": [
-   21,
+   24,
    0
   ],
   "post get offer|[fares O3] Each fare is of a type asked (ADMISSION)": [
-   19,
+   22,
    0
   ],
   "post get offer|[fares O3] Each fare is of a type asked (ADMISSION, ANCILLARY)": [
@@ -4863,19 +4887,19 @@
    0
   ],
   "post get offer|[fares O4] Each fare has regional validities (regionalConstraint.regionalValidities)": [
-   21,
+   24,
    0
   ],
   "post get offer|[fares O5] Each fare has after-sales conditions (afterSalesCondition.conditions)": [
-   21,
+   24,
    0
   ],
   "post get offer|[fares O6] Each fare has a validity range (travelValidityConstraint.validityRange)": [
-   21,
+   24,
    0
   ],
   "post get offer|[fares O7] Every passenger has a fare in each fare offer (a free one priced N)": [
-   21,
+   24,
    0
   ],
   "post get offer|[fares O8] Each passenger's fares cover the requested section without a gap": [
@@ -4979,14 +5003,6 @@
    0
   ],
   "post get offer|🧪 Departure date probe [departure N day(s) from today, POST /offers]: no offer is given": [
-   1,
-   0
-  ],
-  "post get offer|🧪 Fares without a trip probe [POST /offers]: error body is an RFC-N Problem (title/detail/code present)": [
-   1,
-   0
-  ],
-  "post get offer|🧪 Fares without a trip probe [POST /offers]: provider rejects with a client error (4xx)": [
    1,
    0
   ],
@@ -5407,7 +5423,7 @@
    0
   ],
   "post obtaining fulfillments from booking|Status code is N or N": [
-   144,
+   147,
    0
   ],
   "post obtaining fulfillments from booking|[<id>] Expired booking: error body is an RFC-N Problem (title/detail/code present)": [
@@ -5419,27 +5435,27 @@
    0
   ],
   "post obtaining fulfillments from booking|[OSCAR request] POST /bookings/{bookingId}/fulfillments conforms to OSDM N.N FulfillmentPostRequest": [
-   146,
+   149,
    0
   ],
   "post obtaining fulfillments from booking|[OSDM] Content-Type is JSON": [
-   146,
+   149,
    0
   ],
   "post obtaining fulfillments from booking|[fares F1] Each fare fulfilment is CONFIRMED or FULFILLED": [
-   22,
+   25,
    0
   ],
   "post obtaining fulfillments from booking|[fares F1] The confirmation gives the fare fulfilment (fulfillments)": [
-   22,
+   25,
    0
   ],
   "post obtaining fulfillments from booking|[fares F3] Each fare fulfilment names only parts of this booking (Fulfillment.bookingParts)": [
-   22,
+   25,
    0
   ],
   "post obtaining fulfillments from booking|[fares F4] No fulfilment holds both fares and product booking parts (OSDM processes)": [
-   22,
+   25,
    0
   ],
   "post obtaining fulfillments from booking|🧪 Confirm again: no new ticket — HTTP N, the same fulfillments": [
@@ -5639,11 +5655,11 @@
    0
   ],
   "simulator access token|Authentication: access token acquired for Simulator": [
-   177,
+   180,
    0
   ],
   "simulator access token|[OSDM] Content-Type is JSON": [
-   177,
+   180,
    0
   ]
  }

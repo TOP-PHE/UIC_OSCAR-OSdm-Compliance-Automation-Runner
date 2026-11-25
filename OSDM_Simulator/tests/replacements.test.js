@@ -140,7 +140,7 @@ test('a sale without a trip is not checked for a lost item', () => {
 });
 
 test('GET /products lists both replacements, tagged', () => {
-  const lost = productsOf(gamma).filter((p) => p.productTags);
+  const lost = productsOf(gamma).filter((p) => ['TICKET_LOST', 'CARD_LOST'].includes(p.productTags?.[0]));
   assert.deepEqual(lost.map((p) => [p.code, p.type, p.productTags[0]]), [
     ['SIM_LOST_TICKET', 'ADMISSION_MULTI_RIDE', 'TICKET_LOST'],
     ['SIM_LOST_CARD', 'REDUCTION_CARD', 'CARD_LOST'],

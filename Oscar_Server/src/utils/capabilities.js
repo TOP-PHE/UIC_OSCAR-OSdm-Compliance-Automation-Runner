@@ -99,6 +99,8 @@ const CAPABILITIES = Object.freeze([
   { id: 'exchange.withdraw', group: 'Exchange', label: 'Exchange withdrawn', optional: true, goal: ['16. DEL Exchange Offer'] },
   { id: 'fares.offers', group: 'Fares', label: 'Fare offers', stage: 'offer' },
   { id: 'fares.sale', group: 'Fares', label: 'Fare sale', goal: [SALE_GOAL] },
+  // #1449: fares sold without a trip, a theoretical case.
+  { id: 'fares.nonTrip', group: 'Fares', label: 'Fare sale without a trip', goal: [SALE_GOAL] },
   { id: 'fares.refund', group: 'Fares', label: 'Fare refund', goal: ['13. PATCH Refund Offer'] },
   { id: 'fares.reservation', group: 'Fares', label: 'Fare reservation (bicycle)', stage: 'sale' },
   { id: 'expiry', group: 'Time limits', label: 'Time limits of offers, bookings and after-sale offers', stage: 'offer' },
@@ -288,6 +290,7 @@ function fareCapability(scenario, datafile) {
   // #1444: fares asked without a trip, expected refused or given none.
   if (armed(scenario.nonTripFaresExpectRejection)) return 'fares.offers';
   if (partsOf(scenario, datafile).includes('FARE_RESERVATION')) return 'fares.reservation';
+  if (NON_TRIP_REQUEST_FORMS.includes(offerRequestFormOf(scenario, datafile))) return 'fares.nonTrip';
   return 'fares.sale';
 }
 
@@ -346,9 +349,12 @@ function traitsOf(scenario, datafile) {
   const fare = isFareScenario(scenario, datafile) && text(scenario.bookMode).toUpperCase() !== 'PRODUCT';
   const features = new Set(FEATURE_RULES.flatMap((rule) => rule(scenario, datafile)));
   if (fare && partsOf(scenario, datafile).includes('FARE_RESERVATION')) features.add('fares.reservation');
+  const form = offerRequestFormOf(scenario, datafile);
   return {
-    form: offerRequestFormOf(scenario, datafile),
+    form,
     fare,
+    // #1449: a fare sale without a trip proves its own capability at the sale's step.
+    nonTripFare: fare && NON_TRIP_REQUEST_FORMS.includes(form),
     refund: typeOf(scenario) === 'REFUND' ? refundCapability(scenario, datafile) : null,
     features: [...features],
   };
@@ -359,7 +365,10 @@ function stepCapabilities(stepName, traits) {
   const role = STEP_ROLES[stepName];
   if (!role) return [];
   if (role === 'offers') return [OFFER_FORM_CAPABILITY[traits?.form] || 'offers.search'];
-  if (role === 'sale') return [traits?.fare ? 'fares.sale' : 'sale'];
+  if (role === 'sale') {
+    if (!traits?.fare) return ['sale'];
+    return [traits.nonTripFare ? 'fares.nonTrip' : 'fares.sale'];
+  }
   if (role === 'refundOffer') return ['refund.offer'];
   if (role === 'refund') return [traits?.refund || 'refund.full'];
   return [role];
