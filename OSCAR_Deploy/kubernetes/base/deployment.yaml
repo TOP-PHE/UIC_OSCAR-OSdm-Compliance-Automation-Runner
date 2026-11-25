@@ -76,10 +76,12 @@ spec:
             capabilities:
               drop:
                 - ALL
-            # Not read-only yet: the root file system of the image is not
-            # written today (data on the volume, /tmp below), but nothing
-            # proves it for every path yet.
-            readOnlyRootFilesystem: false
+            # Read-only (#1441): what the server writes is on the volumes
+            # below (database, data files and reports on /app/data, the runs'
+            # folders on /app/run-workspaces, HOME and temporary files on
+            # /tmp). The CI proves it with real runs; a write anywhere else
+            # fails with EROFS, which the CI looks for in the logs.
+            readOnlyRootFilesystem: true
           # /health checks the database, the data directory and the free
           # space. In production OSCAR redirects plain http to https unless
           # the request names localhost: the probes do, as the VPS's Docker
@@ -173,7 +175,9 @@ spec:
             capabilities:
               drop:
                 - ALL
-            readOnlyRootFilesystem: false
+            # Read-only too (#1441): Bruno writes in the run's folder and /tmp,
+            # as in a run pod.
+            readOnlyRootFilesystem: true
           # The agent listens on the pod's loopback only, which a kubelet
           # tcpSocket probe (the pod's address) cannot reach.
           startupProbe:

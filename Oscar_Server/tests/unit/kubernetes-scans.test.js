@@ -173,9 +173,10 @@ describe('accepted.json', () => {
     }
   });
 
-  test('the run pods and the dispatcher\'s reading of Secrets are not accepted: they are fixed', () => {
+  test('the run pods, the dispatcher\'s reading of Secrets and the server\'s writable root are not accepted: they are fixed', () => {
     expect(accepted.kubescape.some((e) => e.resources.some((r) => r.includes('pod-job')))).toBe(false);
     expect(accepted.kubescape.some((e) => e.control === 'C-0015')).toBe(false);
+    expect(accepted.kubescape.some((e) => e.control === 'C-0017')).toBe(false);
   });
 });
 
