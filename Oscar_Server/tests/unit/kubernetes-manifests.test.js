@@ -875,6 +875,29 @@ describe('k3s on one machine (overlays/k3s, k3s/)', () => {
     expect(fs.readFileSync(path.join(REPO, '.gitignore'), 'utf8')).toContain('OSCAR_Deploy/kubernetes/overlays/site/');
   });
 
+  test('moving to a release applies its runs\' namespace again, before OSCAR\'s pods', () => {
+    // The dispatcher's rights are there and move with a release (2026.629:
+    // deletecollection on Secrets, no list).
+    const between = (text, from, to) => {
+      const start = text.indexOf(from);
+      expect(start).toBeGreaterThan(-1);
+      return text.slice(start, text.indexOf(to, start));
+    };
+    const runs = 'kubectl apply -k OSCAR_Deploy/kubernetes/runs';
+    const checkout = 'git checkout "$RELEASE"';
+    const update = between(doc, '### A new OSCAR release', '### Kept run pods');
+    expect(update.indexOf(checkout)).toBeGreaterThan(-1);
+    expect(update.indexOf(runs)).toBeGreaterThan(update.indexOf(checkout));
+    expect(update.indexOf(runs)).toBeLessThan(update.indexOf('apply -k OSCAR_Deploy/kubernetes/overlays/site'));
+    const restore = between(doc, '## 6a.', '## 7.');
+    expect(restore.indexOf(checkout)).toBeGreaterThan(-1);
+    expect(restore.indexOf(runs)).toBeGreaterThan(restore.indexOf(checkout));
+    expect(between(GUIDE, '## 10. Updating', '## 10a.')).toContain(runs);
+    const role = yaml.loadAll(fs.readFileSync(path.join(REPO, 'OSCAR_Deploy/kubernetes/runs/dispatcher-role.yaml'), 'utf8'))
+      .find((d) => d?.kind === 'Role');
+    expect(role.rules.find((r) => r.resources.includes('secrets')).verbs).toContain('deletecollection');
+  });
+
   test('the CI deploys the overlay as it is, but for its images and Let\'s Encrypt', () => {
     expect(ci.resources).toEqual(['../../overlays/k3s']);
     expect(ci.images).toEqual([{ name: 'ghcr.io/top-phe/oscar', newName: 'local/oscar', newTag: 'ci' }]);

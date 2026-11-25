@@ -484,12 +484,15 @@ RELEASE=release-YYYY.NNN        # ← yours: release_tag above, or a later relea
 cd /opt/oscar
 git fetch --tags origin
 git checkout "$RELEASE"
+sudo kubectl apply -k OSCAR_Deploy/kubernetes/runs
 ```
 
 git answers *You are in 'detached HEAD' state*: normal, the files are pinned
 to that release and nothing is committed here. `git pull` does not work in
 that state: a later release is taken the same way (section 9, *A new OSCAR
-release*).
+release*). The `apply` gives the runs' namespace the dispatcher's rights of
+that release (section 4 applied those of the files checked out then): what
+did not move prints `unchanged`.
 
 **3. OSCAR's secrets, with the backup's keys.** The same `ENCRYPTION_KEY`, or
 the stored credentials, data files and reports cannot be read; the same
@@ -1019,6 +1022,7 @@ KEPT_PODS=off                   # ← yours: on keeps a run pod for a batch (Kep
 cd /opt/oscar
 git fetch --tags origin
 git checkout "$RELEASE"
+sudo kubectl apply -k OSCAR_Deploy/kubernetes/runs
 rm -rf OSCAR_Deploy/kubernetes/overlays/site
 cp -r OSCAR_Deploy/kubernetes/overlays/k3s OSCAR_Deploy/kubernetes/overlays/site
 sed -i "s/oscar.example.org/$HOST/g" OSCAR_Deploy/kubernetes/overlays/site/kustomization.yaml OSCAR_Deploy/kubernetes/overlays/site/ingress.yaml
@@ -1037,6 +1041,12 @@ curl -sS -w '\nHTTP %{http_code}\n' "https://$HOST/health"
 - `git checkout` says *detached HEAD*: normal. A checkout that followed `main`
   (sections 2 to 6) moves to the tag the same way, and takes its releases by
   tag from then on.
+- `apply -k …/runs`: the runs' namespace of the release, made before OSCAR's
+  pods start, because it holds the dispatcher's rights and a release may
+  change them (2026.629: the dispatcher removes its runs' Secrets by label,
+  `deletecollection`, and no longer lists them; without it, the dispatcher's
+  log says `leftovers not removed` at each start). What did not move prints
+  `unchanged`.
 - The `grep` shows your release twice (`newTag`, `RUN_IMAGE`) and your name
   three times, as in 6a step 4, and `RUN_KEPT_PODS` with your choice.
   `YYYY` there means `RELEASE` was not changed. A release from before
