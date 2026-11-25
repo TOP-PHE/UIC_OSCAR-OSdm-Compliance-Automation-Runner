@@ -110,6 +110,20 @@ jobs:
       matrix:
         image: ${{ fromJSON(needs.images.outputs.images) }}
     steps:
+      # Once, with retries: both scans then read the image from Docker. Read
+      # from the registry twice, a layer cut short (unexpected EOF) failed
+      # the second scan of an image that had no finding.
+      - name: Pull the image once
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          for attempt in 1 2 3; do
+            if docker pull --quiet "$IMAGE"; then exit 0; fi
+            echo "Pulling $IMAGE failed (attempt $attempt of 3)."
+            sleep $((attempt * 15))
+          done
+          exit 1
+
       - name: Trivy, HIGH and CRITICAL with a fix, listed
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

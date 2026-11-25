@@ -215,6 +215,11 @@ describe('the weekly job', () => {
     expect(job.strategy['fail-fast']).toBe(false);
     expect(job.strategy.matrix.image).toBe('${{ fromJSON(needs.images.outputs.images) }}');
     const [list, rule] = trivySteps(job);
+    // Pulled once, with retries, before both scans read it.
+    const pull = job.steps.find((s) => /docker pull/.test(s.run || ''));
+    expect(job.steps.indexOf(pull)).toBeLessThan(job.steps.indexOf(list));
+    expect(pull.env.IMAGE).toBe('${{ matrix.image }}');
+    expect(pull.run).toMatch(/for attempt in 1 2 3/);
     for (const s of [list, rule]) {
       expect(s.uses).toBe(TRIVY_ACTION);
       expect(s.with).toEqual(expect.objectContaining({ 'image-ref': '${{ matrix.image }}', scanners: 'vuln', 'ignore-unfixed': true }));
