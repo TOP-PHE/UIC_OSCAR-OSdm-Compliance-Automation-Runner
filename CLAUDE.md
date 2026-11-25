@@ -189,6 +189,21 @@ turns that off); an OSCAR **administrator** manages tenants, not test content.
     `XS112` (its 0000042 is a wrong variant: use XS111), each admission a
     Zone naming the code, an unknown code 400 pointing at it. The
     reference adds the form only for a profile whose zones name codes.
+    **Sold by product tag** (#1436, 1.11.586 / OTST_V2.0.271, simulator
+    0.74.0; maintainer 2026-11-24). Every simulator provider answers
+    `GET /product-tags` (`productTags.js`: groups WITHOUT_TRIP, REPLACEMENT,
+    WITH_TRIP from the profile) and `GET /products` names each product's tag.
+    **OSDM 3.6.0's `ProductTagsResponse` requires two members it does not
+    declare** (`additionalProperties: false`): alpha answers as 3.7, and the
+    simulator's conformance helper excuses that exact issue only
+    (`KNOWN_SPEC_DEFECTS`, `tests/osdm-conformance.js`). A sale asking a
+    product type by its tag (`productTagsAsked()`, `products.js`;
+    `SEARCH_ONLY_TAGS` TICKET_LOST / CARD_LOST / SPLIT_RESERVATION left out,
+    pinned to `capabilities.js`) chooses an offer of the tag
+    (`offersOfTagAsked()` in `offers.js`), and 07 fails a booking holding no
+    product of it (`checkBookingTag()`; a WARNING when the booked products
+    name neither a type nor a tag). Capability `sale.products`. The system
+    requests run in every scenario: every catalogue `checks` moved (+11).
     Left in #1266: #227 without a trip, fares.
     **To regenerate *Checks by scenario* from a partial change**, record the
     scenarios it names in chunks and merge the recordings (the

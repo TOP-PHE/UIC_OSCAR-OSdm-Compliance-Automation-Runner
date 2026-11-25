@@ -4,6 +4,17 @@
   "current_release": "2026.625",
   "releases": [
     {
+      "release": "2026.627",
+      "date": "2026-11-24",
+      "server": "1.11.586",
+      "collection": "OTST_V2.0.271",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.586 / collection OTST_V2.0.271 / simulator 0.74.0 (#1436, part of #1266): a sale without a trip by product tag. A sale asking a product type by its tag (productTags, or a productSelections entry naming a tag) books an offer holding a product of that tag when one does, and step 07 fails a booking holding no product of the tag (a warning when its products name neither a type nor a tag); TICKET_LOST, CARD_LOST and SPLIT_RESERVATION only ask for something and choose nothing. Coverage: such a sale is under Named products and tariff choice (sale.products). The simulator answers GET /product-tags on every provider (three groups: without a trip, replacement, with a trip; OSDM 3.6.0 requires two members it does not declare, so alpha answers as 3.7 does), and GET /products names each product's tag: every scenario run on the simulator has 11 more checks, and every catalogue count moved. Three simulator scenarios with their version copies, three reference scenarios (OTST_NONTRIP_SALE_SINGLE_RIDE_BY_TAG_1ADT, _PASS_BY_TAG_1ADT, _MULTI_RIDE_BY_TAG_1ADT), the simulator references regenerated. Not released on its own: current_release is not moved."
+      ]
+    },
+    {
       "release": "2026.626",
       "date": "2026-11-25",
       "server": "1.11.585",

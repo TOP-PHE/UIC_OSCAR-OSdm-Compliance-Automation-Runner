@@ -22,6 +22,20 @@ const SCHEMAS = require('./fixtures/osdm-response-schemas.json');
 
 const MAX_DEPTH = 64;
 
+// Defects of a published OSDM version that no answer can avoid, each excused
+// by its exact issue only (#1436). OSDM 3.6.0's ProductTagsResponse requires
+// productTagGroupNames and productTagGroupings, which it does not declare,
+// with additionalProperties false; 3.7.0 requires productTagNames and
+// productTagGroups. The simulator answers in the form 3.6's own properties
+// describe, as 3.7 does, and as the collection checks (maintainer, 2026-11-24).
+const KNOWN_SPEC_DEFECTS = Object.freeze([
+  { version: '3.6.0', method: 'GET', path: '/product-tags', status: 200,
+    issue: '(body): missing productTagGroupNames, productTagGroupings' },
+]);
+
+const excused = (version, op, issue) => KNOWN_SPEC_DEFECTS.some((d) => d.version === version
+  && d.method === op.method && d.path === op.path && d.status === op.status && d.issue === issue);
+
 function pathSegments(url) {
   const noQuery = String(url || '').split(/[?#]/)[0];
   return noQuery.replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, '').split('/').filter(Boolean);
@@ -130,7 +144,7 @@ function responseIssues(version, method, url, status, body) {
   if (!op) return null;
   const ctx = { schemas: SCHEMAS.versions[version].schemas, owner: op.path, depth: 0, issues: [] };
   visit(body, op.schema, ctx, '');
-  return ctx.issues;
+  return ctx.issues.filter((issue) => !excused(version, op, issue));
 }
 
-module.exports = { responseIssues, operationFor, VERSIONS: Object.keys(SCHEMAS.versions) };
+module.exports = { responseIssues, operationFor, KNOWN_SPEC_DEFECTS, VERSIONS: Object.keys(SCHEMAS.versions) };
