@@ -597,10 +597,13 @@ function phase4Line(all) {
 }
 
 /** The lines of the report, for the run log. */
+// #1437: ", offers without a trip (<where>)" in the report's first line, '' for a trip.
+const withoutTripText = (report) => (report.withoutTrip ? `, offers without a trip (${report.withoutTrip})` : '');
+
 function reportLines(report) {
   const answered = report.mandatory.ok ? 'answered' : 'NOT answered';
   const lines = [
-    `[INFO] 🧭 Offer request options (#227) — OSDM ${report.version}${report.withoutTrip ? `, offers without a trip (${report.withoutTrip})` : ''}, budget ${report.budget} request(s), ${report.used} used, seed ${report.seed}.`,
+    `[INFO] 🧭 Offer request options (#227) — OSDM ${report.version}${withoutTripText(report)}, budget ${report.budget} request(s), ${report.used} used, seed ${report.seed}.`,
     `[INFO] 🧭 Phase 1, mandatory parameters only: ${answered} — ${report.mandatory.message}`,
   ];
   const counts = {};

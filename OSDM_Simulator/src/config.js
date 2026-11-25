@@ -324,8 +324,13 @@ function checkRequestOptions(value, bad) {
   const { nonTripFrom, nonTripZone } = value;
   if (nonTripFrom !== undefined && !isText(nonTripFrom, 1, 120)) throw bad('requestOptions.nonTripFrom');
   if (nonTripZone !== undefined && !isText(nonTripZone, 1, 60)) throw bad('requestOptions.nonTripZone');
-  return { requestOptions: Object.assign({ from: value.from, members: { ...members }, promotionCodes: [...promotionCodes] },
-    nonTripFrom === undefined ? {} : { nonTripFrom }, nonTripZone === undefined ? {} : { nonTripZone }) };
+  return {
+    requestOptions: {
+      from: value.from, members: { ...members }, promotionCodes: [...promotionCodes],
+      ...(nonTripFrom === undefined ? {} : { nonTripFrom }),
+      ...(nonTripZone === undefined ? {} : { nonTripZone }),
+    },
+  };
 }
 
 // #1258: what the provider sells without a trip: its stop places (by id and
