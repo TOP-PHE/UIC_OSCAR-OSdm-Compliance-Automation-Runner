@@ -1,0 +1,135 @@
+# Copyright [2026] [International Union of Railways (UIC)]
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#        http://www.apache.org/licenses/LICENSE-2.0
+
+name: Scan · published and pinned images (weekly)
+
+# #1453: an image is scanned when it is built (ci-server.yml, Trivy), never
+# again after, and the third-party images the deployments pin were never
+# scanned at all. Every week this scans, with the build's rule (CRITICAL and
+# HIGH with a fix fail):
+#   - the current release's images on GHCR (compatibility.json):
+#     oscar-server, oscar and oscar-run, :release-<current_release>;
+#   - every third-party image a deployment file pins (Docker Compose,
+#     Kubernetes, the Dockerfiles' FROM), listed by OSCAR_Deploy/scans/images.js;
+#   - the images of the kube-prometheus-stack chart the k3s monitoring installs,
+#     at its pinned version and with its values (helm template).
+# One job per image, so a red one names its image. A finding is fixed by a new
+# release (our images) or by moving the pin (Dependabot, or by hand).
+#
+# The images are read without credentials: OSCAR's are public on GHCR, and no
+# token of this repository is ever sent to another registry.
+
+on:
+  schedule:
+    - cron: '47 5 * * 1'
+  workflow_dispatch: {}
+  # A change to this scan, to its list or to a pinned image (a Dependabot
+  # bump included) is scanned before it lands. Not compatibility.json: a
+  # release PR names images published only once it is merged.
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/scan-images.yml'
+      - 'OSCAR_Deploy/scans/**'
+      - 'OSCAR_Deploy/docker-compose*.yml'
+      - 'OSCAR_Deploy/kubernetes/monitoring/stack/**'
+      - 'OSCAR_Deploy/kubernetes/Dockerfile.run'
+      - 'Oscar_Server/Dockerfile'
+      - 'OSDM_Simulator/deploy/docker-compose.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  images:
+    name: The images to scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      HELM_VERSION: 4.3.1
+      HELM_SHA256: 0403a88ae20913d11b10a2467b50087721fea7581736da6b9d3992f5357fe54b
+    outputs:
+      images: ${{ steps.list.outputs.images }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Helm, its pinned release checked
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/helm"
+          mkdir -p "$dir"
+          curl -fsSL -o "$dir/helm.tar.gz" "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz"
+          echo "${HELM_SHA256}  $dir/helm.tar.gz" | sha256sum -c -
+          tar -xzf "$dir/helm.tar.gz" -C "$dir"
+          sudo install -m 0755 "$dir/linux-amd64/helm" /usr/local/bin/helm
+          helm version
+
+      - name: List them
+        id: list
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/images.txt"
+          node OSCAR_Deploy/scans/images.js list > "$out"
+          read -r repo chart version < <(node OSCAR_Deploy/scans/images.js chart)
+          node OSCAR_Deploy/scans/images.js chart-values > "$RUNNER_TEMP/values.yaml"
+          helm template kube-prometheus-stack "$chart" --repo "$repo" --version "$version" \
+            --namespace monitoring -f "$RUNNER_TEMP/values.yaml" > "$RUNNER_TEMP/chart.yaml"
+          node OSCAR_Deploy/scans/images.js from-render < "$RUNNER_TEMP/chart.yaml" >> "$out"
+          sort -u -o "$out" "$out"
+          {
+            echo "### Images scanned"
+            echo
+            sed 's/^/- `/; s/$/`/' "$out"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "images=$(node -e 'const fs = require("node:fs"); process.stdout.write(JSON.stringify(fs.readFileSync(0, "utf8").split("\n").filter(Boolean)))' < "$out")" >> "$GITHUB_OUTPUT"
+
+  scan:
+    name: Trivy ${{ matrix.image }}
+    needs: images
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        image: ${{ fromJSON(needs.images.outputs.images) }}
+    steps:
+      - name: Trivy, vulnerabilities with a fix
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ matrix.image }}
+          scanners: vuln
+          format: table
+          output: trivy.txt
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+      - name: What it found
+        if: ${{ !cancelled() }}
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          if [ ! -s trivy.txt ]; then echo "No report for $IMAGE."; exit 0; fi
+          cat trivy.txt
+          {
+            echo "### $IMAGE"
+            echo
+            echo '```'
+            cat trivy.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

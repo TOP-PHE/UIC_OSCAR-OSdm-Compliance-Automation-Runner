@@ -1194,7 +1194,7 @@ admin-override with extra audit logging — not implemented in Phase 1.)
 - Credentials redacted from persisted reports (since v17 retroactive scrub)
 - Self-service password reset, JWT rotation, granular roles
 - 401 auto-logout, sticky session toast, rate limiting
-- CodeQL / SonarCloud / Gitleaks / Trivy on every commit
+- CodeQL / SonarCloud / Gitleaks / Trivy on every commit (the server, run and cluster images), and Trivy every week on the release's images and the pinned third-party ones
 
 #### Defended in code (since v1.11.0 — Phase 2 at-rest encryption)
 

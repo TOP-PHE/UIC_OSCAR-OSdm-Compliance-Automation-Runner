@@ -108,9 +108,9 @@ secrets and still report green.
 
 | File | Name | Runs on | What it does |
 |---|---|---|---|
-| `ci-server.yml` | CI · Server | push, PR | Lint (server, pages, tests, scripts and the Bruno library), audit, unit and integration tests (server, simulator, MCP server, API test tool); Docker build; Trivy scan |
+| `ci-server.yml` | CI · Server | push, PR | Lint (server, pages, tests, scripts and the Bruno library), audit, unit and integration tests (server, simulator, MCP server, API test tool); Docker build; Trivy scan of the three images a release publishes (server, run, cluster) |
 | `ci-collection.yml` | CI · Bruno collection | push, PR | Validates the collection with the pinned Bruno CLI |
-| `ci-kubernetes.yml` | CI · Kubernetes | PR and push on its paths, weekly | OSCAR on kind (OpenShift-like and Kubernetes) and on k3s, a run on the simulator. Not required |
+| `ci-kubernetes.yml` | CI · Kubernetes | PR and push on its paths, weekly | OSCAR on kind (OpenShift-like and Kubernetes) and on k3s, a run on the simulator; Kubescape and Trivy on the manifests and Dockerfiles, kube-bench on k3s (`scans/accepted.json`). Not required |
 | `codeql.yml` | CodeQL | push, PR, weekly | Analysis of the JavaScript and of the workflow files (`javascript-typescript`, `actions`), config `.github/codeql/codeql-config.yml` |
 | `gitleaks.yml` | Gitleaks (secret scan) | push, PR | Every commit of the PR |
 | `sonar.yml` | SonarCloud | push, PR | Tests with coverage (server, simulator, MCP, API test tool), then the scan |
@@ -122,6 +122,7 @@ secrets and still report green.
 | `publish-cluster-images.yml` | Publish · cluster images to GHCR | tag `release-*` | The bundle and run images for Kubernetes |
 | `simulator-release.yml` | Simulator · tag and release | push to `main` | A new simulator version gets its tag and GitHub release |
 | `simulator-deploy.yml` | Simulator · update the installed simulator | push to `main` | On a version change, updates the simulator's host over SSH |
+| `scan-images.yml` | Scan · published and pinned images (weekly) | Monday 05:47 UTC, manual, PR on its paths (the scan, a pinned image) | Trivy on the current release's images on GHCR and on every third-party image a deployment pins, kube-prometheus-stack's included; one job per image, red on a CRITICAL or HIGH finding with a fix (#1453) |
 | `production-smoke.yml` | Production smoke · OSCAR API | after a promotion, daily 06:17 UTC, manual | Three GAMMA scenarios through the test automation API, as a company's CI would |
 
 **Actions settings:** every action allowed, but by convention each is pinned
@@ -183,6 +184,10 @@ the script.
   (`CLAUDE.md`, § 2).
 - **CodeQL**, **Gitleaks** and **Trivy**, as required checks (§ 2). CodeQL
   reads the JavaScript and the workflow files; only the first is required.
+  Trivy scans the server, run and cluster images of each PR; every week it
+  scans the release's images again and the third-party images the
+  deployments pin (`scan-images.yml`), since a flaw found after a build is
+  not seen otherwise.
 
 ## 9. Test environments outside GitHub
 

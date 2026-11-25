@@ -7,8 +7,9 @@
 
 'use strict';
 
-// check-scans.js <kubescape|kube-bench> <results.json> — a scan's findings
-// against the accepted list (accepted.json beside this file), #1438.
+// check-scans.js <kubescape|kube-bench|trivy> <results.json> — a scan's
+// findings against the accepted list (accepted.json beside this file), #1438,
+// Trivy since #1453.
 //
 // Fails (exit 1) on a finding the list does not accept, on an accepted entry
 // that matched nothing (the list stays true: remove what no longer fails), and
@@ -25,11 +26,17 @@
 //  - kube-bench (--json): a finding is a check that FAILED, by number
 //    ("1.1.1"). WARN checks are the benchmark's manual ones: listed, never
 //    failing.
+//  - Trivy (`trivy config --format json`): a finding is a misconfiguration
+//    that failed, in a Dockerfile (its folder: "dockerfile-run") or a
+//    rendered file, with the resource Trivy's message names:
+//    "overlays-k3s:Deployment/oscar". An accepted entry names its check and
+//    what it covers: "file", "file:Kind/name", "Kind/name" (in any file),
+//    "*" for any part.
 
 const fs = require('node:fs');
 const path = require('node:path');
 
-const TOOLS = ['kubescape', 'kube-bench'];
+const TOOLS = ['kubescape', 'kube-bench', 'trivy'];
 
 // ── Kubescape ────────────────────────────────────────────────────────────────
 function resourceName(object) {
@@ -119,9 +126,74 @@ function kubeBenchFindings(report) {
   return findings;
 }
 
+// ── Trivy ────────────────────────────────────────────────────────────────────
+// "dockerfile-run/Dockerfile" is the folder's name, "overlays-k3s.yaml" the
+// file's without its extension.
+function trivyTarget(target) {
+  const parts = String(target || '').split('/').filter(Boolean);
+  const base = parts.pop() || '';
+  if (base === 'Dockerfile' && parts.length > 0) return parts.pop();
+  return base.replace(/\.(ya?ml|json)$/, '');
+}
+
+// The resource a Kubernetes check's message names: "Container 'x' of
+// Deployment 'oscar' should …" or "Role 'oscar-dispatcher' should …".
+function trivyResource(message) {
+  const text = String(message || '');
+  const m = /\bof (\w+) '([^']+)'/.exec(text) || /^(\w+) '([^']+)'/.exec(text);
+  return m ? `${m[1]}/${m[2]}` : '';
+}
+
+function trivyFindings(report) {
+  if (!report || typeof report !== 'object' || Array.isArray(report) || !('SchemaVersion' in report)) {
+    throw new Error(`not a Trivy JSON report: no "SchemaVersion" (keys: ${Object.keys(report || {}).join(', ')})`);
+  }
+  const findings = [];
+  for (const result of report.Results || []) {
+    const file = trivyTarget(result.Target);
+    for (const m of result.Misconfigurations || []) {
+      if (m.Status !== 'FAIL') continue;
+      const resource = trivyResource(m.Message);
+      findings.push({
+        id: m.ID || m.AVDID || '?',
+        name: m.Title || '',
+        where: resource ? `${file}:${resource}` : file,
+        detail: `${m.Severity || '?'}: ${String(m.Message || '').replace(/\s+/g, ' ').slice(0, 300)}`,
+      });
+    }
+  }
+  return findings;
+}
+
+function matchesTrivy(pattern, where) {
+  if (pattern === '*') return true;
+  const [haveFile, haveResource = ''] = where.split(':');
+  let wantFile = pattern;
+  let wantResource = '*';
+  if (pattern.includes(':')) [wantFile, wantResource] = pattern.split(':');
+  else if (pattern.includes('/')) [wantFile, wantResource] = ['*', pattern];
+  if (wantFile !== '*' && wantFile !== haveFile) return false;
+  if (wantResource === '*') return true;
+  const want = wantResource.split('/');
+  const have = haveResource.split('/');
+  return want.length === 2 && have.length === 2 && want.every((part, i) => part === '*' || part === have[i]);
+}
+
 // ── The list ─────────────────────────────────────────────────────────────────
+const FINDINGS = { kubescape: kubescapeFindings, 'kube-bench': kubeBenchFindings, trivy: trivyFindings };
+
+function acceptedEntry(tool, entries, f) {
+  if (tool === 'kubescape') {
+    return entries.find((e) => e.control === f.id && (e.resources || []).some((p) => matchesResource(p, f.where)));
+  }
+  if (tool === 'trivy') {
+    return entries.find((e) => e.check === f.id && (e.resources || []).some((p) => matchesTrivy(p, f.where)));
+  }
+  return entries.find((e) => e.check === f.id);
+}
+
 function check(tool, report, accepted) {
-  const all = tool === 'kubescape' ? kubescapeFindings(report) : kubeBenchFindings(report);
+  const all = FINDINGS[tool](report);
   const entries = accepted[tool] || [];
   const problems = [];
   for (const e of entries) {
@@ -133,12 +205,7 @@ function check(tool, report, accepted) {
   for (const f of all) {
     const key = `${f.id}|${f.where}`;
     if (seen.has(key)) { seen.get(key).times += 1; continue; }
-    let entry;
-    if (tool === 'kubescape') {
-      entry = entries.find((e) => e.control === f.id && (e.resources || []).some((p) => matchesResource(p, f.where)));
-    } else {
-      entry = entries.find((e) => e.check === f.id);
-    }
+    const entry = acceptedEntry(tool, entries, f);
     if (entry) used.add(entry);
     const state = f.warn ? 'manual' : entry ? 'accepted' : 'NEW';
     const row = { ...f, state, reason: entry?.reason || '', times: 1 };
@@ -186,4 +253,7 @@ function main(argv) {
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));
 
-module.exports = { check, kubescapeFindings, kubeBenchFindings, matchesResource, resourceName, pathsOf, fileOf, markdown, main };
+module.exports = {
+  check, kubescapeFindings, kubeBenchFindings, trivyFindings, trivyTarget, trivyResource, matchesTrivy,
+  matchesResource, resourceName, pathsOf, fileOf, markdown, main,
+};

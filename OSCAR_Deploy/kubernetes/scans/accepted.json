@@ -1,5 +1,5 @@
 {
-  "about": "Findings of the Kubernetes scans accepted on purpose, each with its reason (#1438). check-scans.js fails on any other finding, and on an entry here that no longer matches anything. Kubescape: control + resources ([file:]Kind/namespace/name, * for any part). kube-bench: check number.",
+  "about": "Findings of the Kubernetes scans accepted on purpose, each with its reason (#1438; Trivy since #1453). check-scans.js fails on any other finding, and on an entry here that no longer matches anything. Kubescape: control + resources ([file:]Kind/namespace/name, * for any part). kube-bench: check number. Trivy: check + what it covers (file, file:Kind/name, Kind/name, * for any part).",
   "kubescape": [
     {
       "control": "C-0013",
@@ -41,5 +41,6 @@
       "check": "5.1.6",
       "reason": "k3s's own pods (CoreDNS, Traefik, metrics-server, the volume provisioner) need their tokens, and k3s writes their manifests. OSCAR's pods are Kubescape's C-0034 to check, where only the dispatcher and Alloy mount one."
     }
-  ]
+  ],
+  "trivy": []
 }
