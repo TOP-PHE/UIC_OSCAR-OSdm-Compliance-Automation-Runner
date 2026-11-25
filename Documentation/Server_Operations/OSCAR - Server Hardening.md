@@ -259,6 +259,8 @@ above. The check of section 2 lists nothing.
 
 ### 4.2 Still open
 
-- The OSCAR container's root file system is writable; making it read-only
-  needs every place Bruno and the server write (temporary files, the run's
-  environment files) to be a volume or a `tmpfs` first.
+- The OSCAR container's root file system is writable on the VPS; making it
+  read-only needs every place Bruno and the server write (temporary files, the
+  run's environment files) to be a volume or a `tmpfs` first. On Kubernetes
+  it is read-only since #1441: there, those places are volumes, and the CI
+  proves it with real runs.
