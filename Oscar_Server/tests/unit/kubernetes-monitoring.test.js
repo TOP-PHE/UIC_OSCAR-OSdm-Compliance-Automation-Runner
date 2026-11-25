@@ -246,7 +246,7 @@ describe('who reaches Prometheus, Alertmanager and Loki', () => {
     .flatMap(rule => rule.from.map(f => f.podSelector.matchLabels['app.kubernetes.io/name']));
 
   test('each has a policy, in monitoring, selecting its pods', () => {
-    expect(policies.map(p => p.metadata.name).sort()).toEqual(['alertmanager', 'grafana', 'loki', 'prometheus']);
+    expect(policies.map(p => p.metadata.name).sort()).toEqual(['alertmanager', 'alloy', 'grafana', 'loki', 'prometheus']);
     for (const p of policies) {
       expect(p.metadata.namespace).toBe('monitoring');
       expect(p.spec.podSelector.matchLabels).toEqual({ 'app.kubernetes.io/name': p.metadata.name });
@@ -258,8 +258,10 @@ describe('who reaches Prometheus, Alertmanager and Loki', () => {
     expect(sources('prometheus').sort()).toEqual(['grafana', 'prometheus']);
     expect(sources('alertmanager').sort()).toEqual(['grafana', 'prometheus']);
     expect(sources('loki').sort()).toEqual(['alloy', 'grafana']);
+    // Alloy: nobody (#1438); its own page listens on the pod's loopback.
+    expect(policies.find(p => p.metadata.name === 'alloy').spec.ingress).toBeUndefined();
     for (const p of policies) {
-      for (const rule of p.spec.ingress) {
+      for (const rule of p.spec.ingress || []) {
         for (const f of rule.from) expect(f.namespaceSelector === undefined || p.metadata.name === 'grafana').toBe(true);
       }
     }

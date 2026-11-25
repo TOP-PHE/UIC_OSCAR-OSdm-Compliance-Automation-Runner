@@ -110,7 +110,8 @@ function createKubeClient({ base, ca = null, token = null, tokenFile = null, nam
     patchSecret: (name, patch) => call('PATCH', `/api/v1/namespaces/${ns}/secrets/${one(name)}`,
       { body: patch, contentType: 'application/merge-patch+json' }),
     deleteSecret: (name) => call('DELETE', `/api/v1/namespaces/${ns}/secrets/${one(name)}`),
-    listSecrets: (labels) => call('GET', `/api/v1/namespaces/${ns}/secrets?${selector(labels)}`),
+    // By label, in one call: the Role gives deletecollection, never list.
+    deleteSecrets: (labels) => call('DELETE', `/api/v1/namespaces/${ns}/secrets?${selector(labels)}`),
     createJob: (job) => call('POST', `/apis/batch/v1/namespaces/${ns}/jobs`, { body: job }),
     getJob: (name) => call('GET', `/apis/batch/v1/namespaces/${ns}/jobs/${one(name)}`),
     deleteJob: (name) => call('DELETE', `/apis/batch/v1/namespaces/${ns}/jobs/${one(name)}?propagationPolicy=Background`),

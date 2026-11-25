@@ -11,9 +11,11 @@ rules:
   - apiGroups: ["batch"]
     resources: ["jobs"]
     verbs: ["create", "get", "list", "delete"]
+  # Its run Secrets: made, given to their Job (patch), removed one by one or
+  # by label (deletecollection). Never listed nor read (#1438).
   - apiGroups: [""]
     resources: ["secrets"]
-    verbs: ["create", "list", "patch", "delete"]
+    verbs: ["create", "patch", "delete", "deletecollection"]
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list"]
