@@ -94,11 +94,9 @@ RUN apt-get update && \
 # BRU_CMD=/usr/local/bin/bru (OSCAR_Deploy/docker-compose.yml) keeps working.
 # Node resolves the symlink chain to bin/bru.js, so its relative requires work.
 COPY bruno-cli/package.json bruno-cli/package-lock.json /opt/bruno-cli/
-RUN cd /opt/bruno-cli && \
-    npm ci --omit=dev --ignore-scripts --no-audit --no-fund && \
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund --prefix /opt/bruno-cli && \
     ln -s /opt/bruno-cli/node_modules/.bin/bru /usr/local/bin/bru && \
     bru --version && \
-    cd / && \
     rm -rf /usr/local/lib/node_modules/npm \
            /usr/local/lib/node_modules/corepack \
            /usr/local/bin/npm \

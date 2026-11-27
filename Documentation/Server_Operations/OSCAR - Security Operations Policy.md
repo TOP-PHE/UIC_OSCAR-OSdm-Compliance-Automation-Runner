@@ -436,7 +436,9 @@ is the only mitigation:
 5. **Build supply chain** — a compromise of GitHub Actions, the GHCR
    registry, or a package OSCAR depends on (npm, Bruno CLI) could land
    a backdoor in the next `:stable` image. Mitigation: Dependabot
-   alerts, CodeQL + Sonar gates, Trivy image scan, and the operator
+   alerts, CodeQL + Sonar gates, Trivy scans (each PR's three images,
+   and every week the release's images and the pinned third-party ones),
+   Kubescape and Trivy on the manifests and Dockerfiles, and the operator
    reviewing release notes before manually unlocking auto-update if a
    suspicious release lands.
 

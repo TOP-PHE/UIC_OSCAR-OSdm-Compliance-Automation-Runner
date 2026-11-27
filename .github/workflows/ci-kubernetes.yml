@@ -1002,7 +1002,7 @@ jobs:
           echo "Promtail: names, compose labels and streams from the files, no socket"
 
   kubescape:
-    name: Kubescape (the Kubernetes manifests)
+    name: Kubescape and Trivy (manifests, Dockerfiles)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -1039,3 +1039,35 @@ jobs:
           set -euo pipefail
           kubescape scan framework nsa,mitre "$RUNNER_TEMP/rendered" --format json --output "$RUNNER_TEMP/kubescape.json"
           node OSCAR_Deploy/kubernetes/scans/check-scans.js kubescape "$RUNNER_TEMP/kubescape.json"
+
+      # #1453: Trivy reads the same render and the three Dockerfiles, each in a
+      # folder of its own so that a finding names it ("dockerfile-run"). Its
+      # findings go through the same accepted list. It runs when Kubescape
+      # failed too.
+      - name: What Trivy reads (the render and the Dockerfiles)
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          cfg="$RUNNER_TEMP/trivy-config"
+          mkdir -p "$cfg"
+          cp "$RUNNER_TEMP"/rendered/* "$cfg/"
+          for pair in server=Oscar_Server/Dockerfile run=OSCAR_Deploy/kubernetes/Dockerfile.run bundle=OSCAR_Deploy/kubernetes/Dockerfile.bundle; do
+            mkdir -p "$cfg/dockerfile-${pair%%=*}"
+            cp "${pair#*=}" "$cfg/dockerfile-${pair%%=*}/Dockerfile"
+          done
+          find "$cfg" -type f | sort
+
+      - name: Trivy config (misconfigurations)
+        if: ${{ !cancelled() }}
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: config
+          scan-ref: ${{ runner.temp }}/trivy-config
+          format: json
+          output: ${{ runner.temp }}/trivy-config.json
+          exit-code: '0'
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+
+      - name: Trivy's findings against the accepted list
+        if: ${{ !cancelled() }}
+        run: node OSCAR_Deploy/kubernetes/scans/check-scans.js trivy "$RUNNER_TEMP/trivy-config.json"

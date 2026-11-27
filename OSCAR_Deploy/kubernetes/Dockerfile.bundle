@@ -23,3 +23,7 @@ FROM ${OSCAR_SERVER_IMAGE}
 # copies what it needs into its workspace on the data volume.
 COPY --chown=0:0 Bruno_Collection/ /collection/
 COPY --chown=0:0 compatibility.json /app/compatibility.json
+
+# The server image's user, named again (#1453): an image that names its user
+# says so itself, whatever its base image did.
+USER 1000

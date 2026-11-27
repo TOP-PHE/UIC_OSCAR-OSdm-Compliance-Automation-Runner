@@ -28,11 +28,9 @@ RUN apt-get update && \
 # The Bruno CLI as the server image installs it (#545): the same lockfile,
 # no install script, then npm and corepack removed.
 COPY Oscar_Server/bruno-cli/package.json Oscar_Server/bruno-cli/package-lock.json /opt/bruno-cli/
-RUN cd /opt/bruno-cli && \
-    npm ci --omit=dev --ignore-scripts --no-audit --no-fund && \
+RUN npm ci --omit=dev --ignore-scripts --no-audit --no-fund --prefix /opt/bruno-cli && \
     ln -s /opt/bruno-cli/node_modules/.bin/bru /usr/local/bin/bru && \
     bru --version && \
-    cd / && \
     rm -rf /usr/local/lib/node_modules/npm \
            /usr/local/lib/node_modules/corepack \
            /usr/local/bin/npm \

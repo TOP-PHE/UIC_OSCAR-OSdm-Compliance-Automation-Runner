@@ -1287,7 +1287,8 @@ The copy holds the cluster's keys: do not leave it on the machine.
 
 The CI runs both on every change of the Kubernetes files: kube-bench (the CIS
 benchmark of k3s) on a k3s installed as this guide installs it, Kubescape
-(NSA and MITRE frameworks) on the manifests. A finding fails the CI unless
+(NSA and MITRE frameworks) on the manifests, and Trivy on the same manifests
+and on the three Dockerfiles (#1453). A finding fails the CI unless
 [`scans/accepted.json`](../../OSCAR_Deploy/kubernetes/scans/accepted.json)
 accepts it, with its reason. To run them on this machine (both pinned, their
 downloads checked):

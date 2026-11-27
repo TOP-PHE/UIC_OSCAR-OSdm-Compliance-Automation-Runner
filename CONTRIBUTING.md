@@ -41,7 +41,7 @@ The CI pipeline runs automatically on every PR:
 - SonarCloud quality gate
 - Gitleaks secret-scanning
 - Bruno collection validation
-- Docker image build (also Trivy-scanned)
+- Docker image build, and a Trivy scan of the three images a release publishes (server, run, cluster)
 - Coverage threshold (lines ≥ 50 %, branches ≥ 42 %)
 
 All seven must be green before merge. A maintainer will review once CI

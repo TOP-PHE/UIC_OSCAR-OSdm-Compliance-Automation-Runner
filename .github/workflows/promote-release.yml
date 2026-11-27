@@ -110,7 +110,10 @@ jobs:
           tags: |
             ${{ steps.img.outputs.name }}:stable
             ${{ steps.img.outputs.name }}:${{ steps.ref.outputs.tag }}
-          cache-from: type=gha
+          # No cache (#1453): the Dockerfile's `apt-get upgrade` must run at
+          # each release. From the cache, 2026.629 went out with an apt older
+          # than the fix of a HIGH finding the weekly Trivy scan then reported.
+          no-cache: true
           cache-to: type=gha,mode=max
           provenance: false
 

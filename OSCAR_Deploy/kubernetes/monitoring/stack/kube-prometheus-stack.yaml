@@ -170,6 +170,13 @@ spec:
       # The dashboards are ConfigMaps of this namespace (monitoring/oscar,
       # OSCAR_Deploy/grafana): the sidecar looks here only.
       sidecar:
+        # k8s-sidecar 2.14.3 by digest, not the chart's 2.14.1: the weekly
+        # scan (#1453) found two CRITICAL findings in it (certifi among
+        # them). Nothing moves this pin by itself: drop it when the chart
+        # names a fixed version.
+        image:
+          tag: 2.14.3
+          sha: 52d311dcedd587421a236c4d6c621f05614c40a51386e955e0699dca97ec0880
         dashboards:
           searchNamespace: monitoring
       # The datasource names the VPS's dashboards use: "prometheus" is the

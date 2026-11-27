@@ -1,5 +1,5 @@
 {
-  "about": "Findings of the Kubernetes scans accepted on purpose, each with its reason (#1438). check-scans.js fails on any other finding, and on an entry here that no longer matches anything. Kubescape: control + resources ([file:]Kind/namespace/name, * for any part). kube-bench: check number.",
+  "about": "Findings of the Kubernetes scans accepted on purpose, each with its reason (#1438; Trivy since #1453). check-scans.js fails on any other finding, and on an entry here that no longer matches anything. Kubescape: control + resources ([file:]Kind/namespace/name, * for any part). kube-bench: check number. Trivy: check + what it covers (file, file:Kind/name, Kind/name, * for any part).",
   "kubescape": [
     {
       "control": "C-0013",
@@ -40,6 +40,94 @@
     {
       "check": "5.1.6",
       "reason": "k3s's own pods (CoreDNS, Traefik, metrics-server, the volume provisioner) need their tokens, and k3s writes their manifests. OSCAR's pods are Kubescape's C-0034 to check, where only the dispatcher and Alloy mount one."
+    }
+  ],
+  "trivy": [
+    {
+      "check": "DS-0026",
+      "resources": [
+        "dockerfile-server",
+        "dockerfile-run",
+        "dockerfile-bundle"
+      ],
+      "reason": "The platform checks health, not the image: Docker Compose on the VPS (healthcheck of oscar and oscar-runner), probes on Kubernetes (Docker's HEALTHCHECK is ignored there). The run image runs one scenario and ends."
+    },
+    {
+      "check": "KSV-0020",
+      "resources": [
+        "Deployment/oscar",
+        "Deployment/oscar-dispatcher",
+        "monitoring-stack:*/*",
+        "run-pod-job:Job/*",
+        "kept-pod-job:Job/*"
+      ],
+      "reason": "OSCAR's containers run as the user of their image, 1000:1000, which owns the data volume (the Kubernetes and k3s overlays name it, runAsNonRoot is set); a uid above 10000 would change who owns an installed data volume. Alloy runs as its image's own user. OpenShift chooses a high uid itself."
+    },
+    {
+      "check": "KSV-0021",
+      "resources": [
+        "Deployment/oscar",
+        "Deployment/oscar-dispatcher",
+        "monitoring-stack:*/*",
+        "run-pod-job:Job/*",
+        "kept-pod-job:Job/*"
+      ],
+      "reason": "OSCAR's containers run as the user of their image, 1000:1000, which owns the data volume (the Kubernetes and k3s overlays name it, runAsNonRoot is set); a uid above 10000 would change who owns an installed data volume. Alloy runs as its image's own user. OpenShift chooses a high uid itself."
+    },
+    {
+      "check": "KSV-0037",
+      "resources": [
+        "monitoring-stack:HelmChart/kube-prometheus-stack"
+      ],
+      "reason": "A HelmChart is a k3s object read by k3s's own Helm controller, which takes it from kube-system as k3s's documentation places it; the chart itself installs into the monitoring namespace (targetNamespace)."
+    },
+    {
+      "check": "KSV-0040",
+      "resources": [
+        "*"
+      ],
+      "reason": "The runs' namespace has its quota (runs/quota.yaml), which bounds what the dispatcher may start. OSCAR's namespace holds one server pod (replicas 1) and the dispatcher, each with its requests and limits; the monitoring's pods have theirs. Trivy asks for a quota in every file it reads."
+    },
+    {
+      "check": "KSV-0048",
+      "resources": [
+        "runs:Role/oscar-dispatcher"
+      ],
+      "reason": "The dispatcher makes and removes the run Jobs it starts, in oscar-runs only (a Role, not a ClusterRole): its work. Kubescape's C-0007 is accepted for the same right."
+    },
+    {
+      "check": "KSV-0113",
+      "resources": [
+        "runs:Role/oscar-dispatcher"
+      ],
+      "reason": "The dispatcher makes each run's Secret, gives it to the run's Job and removes it, in oscar-runs only; it can neither list nor read Secrets (#1438). Kubescape's C-0034/C-0053 are accepted for the same account."
+    },
+    {
+      "check": "KSV-0110",
+      "resources": [
+        "Deployment/oscar",
+        "Deployment/oscar-dispatcher"
+      ],
+      "reason": "The overlays name no namespace: an operator applies them with -n (oscar in the guides; on OpenShift the project the cluster gives). The CI renders them without one, which Trivy reads as the default namespace."
+    },
+    {
+      "check": "KSV-01010",
+      "resources": [
+        "ConfigMap/oscar-settings",
+        "ConfigMap/oscar-dispatcher-settings"
+      ],
+      "reason": "Trivy guesses from names (PORT, RUN_POD_USER, RUN_TIMEOUT_MS): these ConfigMaps hold ports, times, a uid and addresses, no secret. Every secret is in a Secret (oscar-secrets, oscar-runner), never in a ConfigMap."
+    },
+    {
+      "check": "KSV-0125",
+      "resources": [
+        "Deployment/oscar",
+        "Deployment/oscar-dispatcher",
+        "monitoring-stack:*/*",
+        "run-pod-job:Job/*",
+        "kept-pod-job:Job/*"
+      ],
+      "reason": "Trivy's list of trusted registries leaves out ghcr.io and docker.io. OSCAR's images are those of its own releases on GHCR; every third-party image is pinned by its digest, and the weekly scan (scan-images.yml) reads them all."
     }
   ]
 }

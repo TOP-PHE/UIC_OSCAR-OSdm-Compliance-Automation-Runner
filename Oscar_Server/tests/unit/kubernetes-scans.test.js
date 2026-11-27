@@ -9,7 +9,8 @@
 
 /**
  * kubernetes-scans.test.js — the Kubernetes scans of the CI (#1438):
- *  - check-scans.js reads Kubescape's and kube-bench's JSON reports, fails on
+ *  - check-scans.js reads Kubescape's, kube-bench's and (#1453) Trivy's
+ *    configuration JSON reports, fails on
  *    a finding accepted.json does not accept, on an accepted entry that
  *    matches nothing, and on an entry without its reason;
  *  - accepted.json is sound;
@@ -127,6 +128,89 @@ describe('check-scans.js, kube-bench', () => {
   });
 });
 
+// Shaped like `trivy config --format json`: a result per file read, a
+// Dockerfile in a folder of its own, the render's files by name.
+function trivyReport() {
+  return {
+    SchemaVersion: 2,
+    Results: [
+      { Target: 'dockerfile-run/Dockerfile', Class: 'config', Type: 'dockerfile', Misconfigurations: [
+        { ID: 'DS026', Title: 'No HEALTHCHECK defined', Message: 'Add HEALTHCHECK instruction in your Dockerfile', Severity: 'LOW', Status: 'FAIL' },
+        { ID: 'DS002', Title: 'Image user should not be root', Message: 'Specify at least 1 USER command', Severity: 'HIGH', Status: 'PASS' },
+      ] },
+      { Target: 'overlays-k3s.yaml', Class: 'config', Type: 'kubernetes', Misconfigurations: [
+        { ID: 'KSV014', Title: 'Root file system is not read-only', Message: "Container 'oscar' of Deployment 'oscar' should set 'securityContext.readOnlyRootFilesystem' to true", Severity: 'HIGH', Status: 'FAIL' },
+        { ID: 'KSV113', Title: 'Manage namespace secrets', Message: "Role 'oscar-dispatcher' shouldn't have access to manage secrets in namespace 'oscar-runs'", Severity: 'MEDIUM', Status: 'FAIL' },
+      ] },
+      { Target: 'overlays-openshift.yaml', Class: 'config', Type: 'kubernetes' },
+    ],
+  };
+}
+
+describe('check-scans.js, Trivy (#1453)', () => {
+  test('a finding names its Dockerfile\'s folder or its rendered file, and the resource its message names', () => {
+    const rows = C.check('trivy', trivyReport(), { trivy: [] }).rows;
+    expect(rows.map((r) => `${r.id} ${r.where}`)).toEqual([
+      'DS026 dockerfile-run',
+      'KSV014 overlays-k3s:Deployment/oscar',
+      'KSV113 overlays-k3s:Role/oscar-dispatcher',
+    ]);
+    expect(rows[1]).toEqual(expect.objectContaining({
+      name: 'Root file system is not read-only', state: 'NEW',
+      detail: "HIGH: Container 'oscar' of Deployment 'oscar' should set 'securityContext.readOnlyRootFilesystem' to true",
+    }));
+  });
+
+  test('accepted by check and what it covers; everything else is to look at', () => {
+    const accepted = { trivy: [
+      { check: 'DS026', resources: ['dockerfile-run'], reason: 'a' },
+      { check: 'KSV014', resources: ['Deployment/oscar'], reason: 'b' },
+    ] };
+    const result = C.check('trivy', trivyReport(), accepted);
+    expect(result.rows.map((r) => r.state)).toEqual(['accepted', 'accepted', 'NEW']);
+    expect(result.problems).toEqual(['KSV113 Manage namespace secrets — overlays-k3s:Role/oscar-dispatcher']);
+  });
+
+  test('an entry that matches nothing fails, as for Kubescape', () => {
+    const { problems } = C.check('trivy', trivyReport(), { trivy: [{ check: 'KSV014', resources: ['overlays-openshift'], reason: 'r' }] });
+    expect(problems).toContain('accepted KSV014 matched nothing: remove it from accepted.json');
+  });
+
+  test('what an entry covers: a file, a file and resource, a resource in any file, "*" for any part', () => {
+    const m = C.matchesTrivy;
+    expect(m('*', 'overlays-k3s:Deployment/oscar')).toBe(true);
+    expect(m('overlays-k3s', 'overlays-k3s:Deployment/oscar')).toBe(true);
+    expect(m('overlays-k3s', 'overlays-openshift:Deployment/oscar')).toBe(false);
+    expect(m('overlays-k3s:Deployment/*', 'overlays-k3s:Deployment/oscar')).toBe(true);
+    expect(m('*:Role/oscar-dispatcher', 'runs:Role/oscar-dispatcher')).toBe(true);
+    expect(m('Deployment/oscar', 'monitoring-stack:Deployment/oscar')).toBe(true);
+    expect(m('Deployment/oscar', 'dockerfile-run')).toBe(false);
+    expect(m('Deployment/oscar/x', 'overlays-k3s:Deployment/oscar')).toBe(false);
+    expect(m('dockerfile-run', 'dockerfile-run')).toBe(true);
+  });
+
+  test('the file of a result, and the resource of a message', () => {
+    expect(C.trivyTarget('dockerfile-server/Dockerfile')).toBe('dockerfile-server');
+    expect(C.trivyTarget('/tmp/x/overlays-k3s.yaml')).toBe('overlays-k3s');
+    expect(C.trivyTarget('run-pod-job.json')).toBe('run-pod-job');
+    expect(C.trivyResource("Container 'c' of StatefulSet 'loki' should set …")).toBe('StatefulSet/loki');
+    expect(C.trivyResource("ClusterRole 'x' should not …")).toBe('ClusterRole/x');
+    expect(C.trivyResource('Container run in job oscar-pod-kept-scan (namespace: oscar-runs) uses an image from an untrusted registry.')).toBe('Job/oscar-pod-kept-scan');
+    expect(C.trivyResource('deployment oscar in default namespace should set metadata.namespace to a non-default namespace')).toBe('Deployment/oscar');
+    // kustomize's content hash is left out: it changes with every setting.
+    expect(C.trivyResource("ConfigMap 'oscar-settings-26d6768gk7' in 'default' namespace stores sensitive contents")).toBe('ConfigMap/oscar-settings');
+    expect(C.trivyResource("Role 'oscar-settings-26d6768gk7' should not …")).toBe('Role/oscar-settings-26d6768gk7');
+    expect(C.trivyResource('Specify at least 1 USER command')).toBe('');
+    expect(C.trivyResource('A resource quota policy with hard memory and CPU limits should be configured per namespace')).toBe('');
+  });
+
+  test('a report with nothing found has no finding; not a Trivy report is said', () => {
+    expect(C.check('trivy', { SchemaVersion: 2 }, { trivy: [] }).rows).toEqual([]);
+    expect(() => C.check('trivy', { Controls: [] }, {})).toThrow(/not a Trivy JSON report.*Controls/);
+    expect(() => C.check('trivy', [], {})).toThrow(/not a Trivy JSON report/);
+  });
+});
+
 describe('check-scans.js, its output', () => {
   test('the summary escapes a backslash, then the column bar', () => {
     const md = C.markdown('kubescape', { rows: [{ state: 'NEW', id: String.raw`a\|b`, name: 'n', where: 'w', times: 2, detail: '', reason: '' }], problems: ['x'] });
@@ -146,7 +230,7 @@ describe('check-scans.js, its output', () => {
       try {
         // accepted.json's kube-bench entries match nothing in this report.
         expect(C.main(['kube-bench', file])).toBe(1);
-        expect(C.main(['trivy', file])).toBe(2);
+        expect(C.main(['grype', file])).toBe(2);
       } finally {
         if (saved !== undefined) process.env.GITHUB_STEP_SUMMARY = saved;
         log.mockRestore();
@@ -169,6 +253,12 @@ describe('accepted.json', () => {
     }
     for (const e of accepted['kube-bench']) {
       expect([e.check, /^\d+(\.\d+)+$/.test(e.check)]).toEqual([e.check, true]);
+      expect(e.reason.length).toBeGreaterThan(40);
+    }
+    expect(Array.isArray(accepted.trivy)).toBe(true);
+    for (const e of accepted.trivy) {
+      expect([e.check, /^[A-Z]{2,4}-?\d{3,5}$/.test(e.check)]).toEqual([e.check, true]);
+      expect(e.resources.length).toBeGreaterThan(0);
       expect(e.reason.length).toBeGreaterThan(40);
     }
   });

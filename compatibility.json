@@ -4,6 +4,17 @@
   "current_release": "2026.629",
   "releases": [
     {
+      "release": "2026.631",
+      "date": "2026-11-25",
+      "server": "1.11.590",
+      "collection": "OTST_V2.0.274",
+      "min_collection": "OTST_V2.0.103",
+      "max_collection": "OTST_V2.0.x",
+      "notes": [
+        "Server 1.11.590 (#1453): Trivy scans the three images a release publishes in the required job (server, run, cluster), runs trivy config on the Dockerfiles and the rendered Kubernetes manifests through scans/accepted.json, and every week scans the release's images on GHCR and every third-party image the deployments pin (scan-images.yml). The image changes only in how Bruno is installed (npm ci --prefix, no cd), and the cluster image names its user (USER 1000). The promotion builds the server image without the cache, so that apt-get upgrade runs at each release: 2026.629 went out with an apt older than the fix of a HIGH finding. Not released on its own: current_release is not moved. Collection unchanged."
+      ]
+    },
+    {
       "release": "2026.630",
       "date": "2026-11-25",
       "server": "1.11.589",
