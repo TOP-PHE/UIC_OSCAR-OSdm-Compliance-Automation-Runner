@@ -165,6 +165,11 @@ def oscar_token(oscar, client_id, key_file):
     return r.json()["access_token"]
 ```
 
+**Bruno:** an example collection, `OSCAR_API_TestTool/bruno/`, signs the
+assertion in a script (Developer mode), then asks for tests, waits and reads
+the results, as the Node client does. Its README says how to fill its
+environment and run it from the Bruno app or a CI.
+
 ## 5. Asking for tests
 
 `POST /v1/api/test-requests` (scope `runs:write`), JSON:

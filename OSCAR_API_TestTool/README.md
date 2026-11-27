@@ -8,6 +8,9 @@ It is what a CI pipeline would do (OSCAR #1342), runnable from your PC. It is
 also the reference client for integrators: `src/oscar.js` signs in,
 `src/run.js` asks, waits and reports.
 
+**Without Node in your own code,** the folder `bruno/` holds the same steps
+as a Bruno collection: see its README.
+
 **To check an API set-up with it, step by step,** see *OSCAR - Test
 Automation API Guide*, § 10
 ([Documentation/User_Guides](../Documentation/User_Guides/OSCAR%20-%20Test%20Automation%20API%20Guide.md)).
