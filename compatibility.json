@@ -1,7 +1,7 @@
 {
   "$schema": "./compatibility.schema.json",
   "description": "Tested-together combinations of the Oscar_Server and Bruno_Collection. The server reads this at startup and surfaces a warning in /v1/health if the running combination is not listed.",
-  "current_release": "2026.629",
+  "current_release": "2026.631",
   "releases": [
     {
       "release": "2026.631",
@@ -11,7 +11,8 @@
       "min_collection": "OTST_V2.0.103",
       "max_collection": "OTST_V2.0.x",
       "notes": [
-        "Server 1.11.590 (#1453): Trivy scans the three images a release publishes in the required job (server, run, cluster), runs trivy config on the Dockerfiles and the rendered Kubernetes manifests through scans/accepted.json, and every week scans the release's images on GHCR and every third-party image the deployments pin (scan-images.yml). The image changes only in how Bruno is installed (npm ci --prefix, no cd), and the cluster image names its user (USER 1000). The promotion builds the server image without the cache, so that apt-get upgrade runs at each release: 2026.629 went out with an apt older than the fix of a HIGH finding. Not released on its own: current_release is not moved. Collection unchanged."
+        "Release 2026.631 (current_release): everything merged since 2026.629. Server 1.11.589 (2026.630, #1449, part of #1266) with collection OTST_V2.0.274 and simulator 0.77.0: fares sold without a trip, a theoretical scenario (in a zone, in a NUTS region, between two stop places; Test Framework fares.nonTrip). 1.11.590 (#1453), this entry: Trivy scans the server, run and cluster images of each PR, runs trivy config on the Dockerfiles and the Kubernetes manifests, and every week scans the release's images and the pinned third-party ones; the promotion builds the server image without the cache, so this release carries the fixed apt and libpam (2026.629's images fail the weekly scan). Without version: moving a cluster to a release applies its runs' namespace again (#1451, k3s and Kubernetes guides), and an example Bruno collection for the test automation API (#1455). No migration. The installed simulator is already 0.77.0. The promotion's deploy step ends with oscar is healthy; once it and the cluster images are published, the weekly scan run by hand reads the three release-2026.631 images clean. Collection OTST_V2.0.274.",
+        "Server 1.11.590 (#1453): Trivy scans the three images a release publishes in the required job (server, run, cluster), runs trivy config on the Dockerfiles and the rendered Kubernetes manifests through scans/accepted.json, and every week scans the release's images on GHCR and every third-party image the deployments pin (scan-images.yml). The image changes only in how Bruno is installed (npm ci --prefix, no cd), and the cluster image names its user (USER 1000). The promotion builds the server image without the cache, so that apt-get upgrade runs at each release: 2026.629 went out with an apt older than the fix of a HIGH finding. Collection unchanged."
       ]
     },
     {

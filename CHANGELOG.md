@@ -705,7 +705,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [server-1.11.590] — 2026-11-25
 
-**Trivy scans the run and cluster images, the Dockerfiles and manifests, and every week the published and pinned images** (#1453; auditor's point; maintainer's choices, 2026-11-25). Not released on its own: listed in `compatibility.json` (2026.631) without moving `current_release`. Collection unchanged at OTST_V2.0.274.
+**Trivy scans the run and cluster images, the Dockerfiles and manifests, and every week the published and pinned images** (#1453; auditor's point; maintainer's choices, 2026-11-25). Collection unchanged at OTST_V2.0.274.
+
+**Release 2026.631 (`current_release`)**, with everything merged since 2026.629: fares sold without a trip, a theoretical scenario on the simulator (1.11.589, #1449, part of #1266, with collection OTST_V2.0.274 and simulator 0.77.0); Trivy on the three images a release publishes, on the Dockerfiles and manifests, and every week on the published and pinned images, with the promotion building without the cache (1.11.590, this section); and two changes without version, under *Unreleased*: moving a cluster to a release applies its runs' namespace again (#1451), and an example Bruno collection for the test automation API (#1455).
+
+**What to do with this release.**
+- **Before approving the promotion:** nothing. The installed simulator is already 0.77.0 (*Simulator · update the installed simulator*, run #67), which 1.11.589's scenarios and references need.
+- **The promotion** builds the server image without the cache, so it takes a few minutes longer (`apt-get upgrade` and the installs run again) and brings the fixed `apt` and `libpam`. Its step *Refresh host repo and start the image on VPS* ends with `deployed ghcr.io/top-phe/oscar-server@sha256:…: oscar is healthy`. The production smoke test then runs by itself.
+- **At the start:** no migration.
+- **After it:** once *Publish cluster images* has published `oscar` and `oscar-run` for the tag, run *Scan · published and pinned images (weekly)* by hand: the three `release-2026.631` lines should be green. From this merge the weekly scan reads `release-2026.631`, so a promotion still waiting on Monday at 05:47 UTC leaves its `oscar-server` line red (the image is not published yet).
+- **On the VPS, if not done after 2026.629:** *Server Admin Guide* 13.8, then 13.9's checks; nothing in this release changes them.
+- **On oscartest (k3s), when it moves to this release:** the k3s guide, section 9, *A new OSCAR release* (it now applies `OSCAR_Deploy/kubernetes/runs` right after the checkout) and its monitoring block, which brings Grafana's sidecar k8s-sidecar 2.14.3.
 
 - **Each PR** (required check *Container image scan (Trivy)*): the three images a release publishes, built by `build-images.sh` as a release builds them (`oscar-server`, `oscar-run`, `oscar`), each scanned with the server's rule (CRITICAL or HIGH with a fix fails). Each scan runs even when another failed.
 - **The configuration** (*CI · Kubernetes*, job *Kubescape and Trivy*): `trivy config` on the render Kubescape reads and on the three Dockerfiles. A finding fails unless `scans/accepted.json` accepts it with its reason (its new `trivy` list), and an entry that no longer matches fails, as for Kubescape (`check-scans.js trivy`).
