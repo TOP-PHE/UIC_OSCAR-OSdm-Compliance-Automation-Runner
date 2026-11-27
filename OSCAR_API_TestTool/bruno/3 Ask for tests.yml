@@ -35,7 +35,7 @@ runtime:
           suite: bru.getEnvVar('suite'),
           reference: bru.getEnvVar('reference'),
         })));
-        bru.setVar('idempotency_key', 'bruno-' + require('crypto').randomUUID());
+        bru.setVar('idempotency_key', api.idempotencyKey());
         bru.setVar('wait_tries', '0');
     - type: after-response
       code: |-

@@ -17,8 +17,8 @@
  * example client's tests run it as it is.
  */
 
-const crypto = require('crypto');
-const fs = require('fs');
+const crypto = require('node:crypto');
+const fs = require('node:fs');
 
 const ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 const TOKEN_PATH = '/v1/api/oauth/token';
@@ -92,7 +92,8 @@ function assertionOf(bru, now = Date.now()) {
 /** Keeps a token answer: { ok, error }. */
 function keepToken(bru, status, body, now = Date.now()) {
   if (status !== 200 || typeof body?.access_token !== 'string') {
-    const said = body?.error ? `${body.error}${body.error_description ? ': ' + body.error_description : ''}` : '';
+    const described = body?.error_description ? ': ' + body.error_description : '';
+    const said = body?.error ? body.error + described : '';
     return { ok: false, error: `OSCAR refused the token request (HTTP ${status}). ${said}`.trim() };
   }
   const lifetime = Number.isFinite(body.expires_in) ? body.expires_in : 900;
@@ -166,22 +167,31 @@ function afterWait({ status, body, tries, maxTries }) {
 /** How many waits fit in `minutes` (60 if not a number). */
 const maxWaitsOf = minutes => Math.max(1, Math.ceil(((Number(minutes) > 0 ? Number(minutes) : 60) * 60) / WAIT_S));
 
+// One failed check's line.
+function failureLine(f) {
+  const step = f.step ? f.step + ': ' : '';
+  const message = f.message ? ' — ' + f.message : '';
+  return `      ✗ ${step}${f.check}${message}`;
+}
+
+// A run not passed, then its failed checks.
+const runLines = r => [`    ${r.scenario_code}: ${r.verdict || r.state}  ${r.run_url || ''}`.trimEnd(), ...(r.failures || []).map(failureLine)];
+
 /** The results in lines for a person: the verdict, then each run not passed and its failed checks. */
 function reportLines(results) {
   const lines = [`Verdict: ${String(results?.verdict).toUpperCase()}`];
   for (const p of results?.providers || []) {
     lines.push(`  ${p.name || p.id}: ${p.verdict || p.state}`);
-    for (const r of p.runs || []) {
-      if (r.verdict === 'passed') continue;
-      lines.push(`    ${r.scenario_code}: ${r.verdict || r.state}  ${r.run_url || ''}`.trimEnd());
-      for (const f of r.failures || []) lines.push(`      ✗ ${f.step ? f.step + ': ' : ''}${f.check}${f.message ? ' — ' + f.message : ''}`);
-    }
+    for (const r of (p.runs || []).filter(run => run.verdict !== 'passed')) lines.push(...runLines(r));
   }
   return lines;
 }
 
+/** A new Idempotency-Key for one test request: a retry of that request sends it again. */
+const idempotencyKey = () => 'bruno-' + crypto.randomUUID();
+
 module.exports = {
   ASSERTION_TYPE, TOKEN_PATH, SCOPE, WAIT_S,
   privateKeyOf, algOf, originOf, assertionFor, tokenForm, assertionOf, keepToken, ensureToken,
-  providerIdOf, testRequestBody, afterWait, maxWaitsOf, reportLines,
+  providerIdOf, testRequestBody, afterWait, maxWaitsOf, reportLines, idempotencyKey,
 };
