@@ -1,0 +1,46 @@
+info:
+  name: 4 Wait for the verdict
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{oscar_url}}/v1/api/test-requests/{{test_request_id}}?wait=50"
+  headers:
+    - name: Authorization
+      value: Bearer {{access_token}}
+    - name: Accept
+      value: application/json
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // A run may last longer than a token: one is asked again when needed.
+        await require('./lib/oscarApi.js').ensureToken(bru);
+    - type: after-response
+      code: |-
+        // OSCAR answers as soon as every run is finished, else after 50 s with the
+        // state. Asked again until finished: run the collection (Runner, or
+        // bru run), a request sent alone does not loop.
+        const api = require('./lib/oscarApi.js');
+        const tries = Number(bru.getVar('wait_tries') || 0) + 1;
+        bru.setVar('wait_tries', String(tries));
+        const body = res.getBody();
+        const next = api.afterWait({ status: res.getStatus(), body, tries, maxTries: api.maxWaitsOf(bru.getEnvVar('wait_minutes')) });
+        if (res.getStatus() === 200) console.log(`${body.state}: ${JSON.stringify(body.counts || {})}`);
+        if (next === 'again') {
+          bru.runner.setNextRequest('4 Wait for the verdict');
+        } else {
+          test('the test request is finished', () => {
+            expect(next).to.equal('done');
+          });
+        }
+        if (next === 'stop') bru.runner.stopExecution();
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: false
+  maxRedirects: 0

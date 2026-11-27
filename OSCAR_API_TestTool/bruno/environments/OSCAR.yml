@@ -1,0 +1,20 @@
+name: OSCAR
+variables:
+  - name: oscar_url
+    value: https://oscar.uic.org
+  - secret: true
+    name: client_id
+  - name: private_key_file
+    value: ""
+  - secret: true
+    name: private_key
+  - name: provider
+    value: GAMMA
+  - name: scenarios
+    value: SIM_SALE_SEARCH_1ADT_38
+  - name: suite
+    value: ""
+  - name: reference
+    value: Bruno example
+  - name: wait_minutes
+    value: "60"

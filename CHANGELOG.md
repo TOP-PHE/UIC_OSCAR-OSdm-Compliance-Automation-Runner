@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **An example Bruno collection for the test automation API** (#1455). A tool, its tests and documentation, no version. A first user of the API, whose application does not run Node, was building one and looked for the endpoints in OSCAR's source.
+  - `OSCAR_API_TestTool/bruno/`: six requests: token (the client assertion signed in a script, ES256 or PS256), the provider, the test request (codes or a suite, an Idempotency-Key), the wait (a 50 s long poll asked again until finished, a proxy's 502/504 included), the results (the test fails unless the verdict is passed), JUnit. A token is asked again before it ends. The token and ids are runtime variables, never written to the environment file.
+  - Its scripts' logic is `bruno/lib/oscarApi.js` (Node's `crypto` and `fs` only, Developer mode), tested by `tests/bruno-example.test.js` and counted in Sonar.
+  - Run with the Bruno CLI OSCAR pins (4.3.0) against a local OSCAR: the whole chain, and a wait that loops.
+  - Pointed at from the guide (§ 4) and the client's README.
 - **The GitHub and CI set-up is recorded** (#1372, maintainer's request). Documentation only, no version. New page *OSCAR - GitHub and CI set-up*, read from GitHub's API on 2026-11-22: repository settings, the protection of `main` and its seven required checks (and the checks that run without being required), the release tag ruleset and its one bypass, the four environments with their rules and secret names (never values), the GitHub Apps, every workflow, SonarCloud and its gate, the security features and Dependabot, the test environments, the commands to read it all again and the order to set it up from nothing. Linked from `CONTRIBUTING.md` and *auto-deploy-setup.md*.
 - **A production smoke test through the test automation API** (#1359). CI and documentation, no version.
   - `.github/workflows/production-smoke.yml`: after each successful promotion, and every morning, production is asked for three GAMMA scenarios through the API by the example client, as a company's CI would. After a promotion it first waits until `/health` shows the promoted release (Watchtower takes about five minutes). The client's report is the job's summary, and its exit code the verdict.

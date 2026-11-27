@@ -1,0 +1,49 @@
+info:
+  name: 1 Get a token
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{oscar_url}}/v1/api/oauth/token"
+  headers:
+    - name: Content-Type
+      value: application/x-www-form-urlencoded
+    - name: Accept
+      value: application/json
+  body:
+    type: form-urlencoded
+    data:
+      - name: grant_type
+        value: client_credentials
+      - name: client_assertion_type
+        value: urn:ietf:params:oauth:client-assertion-type:jwt-bearer
+      - name: client_assertion
+        value: "{{client_assertion}}"
+      - name: scope
+        value: runs:read runs:write
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // The client assertion: a one-minute JWT signed with the account's private
+        // key (lib/oscarApi.js). OSCAR holds only the public key.
+        const api = require('./lib/oscarApi.js');
+        bru.setVar('client_assertion', api.assertionOf(bru));
+    - type: after-response
+      code: |-
+        // The token is a runtime variable: never written to the environment file.
+        const api = require('./lib/oscarApi.js');
+        const kept = api.keepToken(bru, res.getStatus(), res.getBody());
+        test('OSCAR gives a token', () => {
+          expect(kept.error || 'ok').to.equal('ok');
+        });
+        if (!kept.ok) bru.runner.stopExecution();
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: false
+  maxRedirects: 0
